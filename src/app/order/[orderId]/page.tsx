@@ -67,6 +67,9 @@ export default async function OrderStatusPage({
   const cancelled = order.status === "CANCELLED";
   const currentIndex = CUSTOMER_STEPS.findIndex((s) => s.status === order.status);
   const completed = order.status === "COMPLETED";
+  // Location withheld -> order is held for a staff member to approve before it
+  // goes to the kitchen. Drives the "waiting for staff" messaging below.
+  const held = order.presence === "UNVERIFIED" && order.status === "PLACED";
   const payAfter = order.restaurant.config?.paymentTiming === "PAY_AFTER";
   const canRate =
     (order.status === "SERVED" || order.status === "COMPLETED") && !order.feedback;
@@ -105,15 +108,21 @@ export default async function OrderStatusPage({
                 ? "This order was cancelled."
                 : completed
                   ? "Order complete. Enjoy your meal!"
-                  : "We've got your order — show this number to collect."}
+                  : held
+                    ? "We've received your order — waiting for a staff member to approve it."
+                    : "We've got your order — show this number to collect."}
             </p>
           </div>
         </div>
 
-        {order.presence === "UNVERIFIED" && order.status === "PLACED" && (
+        {held && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
-            📍 Waiting for the restaurant to confirm you&apos;re at the table — your
-            order goes to the kitchen once a staff member checks you in.
+            <p className="font-medium">⏳ Waiting for staff approval</p>
+            <p className="mt-1 text-amber-800/80">
+              Since we couldn&apos;t confirm your location, a waiter will approve
+              your order at your table and send it to the kitchen. No need to do
+              anything — this page updates automatically.
+            </p>
           </div>
         )}
 

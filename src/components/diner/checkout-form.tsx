@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { placeOrderAction } from "@/lib/customer/actions";
@@ -56,6 +56,9 @@ export function CheckoutForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Set the instant an order is placed so clearing the cart below doesn't trip
+  // the "empty cart -> /cart" redirect and clobber the push to the status page.
+  const placed = useRef(false);
 
   const cartKey = `sto_cart_${restaurantId}`;
   const dineKey = `sto_dine_${restaurantId}`;
@@ -77,9 +80,11 @@ export function CheckoutForm({
     }
   }, [dineKey]);
 
-  // Nothing to check out — send the diner back to the cart.
+  // Nothing to check out — send the diner back to the cart. Skipped once an
+  // order has been placed (we clear the cart then and navigate to the status
+  // page; this effect must not race that navigation back to /cart).
   useEffect(() => {
-    if (ready && count === 0) router.replace("/cart");
+    if (ready && count === 0 && !placed.current) router.replace("/cart");
   }, [ready, count, router]);
 
   const subtotal = cartSubtotal(cart, byId, hhFactor);
@@ -124,6 +129,7 @@ export function CheckoutForm({
         setError(res.error);
         return;
       }
+      placed.current = true;
       // Remember the dining session so later rounds reuse name/phone and the
       // bill consolidates. Cleared once the bill is paid (on the bill screen).
       try {
