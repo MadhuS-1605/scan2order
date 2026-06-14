@@ -7,6 +7,29 @@ import { NextResponse, type NextRequest } from "next/server";
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan.to";
 const NON_TENANT = new Set(["www", "app", "admin", "api", "m", "t"]);
 
+// Single-segment app routes that must NOT be treated as a table label. On a
+// tenant subdomain only the QR's table path (e.g. /T1) is rewritten to
+// /<sub>/<table>; everything else here is a real diner/app page that the table
+// cookie already scopes (set when /t/<token> was visited), so it passes through.
+// Without this, e.g. /menu would be rewritten to /<sub>/menu and 404.
+const RESERVED_PATHS = new Set([
+  "menu",
+  "cart",
+  "checkout",
+  "payment",
+  "order",
+  "account",
+  "banquet",
+  "book",
+  "offline",
+  "onboarding",
+  "signup",
+  "superadmin",
+  "admin",
+  "api",
+  "t",
+]);
+
 const TABLE_COOKIE = "sto_table";
 const TABLE_COOKIE_MAX_AGE = 60 * 60 * 12; // a dining session (12h)
 
@@ -42,9 +65,12 @@ export function proxy(request: NextRequest) {
         url.pathname = `/r/${sub}/signin`;
         return NextResponse.rewrite(url);
       }
-      // Other single-segment paths on a restaurant subdomain map to /<sub>/<table>.
-      if (/^\/[^/]+$/.test(url.pathname)) {
-        url.pathname = `/${sub}${url.pathname}`;
+      // A single-segment path that isn't a reserved app route is a table label
+      // (the QR landing, e.g. /T1) → map it to /<sub>/<table>. Reserved routes
+      // (/menu, /cart, ...) fall through and serve normally.
+      const seg = url.pathname.slice(1);
+      if (/^[^/]+$/.test(seg) && !RESERVED_PATHS.has(seg.toLowerCase())) {
+        url.pathname = `/${sub}/${seg}`;
         return NextResponse.rewrite(url);
       }
     }
