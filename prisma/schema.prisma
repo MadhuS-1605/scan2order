@@ -1,0 +1,816 @@
+// Scan-to-Order — Prisma schema
+// Datasource: PostgreSQL. Generator: prisma-client-js.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum RestaurantType {
+  RESTAURANT
+  CAFE
+  HOTEL
+  CLOUD_KITCHEN
+  BAR
+}
+
+enum AdminRole {
+  OWNER
+  MANAGER
+  CASHIER
+  WAITER
+  KITCHEN
+  STAFF
+}
+
+// How an order was placed: self-ordered by a diner via QR, or taken by staff.
+enum OrderChannel {
+  CUSTOMER
+  STAFF
+}
+
+// Diner presence at order time (anti-fake-order). VERIFIED = on-site (or not
+// required / staff order); UNVERIFIED = location not shared, held for staff
+// confirmation; REMOTE = shared location was outside the venue (order blocked,
+// so this value is not normally persisted).
+enum OrderPresence {
+  VERIFIED
+  UNVERIFIED
+  REMOTE
+}
+
+// Whether an attendance punch was made by the staff member (self, geofenced) or
+// recorded/corrected by a manager.
+enum AttendanceSource {
+  SELF
+  MANAGER
+}
+
+/// Whether placed orders go straight to the kitchen or need a waiter to confirm.
+enum OrderConfirmationMode {
+  AUTO
+  WAITER_CONFIRM
+}
+
+/// When the customer is expected to pay.
+enum PaymentTiming {
+  PAY_BEFORE // pay at the time of ordering (common in hotels / QSRs)
+  PAY_AFTER // request the bill at the end (common in cafes / dine-in)
+}
+
+enum GstMode {
+  NONE
+  INCLUSIVE // prices already include GST
+  EXCLUSIVE // GST added on top of the subtotal
+}
+
+enum OrderStatus {
+  PLACED // created by the customer, awaiting routing
+  CONFIRMED // confirmed (by waiter, or auto) -> visible to kitchen
+  PREPARING // kitchen started cooking
+  READY // ready to serve / pick up
+  SERVED // delivered to the table
+  COMPLETED // closed out (paid + done)
+  CANCELLED // cancelled or rejected
+}
+
+enum PaymentStatus {
+  UNPAID
+  PENDING // online payment initiated, awaiting confirmation
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  ONLINE
+  COUNTER
+  ROOM
+}
+
+enum TableKind {
+  TABLE
+  ROOM
+}
+
+enum PaymentProvider {
+  RAZORPAY
+  COUNTER
+}
+
+enum OtpPurpose {
+  WHATSAPP_BILL
+  LOGIN
+}
+
+enum BillDeliveryMethod {
+  DOWNLOAD
+  WHATSAPP
+}
+
+enum PushRole {
+  RESTAURANT // admin/kitchen device — alerts on new orders
+  CUSTOMER // diner device — alerts on their order status
+}
+
+enum ServiceRequestType {
+  CALL_WAITER
+  WATER
+  BILL
+  CLEAN_TABLE
+  OTHER
+}
+
+enum ServiceRequestStatus {
+  OPEN
+  RESOLVED
+}
+
+enum CouponType {
+  PERCENT
+  FLAT
+}
+
+enum ReservationType {
+  RESERVATION
+  WAITLIST
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  SEATED
+  CANCELLED
+  NO_SHOW
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy & admin
+// ---------------------------------------------------------------------------
+
+// A connected third-party integration (POS / PMS / accounting / SSO / webhook).
+// Credentials/settings live in `config`; most are scaffolding ready for real
+// API wiring, except outbound webhooks which fire live on order events.
+model Integration {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  provider     String // e.g. "petpooja", "webhook", "google-sso"
+  category     String // POS | PMS | ACCOUNTING | SSO | WEBHOOK
+  enabled      Boolean    @default(false)
+  config       Json?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([restaurantId, provider])
+  @@index([restaurantId])
+  @@map("integrations")
+}
+
+// A franchise / multi-outlet group. One owner can manage several restaurants
+// under a single login and switch the active property.
+model PropertyGroup {
+  id          String       @id @default(cuid())
+  name        String
+  createdAt   DateTime     @default(now())
+  restaurants Restaurant[]
+  members     AdminUser[]
+
+  @@map("property_groups")
+}
+
+enum PlanTier {
+  FREE
+  STARTER
+  PRO
+}
+
+model Restaurant {
+  id          String         @id @default(cuid())
+  name        String
+  slug        String         @unique
+  groupId     String?
+  group       PropertyGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  planTier    PlanTier       @default(FREE)
+  type        RestaurantType @default(RESTAURANT)
+  email       String?
+  phone       String?
+  addressLine String?
+  city        String?
+  state       String?
+  country     String         @default("India")
+  postalCode  String?
+  logoUrl     String?
+  // Restaurant-chosen username used as the public subdomain (e.g. "spicegarden"
+  // -> spicegarden.scan.to). Unique across the platform.
+  subdomain   String?  @unique
+  // monotonic per-restaurant order counter (incremented in a transaction)
+  orderSeq    Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  config            OnboardingConfig?
+  admins            AdminUser[]
+  categories        MenuCategory[]
+  menuItems         MenuItem[]
+  tables            RestaurantTable[]
+  orders            Order[]
+  pushSubscriptions PushSubscription[]
+  serviceRequests   ServiceRequest[]
+  coupons           Coupon[]
+  feedback          Feedback[]
+  reservations      Reservation[]
+  banquetBookings   BanquetBooking[]
+  integrations      Integration[]
+  auditLogs         AuditLog[]
+  attendance        StaffAttendance[]
+
+  @@index([groupId])
+  @@map("restaurants")
+}
+
+model AdminUser {
+  id           String      @id @default(cuid())
+  // Owners sign in with email (globally unique). Staff are assigned a username
+  // by their restaurant and need no email — username is unique *within* a
+  // restaurant (see @@unique below). Email is nullable so staff can omit it.
+  email        String?     @unique
+  username     String?
+  passwordHash String
+  name         String
+  role         AdminRole   @default(OWNER)
+  isSuperAdmin Boolean     @default(false)
+  // Disabled accounts keep their history/audit attribution but cannot sign in.
+  disabled     Boolean     @default(false)
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  groupId      String?
+  group        PropertyGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  ordersCreated Order[]           @relation("OrderCreatedBy")
+  attendance    StaffAttendance[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@unique([restaurantId, username])
+  @@index([restaurantId])
+  @@index([groupId])
+  @@map("admin_users")
+}
+
+/// One row per restaurant — drives runtime behavior (routing, payments, tax).
+model OnboardingConfig {
+  id           String     @id @default(cuid())
+  restaurantId String     @unique
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  orderConfirmation     OrderConfirmationMode @default(AUTO)
+  paymentTiming         PaymentTiming         @default(PAY_AFTER)
+  onlinePaymentEnabled  Boolean               @default(false)
+  counterPaymentEnabled Boolean               @default(true)
+
+  gstMode       GstMode @default(NONE)
+  gstNumber     String?
+  gstPercentage Decimal @default(5) @db.Decimal(5, 2)
+  currency      String  @default("INR")
+
+  // Optional per-restaurant Razorpay account (falls back to platform env if null)
+  razorpayKeyId     String?
+  razorpayKeySecret String?
+
+  // UPI VPA + payee name for the "scan to pay" QR on bills (e.g. cafe@oksbi).
+  upiId   String?
+  upiName String?
+
+  // Which optional modules this venue uses — chosen at onboarding, drive which
+  // admin sections show. Defaults are seeded from the venue type.
+  featureReservations Boolean @default(true)
+  featureRooms        Boolean @default(false) // hotel in-room dining
+  featureBanquets     Boolean @default(false) // events / function halls
+  featureBar          Boolean @default(false) // separate bar counter / KDS
+  featureAttendance   Boolean @default(false) // staff clock-in/out tracking
+
+  // Venue location for attendance geofencing. When set, self clock-in/out is
+  // only allowed within geofenceRadiusM metres of these coordinates.
+  latitude        Float?
+  longitude       Float?
+  geofenceRadiusM Int     @default(150)
+
+  // Anti-fake-order: require diners to be at the venue to place an order.
+  // orderRadiusM is a more lenient radius than the staff geofence above.
+  requireDinerLocation Boolean @default(false)
+  orderRadiusM         Int     @default(300)
+
+  // WhatsApp / messaging sender id (falls back to platform env if null)
+  whatsappFrom String?
+
+  // Link diners are nudged to for a public review (e.g. Google Maps).
+  reviewUrl String?
+
+  // Optional custom domain (e.g. order.spicegarden.com) the restaurant owns.
+  customDomain String? @unique
+
+  // Network thermal printer for kitchen tickets (ESC/POS over TCP, usually :9100).
+  kotPrinterHost String?
+  kotPrinterPort Int     @default(9100)
+
+  // Supported menu languages, comma-separated codes (base is always English).
+  languages String @default("en")
+
+  // Happy hour — an automatic % discount on all items during a daily window.
+  happyHourEnabled Boolean @default(false)
+  happyHourFrom    String? // "HH:mm"
+  happyHourTo      String?
+  happyHourPercent Decimal @default(0) @db.Decimal(5, 2)
+
+  onboardingStep      Int     @default(0)
+  onboardingCompleted Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("onboarding_configs")
+}
+
+// ---------------------------------------------------------------------------
+// Menu
+// ---------------------------------------------------------------------------
+
+model MenuCategory {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  icon         String? // emoji shown in the customer menu's category rail
+  // Station that prepares this category: "KITCHEN" (default) or "BAR".
+  station      String     @default("KITCHEN")
+  sortOrder    Int        @default(0)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  items MenuItem[]
+
+  @@index([restaurantId])
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id           String        @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  categoryId   String?
+  category     MenuCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  name        String
+  description String?
+  price       Decimal @db.Decimal(10, 2)
+  imageUrl    String?
+  isVeg       Boolean @default(true)
+  isAvailable Boolean @default(true) // in-stock toggle
+
+  // Optional daily availability window ("HH:mm", 24h). Null => always available.
+  availableFrom String?
+  availableTo   String?
+
+  isSpecialOfDay Boolean @default(false)
+  isChefSpecial  Boolean @default(false) // chef's signature pick
+  sortOrder      Int     @default(0)
+
+  // Per-language overrides: { "hi": { "name": "...", "description": "..." } }
+  translations Json?
+
+  // Inventory. When trackStock is on, the item auto-hides at 0 and decrements
+  // on each order; lowStockThreshold drives low-stock alerts.
+  trackStock        Boolean @default(false)
+  stockQty          Int     @default(0)
+  lowStockThreshold Int     @default(5)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems     OrderItem[]
+  modifierGroups ModifierGroup[]
+
+  @@index([restaurantId])
+  @@index([categoryId])
+  @@map("menu_items")
+}
+
+// A set of choices attached to a menu item. A "variant" (e.g. Size: Half/Full)
+// is just a required single-select group (minSelect=1, maxSelect=1); add-ons are
+// optional multi-select groups.
+model ModifierGroup {
+  id         String   @id @default(cuid())
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name       String
+  required   Boolean  @default(false)
+  minSelect  Int      @default(0)
+  maxSelect  Int      @default(1)
+  sortOrder  Int      @default(0)
+
+  options ModifierOption[]
+
+  @@index([menuItemId])
+  @@map("modifier_groups")
+}
+
+model ModifierOption {
+  id          String        @id @default(cuid())
+  groupId     String
+  group       ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name        String
+  priceDelta  Decimal       @default(0) @db.Decimal(10, 2)
+  sortOrder   Int           @default(0)
+  isAvailable Boolean       @default(true)
+
+  @@index([groupId])
+  @@map("modifier_options")
+}
+
+// ---------------------------------------------------------------------------
+// Tables & QR
+// ---------------------------------------------------------------------------
+
+model RestaurantTable {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  label        String // e.g. "T1", "Patio 3", "204"
+  kind         TableKind  @default(TABLE) // ROOM = hotel in-room dining point
+  seats        Int        @default(4)
+  qrToken      String     @unique @default(cuid()) // opaque token encoded in the QR
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  orders          Order[]
+  serviceRequests ServiceRequest[]
+
+  @@index([restaurantId])
+  @@map("restaurant_tables")
+}
+
+// ---------------------------------------------------------------------------
+// Customers (created at WhatsApp/bill stage; keyed by phone for dining history)
+// ---------------------------------------------------------------------------
+
+model Customer {
+  id            String   @id @default(cuid())
+  phone         String   @unique
+  name          String?
+  loyaltyPoints Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  orders   Order[]
+  feedback Feedback[]
+
+  @@map("customers")
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+model Order {
+  id           String           @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tableId      String?
+  table        RestaurantTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  customerId   String?
+  customer     Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  orderNumber Int // per-restaurant sequence (see Restaurant.orderSeq)
+  status      OrderStatus   @default(PLACED)
+
+  // Groups all orders placed in one dining visit (same table, before the bill is
+  // settled). Rounds accumulate into a single consolidated bill. Tip/coupon are
+  // carried on the earliest ("primary") order of the session.
+  diningSessionId String?
+
+  // Optional diner details captured at order time (name for call-outs, phone
+  // snapshot). A linked Customer (by phone) is created at the WhatsApp-bill step.
+  customerName  String?
+  customerPhone String?
+
+  paymentStatus PaymentStatus  @default(UNPAID)
+  paymentMethod PaymentMethod?
+
+  // Money snapshots (so historical bills don't change if config/prices change)
+  subtotal    Decimal @default(0) @db.Decimal(10, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(10, 2)
+  totalAmount Decimal @default(0) @db.Decimal(10, 2)
+  tipAmount   Decimal @default(0) @db.Decimal(10, 2)
+  // Coupon discount applied at the bill. Payable = total - discount + tip.
+  discountAmount Decimal @default(0) @db.Decimal(10, 2)
+  couponCode     String?
+  // Amount paid so far (supports split / partial payments).
+  amountPaid  Decimal @default(0) @db.Decimal(10, 2)
+  // Loyalty points already credited for this order (guards double-award).
+  pointsAwarded Boolean @default(false)
+  gstMode     GstMode @default(NONE)
+
+  // Who placed the order, and through which channel. CUSTOMER = self-ordered via
+  // QR; STAFF = taken by a waiter/cashier at the POS. createdByName is a snapshot
+  // so attribution survives if the staff account is later deleted.
+  channel       OrderChannel @default(CUSTOMER)
+  createdById   String?
+  createdBy     AdminUser?   @relation("OrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdByName String?
+
+  // Anti-fake-order: was the diner verified on-site when ordering? distanceM is
+  // a rounded metres-from-venue (null when no location was shared). No exact
+  // coordinates are stored.
+  presence  OrderPresence @default(VERIFIED)
+  distanceM Int?
+
+  notes String?
+
+  placedAt    DateTime  @default(now())
+  confirmedAt DateTime?
+  readyAt     DateTime?
+  servedAt    DateTime?
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items             OrderItem[]
+  payments          Payment[]
+  bill              Bill?
+  feedback          Feedback?
+  pushSubscriptions PushSubscription[]
+
+  @@unique([restaurantId, orderNumber])
+  @@index([restaurantId, status])
+  @@index([tableId])
+  @@index([customerId])
+  @@index([diningSessionId])
+  @@index([restaurantId, createdById])
+  @@map("orders")
+}
+
+model OrderItem {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId    String?
+  menuItem      MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  nameSnapshot  String
+  priceSnapshot Decimal  @db.Decimal(10, 2)
+  quantity      Int      @default(1)
+  notes         String?
+  lineTotal     Decimal  @db.Decimal(10, 2)
+  // Snapshot of chosen modifiers: [{ group, name, priceDelta }]
+  modifiers     Json?
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// ---------------------------------------------------------------------------
+// Payments & billing
+// ---------------------------------------------------------------------------
+
+model Payment {
+  id       String          @id @default(cuid())
+  orderId  String
+  order    Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount   Decimal         @db.Decimal(10, 2)
+  method   PaymentMethod
+  provider PaymentProvider
+  status   PaymentStatus   @default(PENDING)
+
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  razorpaySignature String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@map("payments")
+}
+
+model Bill {
+  id        String @id @default(cuid())
+  orderId   String @unique
+  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  billNumber String @unique
+
+  subtotal  Decimal @db.Decimal(10, 2)
+  taxAmount Decimal @db.Decimal(10, 2)
+  total     Decimal @db.Decimal(10, 2)
+  gstMode   GstMode
+  gstNumber String?
+
+  deliveryMethod BillDeliveryMethod?
+  sentToPhone    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("bills")
+}
+
+model OtpVerification {
+  id        String     @id @default(cuid())
+  phone     String
+  codeHash  String
+  purpose   OtpPurpose @default(WHATSAPP_BILL)
+  expiresAt DateTime
+  consumedAt DateTime?
+  attempts  Int        @default(0)
+  createdAt DateTime   @default(now())
+
+  @@index([phone, purpose])
+  @@map("otp_verifications")
+}
+
+// Audit trail of sensitive admin actions (who changed what).
+model AuditLog {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  actorId      String?
+  actorName    String?
+  action       String // e.g. "staff.created", "settings.updated"
+  detail       String?
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@map("audit_logs")
+}
+
+// Staff clock-in / clock-out records. Self punches are geofenced (coords stored
+// as proof); managers can mark or correct times (source = MANAGER).
+model StaffAttendance {
+  id           String           @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  adminUserId  String
+  adminUser    AdminUser        @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  clockInAt    DateTime
+  clockOutAt   DateTime?
+  clockInLat   Float?
+  clockInLng   Float?
+  clockOutLat  Float?
+  clockOutLng  Float?
+
+  source       AttendanceSource @default(SELF)
+  markedById   String? // the manager who marked/corrected this, when source = MANAGER
+  markedByName String?
+
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([restaurantId, clockInAt])
+  @@index([adminUserId, clockInAt])
+  @@map("staff_attendance")
+}
+
+// Web Push subscriptions. Restaurant-scoped (admin/kitchen) or order-scoped
+// (a diner's device for their own order).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  role      PushRole
+
+  restaurantId String?
+  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderId      String?
+  order        Order?      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([restaurantId])
+  @@index([orderId])
+  @@map("push_subscriptions")
+}
+
+// Diner-initiated service requests (call waiter, water, bill, clean table).
+model ServiceRequest {
+  id           String               @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant           @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tableId      String?
+  table        RestaurantTable?     @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  type         ServiceRequestType
+  note         String?
+  status       ServiceRequestStatus @default(OPEN)
+  createdAt    DateTime             @default(now())
+  resolvedAt   DateTime?
+
+  @@index([restaurantId, status])
+  @@map("service_requests")
+}
+
+// Discount codes applied at the bill.
+model Coupon {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  code         String
+  type         CouponType
+  value        Decimal    @db.Decimal(10, 2) // percent (0-100) or flat amount
+  minOrder     Decimal    @default(0) @db.Decimal(10, 2)
+  maxDiscount  Decimal?   @db.Decimal(10, 2) // cap for percentage coupons
+  active       Boolean    @default(true)
+  usageLimit   Int? // total redemptions allowed (null = unlimited)
+  usedCount    Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  @@unique([restaurantId, code])
+  @@index([restaurantId])
+  @@map("coupons")
+}
+
+// Table bookings + walk-in waitlist.
+model Reservation {
+  id            String            @id @default(cuid())
+  restaurantId  String
+  restaurant    Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  type          ReservationType   @default(RESERVATION)
+  customerName  String
+  customerPhone String
+  partySize     Int               @default(2)
+  reservedFor   DateTime? // null for walk-in waitlist
+  notes         String?
+  status        ReservationStatus @default(PENDING)
+  createdAt     DateTime          @default(now())
+
+  @@index([restaurantId, status])
+  @@map("reservations")
+}
+
+enum BanquetStatus {
+  ENQUIRY
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+// A banquet / event booking (function hall, party, corporate event) with a
+// pre-agreed menu and an optional advance deposit.
+model BanquetBooking {
+  id            String        @id @default(cuid())
+  restaurantId  String
+  restaurant    Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerName  String
+  customerPhone String
+  eventType     String // Wedding, Birthday, Corporate, etc.
+  eventDate     DateTime
+  guestCount    Int           @default(20)
+  hall          String? // hall / space name
+  status        BanquetStatus @default(ENQUIRY)
+  advanceAmount Decimal       @default(0) @db.Decimal(10, 2)
+  notes         String?
+  items         BanquetItem[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([restaurantId, eventDate])
+  @@map("banquet_bookings")
+}
+
+// A pre-ordered menu line for a banquet booking (price snapshot at add time).
+model BanquetItem {
+  id            String         @id @default(cuid())
+  bookingId     String
+  booking       BanquetBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  menuItemId    String?
+  nameSnapshot  String
+  priceSnapshot Decimal        @db.Decimal(10, 2)
+  quantity      Int            @default(1)
+
+  @@index([bookingId])
+  @@map("banquet_items")
+}
+
+// Post-meal rating + comment.
+model Feedback {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderId      String?    @unique
+  order        Order?     @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  customerId   String?
+  customer     Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  rating       Int // 1-5
+  comment      String?
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId])
+  @@map("feedback")
+}
