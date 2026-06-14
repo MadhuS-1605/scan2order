@@ -2,6 +2,9 @@
   "name": "scan-to-order",
   "version": "1.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.19.0"
+  },
   "scripts": {
     "dev": "node scripts/lan-url.mjs http 3000 && next dev -H 0.0.0.0 -p 3000",
     "dev:lan": "node scripts/lan-url.mjs https 3000 && next dev -H 0.0.0.0 -p 3000 --experimental-https",
