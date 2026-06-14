@@ -6,15 +6,17 @@ import {
   Layers,
   Trophy,
 } from "lucide-react";
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin, superSetPlanAction } from "@/lib/platform/actions";
+import { signoutAction } from "@/lib/auth/actions";
 import { PLANS } from "@/lib/plans";
 import { formatMoney, toNumber } from "@/lib/utils";
 
 const DAY = 24 * 60 * 60 * 1000;
 
 export default async function SuperAdminPage() {
-  await requireSuperAdmin();
+  const session = await requireSuperAdmin();
 
   const startToday = new Date();
   startToday.setHours(0, 0, 0, 0);
@@ -73,9 +75,33 @@ export default async function SuperAdminPage() {
           <p className="font-display text-lg text-ink">
             Scan to Order <span className="text-ink/40">· Platform console</span>
           </p>
-          <span className="rounded bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-600">
-            Super admin
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="hidden rounded bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-600 sm:inline">
+              Super admin
+            </span>
+            <Link
+              href="/superadmin/analytics"
+              className="rounded-lg border border-sand-300 px-3 py-1.5 text-sm font-medium text-ink/70 hover:bg-sand-100"
+            >
+              Analytics
+            </Link>
+            {session.restaurantId && (
+              <Link
+                href="/admin"
+                className="rounded-lg border border-sand-300 px-3 py-1.5 text-sm font-medium text-ink/70 hover:bg-sand-100"
+              >
+                Restaurant dashboard
+              </Link>
+            )}
+            <form action={signoutAction}>
+              <button
+                type="submit"
+                className="rounded-lg border border-sand-300 px-3 py-1.5 text-sm font-medium text-ink/70 hover:bg-sand-100"
+              >
+                Sign out
+              </button>
+            </form>
+          </div>
         </div>
       </header>
 
@@ -167,7 +193,12 @@ export default async function SuperAdminPage() {
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td className="px-4 py-2.5">
-                    <span className="font-medium text-ink">{r.name}</span>
+                    <Link
+                      href={`/superadmin/analytics?restaurant=${r.id}`}
+                      className="font-medium text-ink hover:text-brand-600 hover:underline"
+                    >
+                      {r.name}
+                    </Link>
                     <span className="block text-xs text-ink/40">/{r.slug}</span>
                   </td>
                   <td className="px-4 py-2.5 text-ink/70">{r.orders}</td>

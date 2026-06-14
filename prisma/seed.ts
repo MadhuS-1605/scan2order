@@ -72,13 +72,32 @@ async function main() {
   // the restaurant link (spicegarden.scan.to/signin) without an email.
   await prisma.adminUser.createMany({
     data: [
-      { name: "Demo Owner", email: "demo@scan.to", passwordHash: staffPass, role: "OWNER", restaurantId: restaurant.id, isSuperAdmin: true },
+      { name: "Demo Owner", email: "demo@scan.to", passwordHash: staffPass, role: "OWNER", restaurantId: restaurant.id },
       { name: "Demo Manager", email: "manager@scan.to", username: "manager", passwordHash: staffPass, role: "MANAGER", restaurantId: restaurant.id },
       { name: "Demo Cashier", email: "cashier@scan.to", username: "cashier", passwordHash: staffPass, role: "CASHIER", restaurantId: restaurant.id },
       { name: "Demo Waiter", email: "waiter@scan.to", username: "waiter", passwordHash: staffPass, role: "WAITER", restaurantId: restaurant.id },
       { name: "Demo Kitchen", email: "kitchen@scan.to", username: "kitchen", passwordHash: staffPass, role: "KITCHEN", restaurantId: restaurant.id },
     ],
   });
+
+  // Platform super-admin — no restaurant of its own, so it lands on /superadmin.
+  // demo@ stays a plain owner for testing the restaurant dashboard. Credentials
+  // are NOT hardcoded: set SUPERADMIN_EMAIL + SUPERADMIN_PASSWORD in the env to
+  // seed one, otherwise this is skipped and you create it out-of-band with
+  // `npm run db:superadmin -- <email> <password>` (nothing lands in the repo).
+  const superEmail = process.env.SUPERADMIN_EMAIL?.toLowerCase().trim();
+  const superPassword = process.env.SUPERADMIN_PASSWORD;
+  if (superEmail && superPassword) {
+    const passwordHash = await hashPassword(superPassword);
+    await prisma.adminUser.upsert({
+      where: { email: superEmail },
+      update: { isSuperAdmin: true, passwordHash },
+      create: { name: "Platform Admin", email: superEmail, passwordHash, role: "OWNER", isSuperAdmin: true },
+    });
+    console.log(`✅ super-admin seeded: ${superEmail}`);
+  } else {
+    console.log("ℹ no SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD set — skipping super-admin seed (use `npm run db:superadmin`)");
+  }
 
   // Seed a couple of attendance punches (one closed shift + one open) so the
   // attendance board and "on shift now" panel have data to show.

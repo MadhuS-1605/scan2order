@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { headers, cookies } from "next/headers";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Bell } from "lucide-react";
 import { getCurrentRestaurant } from "@/lib/restaurant";
@@ -14,24 +14,22 @@ import { Toaster } from "@/components/admin/toast";
 import { AdminNav } from "./nav";
 import { PropertySwitcher } from "./property-switcher";
 
-const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan.to";
-
 export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // scan.to/admin → platform owner goes straight to the super-admin console.
-  const host = ((await headers()).get("host") ?? "").split(":")[0];
-  if (host === PLATFORM_DOMAIN) {
-    const s = await getSession();
-    if (s) {
-      const u = await prisma.adminUser.findUnique({
-        where: { id: s.sub },
-        select: { isSuperAdmin: true },
-      });
-      if (u?.isSuperAdmin) redirect("/superadmin");
-    }
+  // A platform-only super-admin (no restaurant of their own) has no admin
+  // dashboard to show, so send them to the console. A super-admin who also owns
+  // a restaurant (e.g. the demo owner) is NOT redirected — they use /admin and
+  // reach the console via the "Console" link in the header.
+  const s = await getSession();
+  if (s && !s.restaurantId) {
+    const u = await prisma.adminUser.findUnique({
+      where: { id: s.sub },
+      select: { isSuperAdmin: true },
+    });
+    if (u?.isSuperAdmin) redirect("/superadmin");
   }
 
   const { restaurant, config, session } = await getCurrentRestaurant();
@@ -56,7 +54,7 @@ export default async function AdminLayout({
 
   const me = await prisma.adminUser.findUnique({
     where: { id: session.sub },
-    select: { groupId: true },
+    select: { groupId: true, isSuperAdmin: true },
   });
   let properties: { id: string; name: string }[] = [];
   if (hasPermission(session.role, "properties") && me?.groupId) {
@@ -102,6 +100,14 @@ export default async function AdminLayout({
             </Link>
             {properties.length > 1 && (
               <PropertySwitcher properties={properties} currentId={restaurant.id} />
+            )}
+            {me?.isSuperAdmin && (
+              <Link
+                href="/superadmin"
+                className="hidden rounded-lg border border-sand-300 px-3 py-1.5 text-sm font-medium text-ink/70 transition-colors hover:border-brand-300 hover:bg-sand-100 sm:block"
+              >
+                Console
+              </Link>
             )}
             <span className="hidden text-sm text-ink/55 sm:block">
               {session.name}

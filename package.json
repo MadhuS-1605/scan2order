@@ -18,6 +18,7 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:deploy": "prisma db push",
+    "db:superadmin": "tsx scripts/create-superadmin.ts",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts"
   },
