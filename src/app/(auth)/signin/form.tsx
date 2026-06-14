@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { signinAction } from "@/lib/auth/actions";
 import { Button, Input, Field, Alert } from "@/components/ui";
+import { PasswordInput } from "@/components/password-input";
 import type { ActionState } from "@/lib/validation";
 
 export function SigninForm() {
@@ -24,10 +25,9 @@ export function SigninForm() {
         />
       </Field>
       <Field label="Password" htmlFor="password">
-        <Input
+        <PasswordInput
           id="password"
           name="password"
-          type="password"
           placeholder="••••••••"
           required
         />

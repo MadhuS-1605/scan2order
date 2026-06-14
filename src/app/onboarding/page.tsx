@@ -13,8 +13,15 @@ import { TablesStep } from "./steps/tables-step";
 export default async function OnboardingPage() {
   const session = await requireAdmin();
 
-  // No restaurant yet -> start with the profile step.
+  // No restaurant yet. A platform super-admin has no restaurant to onboard —
+  // send them to the console instead of the profile step. A brand-new owner
+  // starts onboarding at step one.
   if (!session.restaurantId) {
+    const u = await prisma.adminUser.findUnique({
+      where: { id: session.sub },
+      select: { isSuperAdmin: true },
+    });
+    if (u?.isSuperAdmin) redirect("/superadmin");
     return (
       <Shell stepIndex={0}>
         <ProfileStep restaurant={null} />

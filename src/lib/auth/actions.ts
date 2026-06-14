@@ -81,7 +81,10 @@ export async function signinAction(
     restaurantId: user.restaurantId,
   });
 
-  redirect(user.restaurantId ? landingFor(user.role) : "/onboarding");
+  if (user.restaurantId) redirect(landingFor(user.role));
+  // No restaurant: a platform super-admin goes straight to the console; a brand
+  // new owner goes to onboarding to create their restaurant.
+  redirect(user.isSuperAdmin ? "/superadmin" : "/onboarding");
 }
 
 // Staff sign in scoped to their restaurant's code (subdomain) + username. The

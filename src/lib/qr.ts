@@ -21,11 +21,17 @@ export function tableMenuUrl(
   const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN;
   const tbl = encodeURIComponent(label);
 
-  // If a real platform domain is configured (and we're not on a bare IP),
-  // use the subdomain form. Otherwise use the path form (works on any host/IP).
+  // When a real platform domain is configured, use the canonical subdomain form
+  // (<username>.<domain>/<table>) regardless of which host the admin happened to
+  // generate the QR on — a wildcard cert + DNS (*.<domain>) makes every tenant
+  // subdomain resolve. On a local/dev host (bare IP or localhost) fall back to
+  // the path form so QR codes still work off-domain.
   const host = base.replace(/^https?:\/\//, "");
-  const isIp = /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(host);
-  if (platformDomain && !isIp && host.includes(platformDomain)) {
+  const isLocal =
+    /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(host) ||
+    host.startsWith("localhost") ||
+    host.endsWith(".local");
+  if (platformDomain && !isLocal) {
     return `https://${tenant}.${platformDomain}/${tbl}`;
   }
   return `${base}/${tenant}/${tbl}`;
