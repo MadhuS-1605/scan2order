@@ -1,10 +1,23 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Clock } from "lucide-react";
 import { clockInAction, clockOutAction } from "@/lib/attendance/actions";
 import { formatDuration } from "@/lib/utils";
+
+const MINUTE = 60_000;
+
+// A "current time" external store, bucketed to the minute so getSnapshot is
+// referentially stable within a minute (avoids render loops) and changes once
+// per minute to keep the elapsed label fresh. Server snapshot is 0 so SSR
+// renders no elapsed time and hydration stays consistent.
+function subscribeMinute(onChange: () => void) {
+  const t = setInterval(onChange, MINUTE);
+  return () => clearInterval(t);
+}
+const minuteNow = () => Math.floor(Date.now() / MINUTE) * MINUTE;
+const minuteServer = () => 0;
 
 // Header clock-in/out button. Captures the device location and sends it to the
 // geofenced server action; shows elapsed time while clocked in.
@@ -12,14 +25,7 @@ export function ClockWidget({ openSince }: { openSince: string | null }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [err, setErr] = useState<string | null>(null);
-  const [, setTick] = useState(0);
-
-  // Re-render each minute so the elapsed label stays current.
-  useEffect(() => {
-    if (!openSince) return;
-    const t = setInterval(() => setTick((n) => n + 1), 60_000);
-    return () => clearInterval(t);
-  }, [openSince]);
+  const now = useSyncExternalStore(subscribeMinute, minuteNow, minuteServer);
 
   function getCoords(): Promise<{ lat?: number; lng?: number }> {
     return new Promise((resolve) => {
@@ -47,9 +53,10 @@ export function ClockWidget({ openSince }: { openSince: string | null }) {
     });
   }
 
-  const elapsed = openSince
-    ? formatDuration((Date.now() - new Date(openSince).getTime()) / 60_000)
-    : null;
+  const elapsed =
+    openSince && now
+      ? formatDuration((now - new Date(openSince).getTime()) / 60_000)
+      : null;
 
   return (
     <div className="relative">
@@ -66,7 +73,9 @@ export function ClockWidget({ openSince }: { openSince: string | null }) {
         {pending
           ? "…"
           : openSince
-            ? `Clock out · ${elapsed}`
+            ? elapsed
+              ? `Clock out · ${elapsed}`
+              : "Clock out"
             : "Clock in"}
       </button>
       {err && (
