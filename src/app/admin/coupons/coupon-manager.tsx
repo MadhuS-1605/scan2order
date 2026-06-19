@@ -7,6 +7,7 @@ import {
   deleteCouponAction,
 } from "@/lib/coupons/actions";
 import { Button, Input, Select, Field, Alert, Card } from "@/components/ui";
+import { useT } from "@/components/admin/i18n-provider";
 import { formatMoney } from "@/lib/utils";
 import type { ActionState } from "@/lib/validation";
 
@@ -29,14 +30,15 @@ export function CouponManager({
   currency: string;
   coupons: Coupon[];
 }) {
+  const tr = useT();
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
       <AddCouponForm />
 
       <Card>
-        <h2 className="mb-3 font-semibold text-ink">Your codes ({coupons.length})</h2>
+        <h2 className="mb-3 font-semibold text-ink">{tr("coupons.yourCodes")} ({coupons.length})</h2>
         {coupons.length === 0 ? (
-          <p className="text-sm text-ink/45">No coupons yet.</p>
+          <p className="text-sm text-ink/45">{tr("coupons.noCoupons")}</p>
         ) : (
           <ul className="divide-y divide-sand-100">
             {coupons.map((c) => (
@@ -49,32 +51,32 @@ export function CouponManager({
                     {c.code}
                     {!c.active && (
                       <span className="ml-2 rounded bg-sand-200 px-1.5 py-0.5 text-xs font-sans text-ink/55">
-                        inactive
+                        {tr("coupons.inactive")}
                       </span>
                     )}
                   </p>
                   <p className="text-xs text-ink/50">
                     {c.type === "PERCENT"
-                      ? `${c.value}% off`
-                      : `${formatMoney(c.value, currency)} off`}
+                      ? `${c.value}% ${tr("coupons.off")}`
+                      : `${formatMoney(c.value, currency)} ${tr("coupons.off")}`}
                     {Number(c.minOrder) > 0 &&
-                      ` · min ${formatMoney(c.minOrder, currency)}`}
+                      ` · ${tr("coupons.min")} ${formatMoney(c.minOrder, currency)}`}
                     {c.maxDiscount &&
-                      ` · max ${formatMoney(c.maxDiscount, currency)}`}
-                    {` · used ${c.usedCount}${c.usageLimit ? `/${c.usageLimit}` : ""}`}
+                      ` · ${tr("coupons.max")} ${formatMoney(c.maxDiscount, currency)}`}
+                    {` · ${tr("coupons.used")} ${c.usedCount}${c.usageLimit ? `/${c.usageLimit}` : ""}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <form action={toggleCouponAction}>
                     <input type="hidden" name="id" value={c.id} />
                     <Button size="sm" variant="secondary" type="submit">
-                      {c.active ? "Disable" : "Enable"}
+                      {c.active ? tr("coupons.disable") : tr("coupons.enable")}
                     </Button>
                   </form>
                   <form action={deleteCouponAction}>
                     <input type="hidden" name="id" value={c.id} />
                     <Button size="sm" variant="ghost" type="submit">
-                      Delete
+                      {tr("common.delete")}
                     </Button>
                   </form>
                 </div>
@@ -88,6 +90,7 @@ export function CouponManager({
 }
 
 function AddCouponForm() {
+  const tr = useT();
   const [state, action, pending] = useActionState<ActionState, FormData>(
     createCouponAction,
     {},
@@ -99,11 +102,11 @@ function AddCouponForm() {
 
   return (
     <Card className="h-fit">
-      <h2 className="mb-4 font-semibold text-ink">Create a coupon</h2>
+      <h2 className="mb-4 font-semibold text-ink">{tr("coupons.createCoupon")}</h2>
       <form ref={ref} action={action} className="space-y-3">
         {state.error && <Alert>{state.error}</Alert>}
         {state.ok && <Alert variant="success">{state.message}</Alert>}
-        <Field label="Code" htmlFor="c-code">
+        <Field label={tr("coupons.code")} htmlFor="c-code">
           <Input
             id="c-code"
             name="code"
@@ -113,13 +116,13 @@ function AddCouponForm() {
           />
         </Field>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Type" htmlFor="c-type">
+          <Field label={tr("coupons.type")} htmlFor="c-type">
             <Select id="c-type" name="type" defaultValue="PERCENT">
-              <option value="PERCENT">% off</option>
-              <option value="FLAT">Flat ₹ off</option>
+              <option value="PERCENT">{tr("coupons.percentOff")}</option>
+              <option value="FLAT">{tr("coupons.flatOff")}</option>
             </Select>
           </Field>
-          <Field label="Value" htmlFor="c-value">
+          <Field label={tr("coupons.value")} htmlFor="c-value">
             <Input
               id="c-value"
               name="value"
@@ -132,18 +135,18 @@ function AddCouponForm() {
           </Field>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Field label="Min order (₹)" htmlFor="c-min" hint="Optional">
+          <Field label={tr("coupons.minOrder")} htmlFor="c-min" hint={tr("common.optional")}>
             <Input id="c-min" name="minOrder" type="number" min="0" placeholder="0" />
           </Field>
-          <Field label="Max discount (₹)" htmlFor="c-max" hint="% only">
+          <Field label={tr("coupons.maxDiscount")} htmlFor="c-max" hint={tr("coupons.percentOnly")}>
             <Input id="c-max" name="maxDiscount" type="number" min="0" />
           </Field>
         </div>
-        <Field label="Usage limit" htmlFor="c-limit" hint="Blank = unlimited">
+        <Field label={tr("coupons.usageLimit")} htmlFor="c-limit" hint={tr("coupons.blankUnlimited")}>
           <Input id="c-limit" name="usageLimit" type="number" min="0" />
         </Field>
         <Button type="submit" className="w-full" disabled={pending}>
-          {pending ? "Creating…" : "Create coupon"}
+          {pending ? tr("coupons.creating") : tr("coupons.createCoupon")}
         </Button>
       </form>
     </Card>

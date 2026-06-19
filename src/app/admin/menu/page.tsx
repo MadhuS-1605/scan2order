@@ -1,4 +1,6 @@
 import { Sparkles } from "lucide-react";
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { parseLanguages } from "@/lib/languages";
@@ -8,6 +10,7 @@ import { Card } from "@/components/ui";
 import { MenuManager } from "./menu-manager";
 
 export default async function MenuPage() {
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const { restaurant } = await getCurrentRestaurant("menu");
   const languages = parseLanguages(restaurant.config!.languages);
 
@@ -30,16 +33,16 @@ export default async function MenuPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="font-display text-3xl font-medium text-ink">Menu</h1>
+      <h1 className="font-display text-3xl font-medium text-ink">{t(d, "menu.title")}</h1>
 
       <Card>
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 font-medium text-ink">
-              <Sparkles className="h-4 w-4 text-brand-600" /> Starter menus
+              <Sparkles className="h-4 w-4 text-brand-600" /> {t(d, "menu.starterMenus")}
             </h2>
             <p className="mt-0.5 text-xs text-ink/55">
-              One tap to add a ready-made menu — then tweak prices &amp; items.
+              {t(d, "menu.starterMenusHint")}
             </p>
           </div>
         </div>

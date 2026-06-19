@@ -1,9 +1,12 @@
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { StaffManager } from "./staff-manager";
 
 export default async function StaffPage() {
   const { session, restaurant } = await getCurrentRestaurant("staff");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   const staff = await prisma.adminUser.findMany({
     where: { restaurantId: restaurant.id },
@@ -18,21 +21,20 @@ export default async function StaffPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-display text-3xl font-medium text-ink">Staff</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "staff.title")}</h1>
         <p className="text-sm text-ink/45">
-          Add team members and control what each can access.
+          {t(d, "staff.subtitle")}
         </p>
         {staffLoginUrl ? (
           <p className="mt-1 text-sm text-ink/55">
-            Staff sign in at{" "}
+            {t(d, "staff.signInAt")}{" "}
             <span className="font-medium text-brand-600">{staffLoginUrl}</span>{" "}
-            with their username &amp; password.
+            {t(d, "staff.withUsernamePassword")}
           </p>
         ) : (
           <p className="mt-1 text-sm text-ink/55">
-            Set your web address in{" "}
-            <span className="font-medium">Settings → Web address</span> so staff
-            get a sign-in link.
+            {t(d, "staff.setWebAddressPre")}{" "}
+            <span className="font-medium">{t(d, "staff.settingsWebAddress")}</span> {t(d, "staff.setWebAddressPost")}
           </p>
         )}
       </div>

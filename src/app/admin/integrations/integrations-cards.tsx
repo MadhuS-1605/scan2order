@@ -8,6 +8,7 @@ import {
   testWebhookAction,
 } from "@/lib/integrations/actions";
 import { Button, Input, Field } from "@/components/ui";
+import { useT } from "@/components/admin/i18n-provider";
 import type { IntegrationProvider } from "@/lib/integrations/catalog";
 
 export function ProviderCard({
@@ -19,6 +20,7 @@ export function ProviderCard({
   connected: boolean;
   config: Record<string, string>;
 }) {
+  const tr = useT();
   const [open, setOpen] = useState(false);
   const [testing, startTest] = useTransition();
   const [testMsg, setTestMsg] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export function ProviderCard({
       const r = await testWebhookAction();
       setTestMsg(
         r.ok
-          ? `✓ Delivered (HTTP ${r.status})`
+          ? `✓ ${tr("integrations.delivered")} (HTTP ${r.status})`
           : `✗ ${r.error ?? `HTTP ${r.status}`}`,
       );
     });
@@ -43,7 +45,7 @@ export function ProviderCard({
             {provider.name}
             {provider.live && (
               <span className="inline-flex items-center gap-0.5 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium text-brand-600">
-                <Zap className="h-2.5 w-2.5" /> Live
+                <Zap className="h-2.5 w-2.5" /> {tr("integrations.live")}
               </span>
             )}
           </p>
@@ -51,11 +53,11 @@ export function ProviderCard({
         </div>
         {connected ? (
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-olive-500/15 px-2 py-0.5 text-xs font-medium text-olive-700">
-            <Check className="h-3 w-3" /> Connected
+            <Check className="h-3 w-3" /> {tr("integrations.connected")}
           </span>
         ) : (
           <span className="shrink-0 rounded-full bg-sand-100 px-2 py-0.5 text-xs text-ink/45">
-            Not connected
+            {tr("integrations.notConnected")}
           </span>
         )}
       </div>
@@ -64,18 +66,18 @@ export function ProviderCard({
         <div className="mt-3 flex items-center gap-2">
           <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
             <Plug className="h-3.5 w-3.5" />
-            {connected ? "Edit" : "Connect"}
+            {connected ? tr("common.edit") : tr("integrations.connect")}
           </Button>
           {connected && provider.live && (
             <Button variant="ghost" size="sm" onClick={runTest} disabled={testing}>
-              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Send test"}
+              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : tr("integrations.sendTest")}
             </Button>
           )}
           {connected && (
             <form action={disconnectIntegrationAction}>
               <input type="hidden" name="provider" value={provider.slug} />
               <button type="submit" className="text-xs text-ink/45 hover:text-red-600">
-                Disconnect
+                {tr("integrations.disconnect")}
               </button>
             </form>
           )}
@@ -99,10 +101,10 @@ export function ProviderCard({
           ))}
           <div className="flex gap-2">
             <Button type="submit" size="sm">
-              Save &amp; connect
+              {tr("integrations.saveConnect")}
             </Button>
             <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
-              Cancel
+              {tr("common.cancel")}
             </Button>
           </div>
         </form>

@@ -5,6 +5,7 @@ import { Plus, Minus, Search } from "lucide-react";
 import { createStaffOrderAction } from "@/lib/orders/staff-actions";
 import { Button, Input, VegMark } from "@/components/ui";
 import { formatMoney } from "@/lib/utils";
+import { useT } from "@/components/admin/i18n-provider";
 
 type Item = { id: string; name: string; price: number; categoryId: string | null; isVeg: boolean };
 
@@ -19,6 +20,7 @@ export function PosClient({
   categories: { id: string; name: string }[];
   items: Item[];
 }) {
+  const tr = useT();
   const [tableId, setTableId] = useState(tables[0]?.id ?? "");
   const [cart, setCart] = useState<Record<string, number>>({});
   const [name, setName] = useState("");
@@ -63,15 +65,15 @@ export function PosClient({
         </span>
         {qty === 0 ? (
           <Button size="sm" variant="secondary" onClick={() => setQty(i.id, 1)}>
-            Add
+            {tr("common.add")}
           </Button>
         ) : (
           <span className="flex items-center gap-2 rounded-lg border border-sand-300">
-            <button className="px-2 py-1 text-ink/70" onClick={() => setQty(i.id, qty - 1)} aria-label="decrease">
+            <button className="px-2 py-1 text-ink/70" onClick={() => setQty(i.id, qty - 1)} aria-label={tr("pos.decrease")}>
               <Minus className="h-3.5 w-3.5" />
             </button>
             <span className="w-5 text-center text-sm font-medium">{qty}</span>
-            <button className="px-2 py-1 text-ink/70" onClick={() => setQty(i.id, qty + 1)} aria-label="increase">
+            <button className="px-2 py-1 text-ink/70" onClick={() => setQty(i.id, qty + 1)} aria-label={tr("pos.increase")}>
               <Plus className="h-3.5 w-3.5" />
             </button>
           </span>
@@ -91,7 +93,7 @@ export function PosClient({
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search the menu…"
+            placeholder={tr("pos.searchMenu")}
             className="pl-10"
           />
         </div>
@@ -113,7 +115,7 @@ export function PosClient({
       >
         <input type="hidden" name="items" value={itemsJson} />
         <div>
-          <label className="mb-1 block text-xs font-medium text-ink/60">Table</label>
+          <label className="mb-1 block text-xs font-medium text-ink/60">{tr("pos.table")}</label>
           <select
             name="tableId"
             value={tableId}
@@ -121,7 +123,7 @@ export function PosClient({
             required
             className="w-full rounded-lg border border-sand-300 bg-surface px-3 py-2 text-sm"
           >
-            {tables.length === 0 && <option value="">No tables — add one first</option>}
+            {tables.length === 0 && <option value="">{tr("pos.noTables")}</option>}
             {tables.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.label}
@@ -131,7 +133,7 @@ export function PosClient({
         </div>
 
         {count === 0 ? (
-          <p className="py-4 text-center text-sm text-ink/45">Add items from the menu.</p>
+          <p className="py-4 text-center text-sm text-ink/45">{tr("pos.addItemsHint")}</p>
         ) : (
           <ul className="max-h-64 space-y-1 overflow-y-auto border-y border-sand-100 py-2 text-sm">
             {lines.map(([id, qty]) => {
@@ -149,17 +151,18 @@ export function PosClient({
           </ul>
         )}
 
-        <Input value={name} onChange={(e) => setName(e.target.value)} name="customerName" placeholder="Guest name (optional)" />
-        <Input value={notes} onChange={(e) => setNotes(e.target.value)} name="notes" placeholder="Notes for the kitchen" />
+        <Input value={name} onChange={(e) => setName(e.target.value)} name="customerName" placeholder={tr("pos.guestName")} />
+        <Input value={notes} onChange={(e) => setNotes(e.target.value)} name="notes" placeholder={tr("pos.kitchenNotes")} />
 
         <div className="flex items-center justify-between border-t border-sand-100 pt-2 text-sm">
-          <span className="text-ink/55">Subtotal</span>
+          <span className="text-ink/55">{tr("pos.subtotal")}</span>
           <span className="font-display text-lg text-ink">{formatMoney(subtotal, currency)}</span>
         </div>
         <Button type="submit" size="lg" className="w-full" disabled={count === 0 || !tableId}>
-          Place order · {count} item{count === 1 ? "" : "s"}
+          {tr("pos.placeOrder")} · {count}{" "}
+          {count === 1 ? tr("pos.item") : tr("pos.items")}
         </Button>
-        <p className="text-center text-[11px] text-ink/40">Taxes are added on the bill.</p>
+        <p className="text-center text-[11px] text-ink/40">{tr("pos.taxesNote")}</p>
       </form>
     </div>
   );

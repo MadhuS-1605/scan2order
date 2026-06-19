@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { formatMoney, toNumber, modifierSummary, seatLabel } from "@/lib/utils";
@@ -26,6 +28,7 @@ export default async function OrderDetailPage({
 }) {
   const { orderId } = await params;
   const { restaurant, config, session } = await getCurrentRestaurant("orders");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const cur = config.currency;
 
   const order = await prisma.order.findFirst({
@@ -69,11 +72,11 @@ export default async function OrderDetailPage({
   const canRefund = hasPermission(session.role, "refunds") && refundable > 0;
 
   const timeline: { label: string; at: Date | null }[] = [
-    { label: "Placed", at: order.placedAt ?? order.createdAt },
-    { label: "Confirmed", at: order.confirmedAt },
-    { label: "Ready", at: order.readyAt },
-    { label: "Served", at: order.servedAt },
-    { label: "Closed", at: order.closedAt },
+    { label: t(d, "orderDetail.placed"), at: order.placedAt ?? order.createdAt },
+    { label: t(d, "orderDetail.confirmed"), at: order.confirmedAt },
+    { label: t(d, "orderDetail.ready"), at: order.readyAt },
+    { label: t(d, "orderDetail.served"), at: order.servedAt },
+    { label: t(d, "orderDetail.closed"), at: order.closedAt },
   ];
 
   return (
@@ -81,7 +84,7 @@ export default async function OrderDetailPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-medium text-ink">
-            Order #{order.orderNumber}
+            {t(d, "orderDetail.order")} #{order.orderNumber}
           </h1>
           <p className="text-sm text-ink/45">
             {order.createdAt.toLocaleString("en-IN")} · {seatLabel(order.table)}
@@ -91,7 +94,7 @@ export default async function OrderDetailPage({
           href="/admin/orders/history"
           className="inline-flex items-center gap-1.5 rounded-lg border border-sand-300 bg-surface px-3 py-1.5 text-sm text-ink/70 hover:bg-sand-100"
         >
-          <ArrowLeft className="h-4 w-4" /> Back
+          <ArrowLeft className="h-4 w-4" /> {t(d, "common.back")}
         </Link>
       </div>
 
@@ -105,7 +108,7 @@ export default async function OrderDetailPage({
           }`}
         >
           {order.paymentStatus === "PAID"
-            ? `Paid · ${order.paymentMethod ?? ""}`
+            ? `${t(d, "orderDetail.paid")} · ${order.paymentMethod ?? ""}`
             : order.paymentStatus}
         </span>
         {order.customerName && (
@@ -122,31 +125,33 @@ export default async function OrderDetailPage({
           }`}
         >
           {order.channel === "STAFF"
-            ? `Taken by ${order.createdByName ?? "staff"}`
-            : "QR self-order"}
+            ? `${t(d, "orderDetail.takenBy")} ${order.createdByName ?? t(d, "orderDetail.staff")}`
+            : t(d, "orderDetail.qrSelfOrder")}
         </span>
         {order.channel === "CUSTOMER" && order.presence === "UNVERIFIED" && (
           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
-            ⚠ Presence unverified
+            ⚠ {t(d, "orderDetail.presenceUnverified")}
           </span>
         )}
         {order.channel === "CUSTOMER" &&
           order.presence === "VERIFIED" &&
           order.distanceM != null && (
             <span className="rounded-full bg-olive-500/15 px-2.5 py-1 text-xs font-medium text-olive-700">
-              ✓ At venue (~{order.distanceM} m)
+              ✓ {t(d, "orderDetail.atVenue")} (~{order.distanceM} m)
             </span>
           )}
         {order.fulfillment !== "DINE_IN" && (
           <span className="rounded-full bg-brand-600 px-2.5 py-1 text-xs font-medium text-white">
-            {order.fulfillment === "DELIVERY" ? "🛵 Delivery" : "🥡 Pickup"}
+            {order.fulfillment === "DELIVERY"
+              ? `🛵 ${t(d, "orderDetail.delivery")}`
+              : `🥡 ${t(d, "orderDetail.pickup")}`}
           </span>
         )}
       </div>
 
       {order.fulfillment === "DELIVERY" && order.deliveryAddress && (
         <div className="rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm text-ink/80">
-          <span className="font-medium text-ink">Deliver to:</span> {order.deliveryAddress}
+          <span className="font-medium text-ink">{t(d, "orderDetail.deliverTo")}:</span> {order.deliveryAddress}
         </div>
       )}
 
@@ -161,17 +166,17 @@ export default async function OrderDetailPage({
               htmlFor="newTableId"
               className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/55"
             >
-              Move to table
+              {t(d, "orderDetail.moveToTable")}
             </label>
             <Select id="newTableId" name="newTableId" required defaultValue="" className="w-40">
               <option value="" disabled>
-                Select…
+                {t(d, "orderDetail.selectPlaceholder")}
               </option>
               {tables
-                .filter((t) => t.id !== order.tableId)
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.kind === "ROOM" ? `Room ${t.label}` : t.label}
+                .filter((tbl) => tbl.id !== order.tableId)
+                .map((tbl) => (
+                  <option key={tbl.id} value={tbl.id}>
+                    {tbl.kind === "ROOM" ? `${t(d, "orderDetail.room")} ${tbl.label}` : tbl.label}
                   </option>
                 ))}
             </Select>
@@ -179,30 +184,30 @@ export default async function OrderDetailPage({
           <div className="flex flex-col gap-1 text-sm text-ink/70">
             <label className="flex items-center gap-1.5">
               <input type="radio" name="scope" value="all" defaultChecked />
-              Whole party (all open orders at this table)
+              {t(d, "orderDetail.wholeParty")}
             </label>
             <label className="flex items-center gap-1.5">
               <input type="radio" name="scope" value="single" />
-              Just this order
+              {t(d, "orderDetail.justThisOrder")}
             </label>
           </div>
           <Button type="submit" variant="secondary">
-            Move
+            {t(d, "orderDetail.move")}
           </Button>
         </form>
       )}
 
       {(canRefund || order.refunds.length > 0) && (
         <Card>
-          <h2 className="mb-1 font-semibold text-ink">Refunds</h2>
+          <h2 className="mb-1 font-semibold text-ink">{t(d, "orderDetail.refunds")}</h2>
           {paid > 0 && (
             <p className="text-sm text-ink/55">
-              Paid {formatMoney(paid, cur)}
-              {refunded > 0 && ` · refunded ${formatMoney(refunded, cur)}`}
+              {t(d, "orderDetail.paid")} {formatMoney(paid, cur)}
+              {refunded > 0 && ` · ${t(d, "orderDetail.refundedLabel")} ${formatMoney(refunded, cur)}`}
               {refundable > 0
-                ? ` · ${formatMoney(refundable, cur)} refundable`
+                ? ` · ${formatMoney(refundable, cur)} ${t(d, "orderDetail.refundableLabel")}`
                 : refunded > 0
-                  ? " · fully refunded"
+                  ? ` · ${t(d, "orderDetail.fullyRefunded")}`
                   : ""}
             </p>
           )}
@@ -213,7 +218,7 @@ export default async function OrderDetailPage({
                   <span className="text-ink/70">
                     {formatMoney(toNumber(r.amount), cur)} · {r.method}
                     {r.status === "FAILED" && (
-                      <span className="ml-1 text-red-600">failed</span>
+                      <span className="ml-1 text-red-600">{t(d, "orderDetail.failed")}</span>
                     )}
                     {r.reason ? ` · ${r.reason}` : ""}
                     {r.createdByName ? ` · ${r.createdByName}` : ""}
@@ -241,9 +246,9 @@ export default async function OrderDetailPage({
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-medium text-ink">Items</h2>
+            <h2 className="font-medium text-ink">{t(d, "orderDetail.items")}</h2>
             {editable && (
-              <span className="text-xs text-ink/40">Tap ± to adjust</span>
+              <span className="text-xs text-ink/40">{t(d, "orderDetail.tapToAdjust")}</span>
             )}
           </div>
           {editable ? (
@@ -283,31 +288,35 @@ export default async function OrderDetailPage({
           <div className="mt-3 space-y-1 border-t border-sand-100 pt-3">
             {order.gstMode !== "NONE" && (
               <>
-                <Row label="Subtotal" value={formatMoney(subtotal, cur)} />
-                <Row label="GST" value={formatMoney(tax, cur)} />
+                <Row label={t(d, "orderDetail.subtotal")} value={formatMoney(subtotal, cur)} />
+                <Row label={t(d, "orderDetail.gst")} value={formatMoney(tax, cur)} />
               </>
             )}
             {discount > 0 && (
               <Row
-                label={order.couponCode ? `Discount (${order.couponCode})` : "Discount"}
+                label={
+                  order.couponCode
+                    ? `${t(d, "orderDetail.discount")} (${order.couponCode})`
+                    : t(d, "orderDetail.discount")
+                }
                 value={"- " + formatMoney(discount, cur)}
               />
             )}
-            {tip > 0 && <Row label="Tip" value={formatMoney(tip, cur)} />}
-            <Row label="Total" value={formatMoney(total, cur)} bold />
-            <Row label="Amount paid" value={formatMoney(paid, cur)} />
+            {tip > 0 && <Row label={t(d, "orderDetail.tip")} value={formatMoney(tip, cur)} />}
+            <Row label={t(d, "common.total")} value={formatMoney(total, cur)} bold />
+            <Row label={t(d, "orderDetail.amountPaid")} value={formatMoney(paid, cur)} />
           </div>
         </Card>
 
         <Card>
-          <h2 className="mb-3 font-medium text-ink">Timeline</h2>
+          <h2 className="mb-3 font-medium text-ink">{t(d, "orderDetail.timeline")}</h2>
           <ul className="space-y-2">
-            {timeline.map((t) => (
-              <li key={t.label} className="flex justify-between text-sm">
-                <span className="text-ink/55">{t.label}</span>
-                <span className={t.at ? "text-ink/80" : "text-ink/30"}>
-                  {t.at
-                    ? t.at.toLocaleString("en-IN", {
+            {timeline.map((row) => (
+              <li key={row.label} className="flex justify-between text-sm">
+                <span className="text-ink/55">{row.label}</span>
+                <span className={row.at ? "text-ink/80" : "text-ink/30"}>
+                  {row.at
+                    ? row.at.toLocaleString("en-IN", {
                         day: "numeric",
                         month: "short",
                         hour: "2-digit",

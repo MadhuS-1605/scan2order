@@ -28,6 +28,7 @@ import {
   Card,
   VegMark,
 } from "@/components/ui";
+import { useT } from "@/components/admin/i18n-provider";
 import { formatMoney } from "@/lib/utils";
 import { LANG_LABEL } from "@/lib/languages";
 import type { ActionState } from "@/lib/validation";
@@ -69,6 +70,7 @@ export function MenuManager({
   categories: Category[];
   items: Item[];
 }) {
+  const tr = useT();
   const grouped = categories.map((c) => ({
     category: c,
     items: items.filter((i) => i.categoryId === c.id),
@@ -94,7 +96,7 @@ export function MenuManager({
                 className="text-xs text-ink/45 hover:text-red-600"
                 type="submit"
               >
-                Delete category
+                {tr("menu.deleteCategory")}
               </button>
             </form>
           </div>
@@ -109,7 +111,7 @@ export function MenuManager({
 
       {uncategorised.length > 0 && (
         <Card>
-          <h3 className="mb-3 font-semibold text-ink">Uncategorised</h3>
+          <h3 className="mb-3 font-semibold text-ink">{tr("menu.uncategorised")}</h3>
           <ItemList
             items={uncategorised}
             categories={categories}
@@ -133,8 +135,9 @@ function ItemList({
   currency: string;
   languages: string[];
 }) {
+  const tr = useT();
   if (items.length === 0)
-    return <p className="text-sm text-ink/45">No items.</p>;
+    return <p className="text-sm text-ink/45">{tr("menu.noItems")}</p>;
   return (
     <ul className="divide-y divide-sand-100">
       {items.map((item) => (
@@ -161,6 +164,7 @@ function ItemRow({
   currency: string;
   languages: string[];
 }) {
+  const tr = useT();
   const [state, action, pending] = useActionState<ActionState, FormData>(
     updateItemAction,
     {},
@@ -180,12 +184,12 @@ function ItemRow({
               {item.name}
               {item.isSpecialOfDay && (
                 <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">
-                  Special
+                  {tr("menu.special")}
                 </span>
               )}
               {!item.isAvailable && (
                 <span className="ml-2 rounded bg-sand-100 px-1.5 py-0.5 text-xs text-ink/55">
-                  Out of stock
+                  {tr("menu.outOfStock")}
                 </span>
               )}
             </p>
@@ -209,18 +213,18 @@ function ItemRow({
         <form action={toggleAvailabilityAction}>
           <input type="hidden" name="id" value={item.id} />
           <Button size="sm" variant="secondary" type="submit">
-            {item.isAvailable ? "Mark out of stock" : "Mark in stock"}
+            {item.isAvailable ? tr("menu.markOutOfStock") : tr("menu.markInStock")}
           </Button>
         </form>
         <form action={toggleSpecialAction}>
           <input type="hidden" name="id" value={item.id} />
           <Button size="sm" variant="ghost" type="submit">
-            {item.isSpecialOfDay ? "Unset special" : "Set as special"}
+            {item.isSpecialOfDay ? tr("menu.unsetSpecial") : tr("menu.setAsSpecial")}
           </Button>
         </form>
         <details ref={detailsRef} className="group">
           <summary className="cursor-pointer list-none rounded-lg px-3 py-1.5 text-sm text-ink/70 hover:bg-sand-100">
-            Edit
+            {tr("common.edit")}
           </summary>
           <form
             action={action}
@@ -229,7 +233,7 @@ function ItemRow({
             <input type="hidden" name="id" value={item.id} />
             {state.error && <Alert>{state.error}</Alert>}
             <div className="grid grid-cols-2 gap-2">
-              <Field label="Name" htmlFor={`n-${item.id}`}>
+              <Field label={tr("common.name")} htmlFor={`n-${item.id}`}>
                 <Input
                   id={`n-${item.id}`}
                   name="name"
@@ -237,7 +241,7 @@ function ItemRow({
                   required
                 />
               </Field>
-              <Field label="Price" htmlFor={`p-${item.id}`}>
+              <Field label={tr("menu.price")} htmlFor={`p-${item.id}`}>
                 <Input
                   id={`p-${item.id}`}
                   name="price"
@@ -248,13 +252,13 @@ function ItemRow({
                 />
               </Field>
             </div>
-            <Field label="Category" htmlFor={`c-${item.id}`}>
+            <Field label={tr("menu.category")} htmlFor={`c-${item.id}`}>
               <Select
                 id={`c-${item.id}`}
                 name="categoryId"
                 defaultValue={item.categoryId ?? ""}
               >
-                <option value="">Uncategorised</option>
+                <option value="">{tr("menu.uncategorised")}</option>
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
@@ -262,7 +266,7 @@ function ItemRow({
                 ))}
               </Select>
             </Field>
-            <Field label="Description" htmlFor={`d-${item.id}`}>
+            <Field label={tr("menu.description")} htmlFor={`d-${item.id}`}>
               <Textarea
                 id={`d-${item.id}`}
                 name="description"
@@ -270,7 +274,7 @@ function ItemRow({
                 defaultValue={item.description ?? ""}
               />
             </Field>
-            <Field label="Image URL" htmlFor={`img-${item.id}`} hint="Optional">
+            <Field label={tr("menu.imageUrl")} htmlFor={`img-${item.id}`} hint={tr("common.optional")}>
               <Input
                 id={`img-${item.id}`}
                 name="imageUrl"
@@ -288,24 +292,24 @@ function ItemRow({
                   className="rounded-lg border border-sand-200 bg-sand-100/40 p-2"
                 >
                   <p className="mb-1.5 text-xs font-medium text-ink/55">
-                    {LANG_LABEL[lang] ?? lang} translation
+                    {`${LANG_LABEL[lang] ?? lang} ${tr("menu.translation")}`}
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     <Input
                       name={`tr_${lang}_name`}
-                      placeholder="Name"
+                      placeholder={tr("common.name")}
                       defaultValue={item.translations[lang]?.name ?? ""}
                     />
                     <Input
                       name={`tr_${lang}_desc`}
-                      placeholder="Description"
+                      placeholder={tr("menu.description")}
                       defaultValue={item.translations[lang]?.description ?? ""}
                     />
                   </div>
                 </div>
               ))}
             <div className="grid grid-cols-2 gap-2">
-              <Field label="Available from" htmlFor={`af-${item.id}`}>
+              <Field label={tr("menu.availableFrom")} htmlFor={`af-${item.id}`}>
                 <Input
                   id={`af-${item.id}`}
                   name="availableFrom"
@@ -313,7 +317,7 @@ function ItemRow({
                   defaultValue={item.availableFrom ?? ""}
                 />
               </Field>
-              <Field label="Available to" htmlFor={`at-${item.id}`}>
+              <Field label={tr("menu.availableTo")} htmlFor={`at-${item.id}`}>
                 <Input
                   id={`at-${item.id}`}
                   name="availableTo"
@@ -330,7 +334,7 @@ function ItemRow({
                   value="true"
                   defaultChecked={item.isVeg}
                 />
-                Veg
+                {tr("menu.veg")}
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -339,7 +343,7 @@ function ItemRow({
                   value="true"
                   defaultChecked={item.isAvailable}
                 />
-                In stock
+                {tr("menu.inStock")}
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -348,7 +352,7 @@ function ItemRow({
                   value="true"
                   defaultChecked={item.isSpecialOfDay}
                 />
-                Special
+                {tr("menu.special")}
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -357,12 +361,12 @@ function ItemRow({
                   value="true"
                   defaultChecked={item.isChefSpecial}
                 />
-                Chef&apos;s special
+                {tr("menu.chefSpecial")}
               </label>
             </div>
             <div className="flex justify-between">
               <Button type="submit" size="sm" disabled={pending}>
-                {pending ? "Saving…" : "Save changes"}
+                {pending ? tr("common.saving") : tr("menu.saveChanges")}
               </Button>
               {/* Submits the same form (carrying the hidden id) to the delete
                   action — avoids an invalid nested <form>. */}
@@ -373,7 +377,7 @@ function ItemRow({
                 formAction={deleteMenuItemAction}
                 formNoValidate
               >
-                Delete item
+                {tr("menu.deleteItem")}
               </Button>
             </div>
           </form>
@@ -393,12 +397,13 @@ function ModifierEditor({
   currency: string;
   languages: string[];
 }) {
+  const tr = useT();
   // Extra per-language name fields (only for non-English languages the venue uses).
   const trLangs = languages.filter((l) => l !== "en");
   return (
     <div className="mt-4 border-t border-sand-200 pt-3">
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/45">
-        Modifiers &amp; variants
+        {tr("menu.modifiersVariants")}
       </p>
 
       <div className="space-y-3">
@@ -411,13 +416,13 @@ function ModifierEditor({
               <p className="text-sm font-medium text-ink">
                 {g.name}
                 <span className="ml-2 rounded bg-sand-200 px-1.5 py-0.5 text-[10px] font-normal text-ink/60">
-                  {g.required ? "required · pick 1" : `optional · up to ${g.maxSelect}`}
+                  {g.required ? tr("menu.requiredPickOne") : `${tr("menu.optionalUpTo")} ${g.maxSelect}`}
                 </span>
               </p>
               <form action={deleteModifierGroupAction}>
                 <input type="hidden" name="id" value={g.id} />
                 <button className="text-xs text-ink/40 hover:text-red-600" type="submit">
-                  Remove
+                  {tr("common.remove")}
                 </button>
               </form>
             </div>
@@ -433,7 +438,7 @@ function ModifierEditor({
                     <span className="ml-2 text-ink/45">
                       {Number(o.priceDelta) > 0
                         ? `+${formatMoney(o.priceDelta, currency)}`
-                        : "free"}
+                        : tr("menu.free")}
                     </span>
                   </span>
                   <form action={deleteModifierOptionAction}>
@@ -441,7 +446,7 @@ function ModifierEditor({
                     <button
                       className="text-xs text-ink/40 hover:text-red-600"
                       type="submit"
-                      aria-label="Remove option"
+                      aria-label={tr("menu.removeOption")}
                     >
                       ✕
                     </button>
@@ -455,7 +460,7 @@ function ModifierEditor({
               className="mt-2 flex flex-wrap gap-2"
             >
               <input type="hidden" name="groupId" value={g.id} />
-              <Input name="name" placeholder="Option (e.g. Extra cheese)" required />
+              <Input name="name" placeholder={tr("menu.optionPlaceholder")} required />
               <Input
                 name="priceDelta"
                 type="number"
@@ -467,12 +472,12 @@ function ModifierEditor({
                 <Input
                   key={lang}
                   name={`tr_${lang}_name`}
-                  placeholder={`Name (${LANG_LABEL[lang] ?? lang})`}
+                  placeholder={`${tr("common.name")} (${LANG_LABEL[lang] ?? lang})`}
                   className="w-32"
                 />
               ))}
               <Button type="submit" size="sm" variant="secondary">
-                Add
+                {tr("common.add")}
               </Button>
             </form>
           </div>
@@ -485,19 +490,19 @@ function ModifierEditor({
       >
         <input type="hidden" name="menuItemId" value={item.id} />
         <div className="flex-1">
-          <Input name="name" placeholder="New group (e.g. Size, Add-ons)" required />
+          <Input name="name" placeholder={tr("menu.newGroupPlaceholder")} required />
         </div>
         {trLangs.map((lang) => (
           <Input
             key={lang}
             name={`tr_${lang}_name`}
-            placeholder={`Name (${LANG_LABEL[lang] ?? lang})`}
+            placeholder={`${tr("common.name")} (${LANG_LABEL[lang] ?? lang})`}
             className="w-32"
           />
         ))}
         <label className="flex items-center gap-1.5 text-xs text-ink/70">
           <input type="checkbox" name="required" />
-          Required (variant)
+          {tr("menu.requiredVariant")}
         </label>
         <Input
           name="maxSelect"
@@ -505,10 +510,10 @@ function ModifierEditor({
           min="1"
           defaultValue="1"
           className="w-16"
-          title="Max selectable (optional groups)"
+          title={tr("menu.maxSelectable")}
         />
         <Button type="submit" size="sm">
-          Add group
+          {tr("menu.addGroup")}
         </Button>
       </form>
     </div>
@@ -516,6 +521,7 @@ function ModifierEditor({
 }
 
 function AddCategoryForm() {
+  const tr = useT();
   const [state, action, pending] = useActionState<ActionState, FormData>(
     addCategoryAction,
     {},
@@ -526,7 +532,7 @@ function AddCategoryForm() {
   }, [state]);
   return (
     <form ref={ref} action={action} className="space-y-2">
-      <Field label="Add category" htmlFor="new-cat">
+      <Field label={tr("menu.addCategory")} htmlFor="new-cat">
         <div className="flex flex-wrap gap-2">
           <Input
             id="new-cat"
@@ -534,26 +540,25 @@ function AddCategoryForm() {
             placeholder="🍰"
             className="w-16 text-center"
             maxLength={2}
-            aria-label="Category icon (emoji)"
+            aria-label={tr("menu.categoryIcon")}
           />
-          <Input id="new-cat-name" name="name" placeholder="Desserts" required className="min-w-[8rem] flex-1" />
+          <Input id="new-cat-name" name="name" placeholder={tr("menu.categoryNamePlaceholder")} required className="min-w-[8rem] flex-1" />
           <select
             name="station"
             defaultValue="KITCHEN"
-            aria-label="Prep station"
+            aria-label={tr("menu.prepStation")}
             className="rounded-lg border border-sand-300 bg-surface px-2 text-sm"
           >
-            <option value="KITCHEN">Kitchen</option>
-            <option value="BAR">Bar</option>
+            <option value="KITCHEN">{tr("menu.kitchen")}</option>
+            <option value="BAR">{tr("menu.bar")}</option>
           </select>
           <Button type="submit" disabled={pending}>
-            Add
+            {tr("common.add")}
           </Button>
         </div>
       </Field>
       <p className="text-xs text-ink/45">
-        Emoji shows in the menu rail. Set “Bar” to route a category&apos;s drinks
-        to the bar counter.
+        {tr("menu.categoryHint")}
       </p>
       {state.error && <Alert>{state.error}</Alert>}
     </form>
@@ -561,6 +566,7 @@ function AddCategoryForm() {
 }
 
 function AddItemForm({ categories }: { categories: Category[] }) {
+  const tr = useT();
   const [state, action, pending] = useActionState<ActionState, FormData>(
     addMenuItemAction,
     {},
@@ -573,10 +579,10 @@ function AddItemForm({ categories }: { categories: Category[] }) {
     <form ref={ref} action={action} className="space-y-2">
       {state.error && <Alert>{state.error}</Alert>}
       <div className="grid grid-cols-2 gap-2">
-        <Field label="New item" htmlFor="ni-name">
+        <Field label={tr("menu.newItem")} htmlFor="ni-name">
           <Input id="ni-name" name="name" placeholder="Gulab Jamun" required />
         </Field>
-        <Field label="Price (₹)" htmlFor="ni-price">
+        <Field label={tr("menu.priceCurrency")} htmlFor="ni-price">
           <Input
             id="ni-price"
             name="price"
@@ -588,18 +594,18 @@ function AddItemForm({ categories }: { categories: Category[] }) {
         </Field>
       </div>
       <Select name="categoryId" defaultValue="">
-        <option value="">Uncategorised</option>
+        <option value="">{tr("menu.uncategorised")}</option>
         {categories.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}
           </option>
         ))}
       </Select>
-      <Input name="imageUrl" type="url" placeholder="Image URL (optional)" />
+      <Input name="imageUrl" type="url" placeholder={tr("menu.imageUrlPlaceholder")} />
       <div className="flex flex-wrap gap-4 text-sm">
         <label className="flex items-center gap-2">
           <input type="checkbox" name="isVeg" value="true" defaultChecked />
-          Veg
+          {tr("menu.veg")}
         </label>
         <label className="flex items-center gap-2">
           <input
@@ -608,15 +614,15 @@ function AddItemForm({ categories }: { categories: Category[] }) {
             value="true"
             defaultChecked
           />
-          In stock
+          {tr("menu.inStock")}
         </label>
         <label className="flex items-center gap-2">
           <input type="checkbox" name="isSpecialOfDay" value="true" />
-          Special
+          {tr("menu.special")}
         </label>
       </div>
       <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Adding…" : "Add item"}
+        {pending ? tr("menu.adding") : tr("menu.addItem")}
       </Button>
     </form>
   );

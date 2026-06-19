@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import type { Prisma } from "@prisma/client";
+import { ADMIN_LOCALE_COOKIE, dictFor, t, type Dict } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { sweepStaleOrders } from "@/lib/orders/sweep";
 import { prisma } from "@/lib/db";
@@ -23,12 +25,15 @@ import {
 import { resolveServiceRequestAction } from "@/lib/service/actions";
 import { Bell } from "lucide-react";
 
-const SERVICE_LABEL: Record<string, string> = {
-  CALL_WAITER: "Waiter",
-  WATER: "Water",
-  BILL: "Bill",
-  CLEAN_TABLE: "Clean table",
-  OTHER: "Service",
+const serviceLabel = (d: Dict, type: string): string => {
+  const map: Record<string, string> = {
+    CALL_WAITER: t(d, "orders.serviceWaiter"),
+    WATER: t(d, "orders.serviceWater"),
+    BILL: t(d, "orders.serviceBill"),
+    CLEAN_TABLE: t(d, "orders.serviceCleanTable"),
+    OTHER: t(d, "orders.serviceOther"),
+  };
+  return map[type] ?? type;
 };
 
 const BTN = {
@@ -48,6 +53,7 @@ export default async function OrdersBoard({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { restaurant, config } = await getCurrentRestaurant("orders");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   // Lazy housekeeping: recover stuck payment intents + cancel abandoned
   // pay-first orders so the board stays clean. Cheap + idempotent.
   await sweepStaleOrders(restaurant.id);
@@ -85,7 +91,7 @@ export default async function OrdersBoard({
     const g =
       groups.get(key) ??
       ({
-        label: o.table ? seatLabel(o.table) : "Takeaway / no table",
+        label: o.table ? seatLabel(o.table) : t(d, "orders.takeawayNoTable"),
         orders: [],
         total: 0,
       } as { label: string; orders: typeof orders; total: number });
@@ -104,20 +110,20 @@ export default async function OrdersBoard({
     <div className="space-y-5">
       <LiveStream />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-3xl font-medium text-ink">Live orders</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "orders.liveOrders")}</h1>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-ink/45">{orders.length} active</span>
+          <span className="text-sm text-ink/45">{orders.length} {t(d, "orders.active")}</span>
           <Link
             href="/admin/orders/new"
             className="rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
           >
-            + New order
+            {t(d, "orders.newOrder")}
           </Link>
           <Link
             href="/admin/orders/history"
             className="rounded-lg border border-sand-300 bg-surface px-3 py-1.5 text-sm font-medium text-ink/70 hover:bg-sand-100"
           >
-            Past orders
+            {t(d, "orders.pastOrders")}
           </Link>
           <EnableNotifications scope="restaurant" />
         </div>
@@ -126,7 +132,7 @@ export default async function OrdersBoard({
       {/* Status filter */}
       <div className="no-scrollbar flex gap-1 overflow-x-auto rounded-xl border border-sand-200 bg-surface p-1">
         <Link href="/admin/orders" className={filterPill(!statusFilter)}>
-          All
+          {t(d, "common.all")}
         </Link>
         {ACTIVE_STATUSES.map((s) => (
           <Link
@@ -143,7 +149,7 @@ export default async function OrdersBoard({
         <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
           <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-brand-700">
             <Bell className="h-4 w-4" />
-            Service requests ({serviceRequests.length})
+            {t(d, "orders.serviceRequests")} ({serviceRequests.length})
           </p>
           <div className="flex flex-wrap gap-2">
             {serviceRequests.map((r) => (
@@ -153,15 +159,15 @@ export default async function OrdersBoard({
               >
                 <span className="text-sm text-ink">
                   <span className="font-semibold">{seatLabel(r.table)}</span> ·{" "}
-                  {SERVICE_LABEL[r.type] ?? r.type}
+                  {serviceLabel(d, r.type)}
                 </span>
                 <ActionButton
                   action={resolveServiceRequestAction}
                   fields={{ id: r.id }}
-                  success="Request resolved"
+                  success={t(d, "orders.requestResolved")}
                   className="rounded-md bg-brand-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-brand-700"
                 >
-                  Resolve
+                  {t(d, "orders.resolve")}
                 </ActionButton>
               </span>
             ))}
@@ -171,7 +177,9 @@ export default async function OrdersBoard({
 
       {orders.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-sand-300 bg-surface p-12 text-center text-ink/55">
-          {statusFilter ? `No ${titleCase(statusFilter)} orders.` : "No active orders right now."}
+          {statusFilter
+            ? `${t(d, "orders.noOrdersIn")} ${titleCase(statusFilter)}`
+            : t(d, "orders.noActiveOrders")}
         </div>
       ) : (
         <div className="space-y-6">
@@ -181,7 +189,7 @@ export default async function OrdersBoard({
                 <h2 className="font-display text-lg text-ink">
                   {g.label}
                   <span className="ml-2 text-sm font-normal text-ink/45">
-                    {g.orders.length} order{g.orders.length > 1 ? "s" : ""}
+                    {g.orders.length} {t(d, "orders.ordersCount")}
                   </span>
                 </h2>
                 <span className="text-sm font-medium text-ink/60">
@@ -195,6 +203,7 @@ export default async function OrdersBoard({
                     o={o}
                     cur={cur}
                     waiterConfirm={waiterConfirm}
+                    d={d}
                   />
                 ))}
               </div>
@@ -212,10 +221,12 @@ function OrderCard({
   o,
   cur,
   waiterConfirm,
+  d,
 }: {
   o: BoardOrder;
   cur: string;
   waiterConfirm: boolean;
+  d: Dict;
 }) {
   const next = nextStatus(o.status as OrderStatus);
   const isPlaced = o.status === "PLACED";
@@ -234,12 +245,12 @@ function OrderCard({
           {o.customerName && <p className="text-xs text-ink/55">{o.customerName}</p>}
           <p className="text-[11px] text-ink/40">
             {o.channel === "STAFF"
-              ? `Taken by ${o.createdByName ?? "staff"}`
-              : "QR self-order"}
+              ? `${t(d, "orders.takenBy")} ${o.createdByName ?? t(d, "orders.staff")}`
+              : t(d, "orders.qrSelfOrder")}
           </p>
           {o.presence === "UNVERIFIED" && (
             <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
-              ⚠ Presence unverified — confirm
+              ⚠ {t(d, "orders.presenceUnverifiedConfirm")}
             </p>
           )}
         </div>
@@ -263,7 +274,7 @@ function OrderCard({
 
       {o.notes && (
         <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-xs text-amber-700">
-          Note: {o.notes}
+          {t(d, "orders.note")}: {o.notes}
         </p>
       )}
 
@@ -281,10 +292,10 @@ function OrderCard({
           }`}
         >
           {o.paymentStatus === "PAID"
-            ? "Paid"
+            ? t(d, "orders.paid")
             : partial
-              ? `${formatMoney(toNumber(o.amountPaid), cur)} paid`
-              : "Unpaid"}
+              ? `${formatMoney(toNumber(o.amountPaid), cur)} ${t(d, "orders.paidLower")}`
+              : t(d, "orders.unpaid")}
         </span>
       </div>
 
@@ -294,19 +305,19 @@ function OrderCard({
             <ActionButton
               action={confirmOrderAction}
               fields={{ orderId: o.id }}
-              success={`#${o.orderNumber} confirmed`}
+              success={`#${o.orderNumber} ${t(d, "orders.confirmedToast")}`}
               className={BTN.primary}
             >
-              Confirm
+              {t(d, "orders.confirm")}
             </ActionButton>
             <ActionButton
               action={rejectOrderAction}
               fields={{ orderId: o.id }}
-              success={`#${o.orderNumber} rejected`}
-              confirm={`Reject order #${o.orderNumber}?`}
+              success={`#${o.orderNumber} ${t(d, "orders.rejectedToast")}`}
+              confirm={`${t(d, "orders.rejectConfirm")} #${o.orderNumber}?`}
               className={BTN.danger}
             >
-              Reject
+              {t(d, "orders.reject")}
             </ActionButton>
           </>
         )}
@@ -314,10 +325,10 @@ function OrderCard({
           <ActionButton
             action={confirmOrderAction}
             fields={{ orderId: o.id }}
-            success={`#${o.orderNumber} sent to kitchen`}
+            success={`#${o.orderNumber} ${t(d, "orders.sentToKitchenToast")}`}
             className={BTN.primary}
           >
-            Send to kitchen
+            {t(d, "orders.sendToKitchen")}
           </ActionButton>
         )}
         {next && !isPlaced && (
@@ -335,10 +346,10 @@ function OrderCard({
             <ActionButton
               action={markPaidAction}
               fields={{ orderId: o.id }}
-              success={`#${o.orderNumber} marked paid`}
+              success={`#${o.orderNumber} ${t(d, "orders.markedPaidToast")}`}
               className={BTN.secondary}
             >
-              Mark paid (counter)
+              {t(d, "orders.markPaidCounter")}
             </ActionButton>
           )}
       </div>

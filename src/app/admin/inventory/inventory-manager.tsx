@@ -2,6 +2,7 @@
 
 import { setStockAction, restockAction } from "@/lib/inventory/actions";
 import { Button, Input, Card } from "@/components/ui";
+import { useT } from "@/components/admin/i18n-provider";
 
 type Item = {
   id: string;
@@ -12,8 +13,9 @@ type Item = {
 };
 
 export function InventoryManager({ items }: { items: Item[] }) {
+  const tr = useT();
   if (items.length === 0)
-    return <p className="text-sm text-ink/45">No menu items yet.</p>;
+    return <p className="text-sm text-ink/45">{tr("inventory.noItems")}</p>;
 
   return (
     <Card className="p-0">
@@ -39,10 +41,10 @@ export function InventoryManager({ items }: { items: Item[] }) {
                           : "bg-olive-500/15 text-olive-600"
                     }`}
                   >
-                    {out ? "Out of stock" : `${it.stockQty} in stock`}
+                    {out ? tr("inventory.outOfStock") : `${it.stockQty} ${tr("inventory.inStock")}`}
                   </span>
                 ) : (
-                  <span className="text-xs text-ink/40">Not tracked</span>
+                  <span className="text-xs text-ink/40">{tr("inventory.notTracked")}</span>
                 )}
               </div>
 
@@ -71,11 +73,11 @@ export function InventoryManager({ items }: { items: Item[] }) {
                       name="trackStock"
                       defaultChecked={it.trackStock}
                     />
-                    Track
+                    {tr("inventory.track")}
                   </label>
                   <div>
                     <label className="block text-[10px] uppercase text-ink/45">
-                      Qty
+                      {tr("inventory.qty")}
                     </label>
                     <Input
                       name="stockQty"
@@ -87,7 +89,7 @@ export function InventoryManager({ items }: { items: Item[] }) {
                   </div>
                   <div>
                     <label className="block text-[10px] uppercase text-ink/45">
-                      Low at
+                      {tr("inventory.lowAt")}
                     </label>
                     <Input
                       name="lowStockThreshold"
@@ -98,7 +100,7 @@ export function InventoryManager({ items }: { items: Item[] }) {
                     />
                   </div>
                   <Button size="sm" type="submit">
-                    Save
+                    {tr("common.save")}
                   </Button>
                 </form>
               </div>

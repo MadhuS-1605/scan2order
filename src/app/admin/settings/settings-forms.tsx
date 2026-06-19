@@ -17,6 +17,7 @@ import {
 import type { ActionState } from "@/lib/validation";
 import { LANGUAGES } from "@/lib/languages";
 import { updateTenantAction } from "@/lib/tenant/actions";
+import { useT } from "@/components/admin/i18n-provider";
 
 type Profile = {
   name: string;
@@ -74,9 +75,10 @@ type Config = {
 };
 
 function Status({ state }: { state: ActionState }) {
+  const tr = useT();
   if (state.error) return <Alert>{state.error}</Alert>;
   if (state.ok)
-    return <Alert variant="success">{state.message ?? "Saved"}</Alert>;
+    return <Alert variant="success">{state.message ?? tr("settings.saved")}</Alert>;
   return null;
 }
 
@@ -104,17 +106,15 @@ function TenantForm({
 }: {
   tenant: { subdomain: string | null; customDomain: string | null };
 }) {
+  const tr = useT();
   const platformDomain =
     process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan.to";
   return (
     <Card>
-      <h2 className="font-semibold text-ink">Web address</h2>
-      <p className="mt-1 text-sm text-ink/55">
-        Your public link diners scan to. Use your free subdomain or connect your
-        own domain.
-      </p>
+      <h2 className="font-semibold text-ink">{tr("settings.webAddress")}</h2>
+      <p className="mt-1 text-sm text-ink/55">{tr("settings.webAddressDesc")}</p>
       <form action={updateTenantAction} className="mt-4 space-y-4">
-        <Field label="Username (subdomain)" htmlFor="t-sub">
+        <Field label={tr("settings.usernameSubdomain")} htmlFor="t-sub">
           <div className="flex items-center gap-1">
             <Input
               id="t-sub"
@@ -128,9 +128,9 @@ function TenantForm({
           </div>
         </Field>
         <Field
-          label="Custom domain"
+          label={tr("settings.customDomain")}
           htmlFor="t-domain"
-          hint="Point a CNAME to the platform, then enter it here."
+          hint={tr("settings.customDomainHint")}
         >
           <Input
             id="t-domain"
@@ -140,7 +140,7 @@ function TenantForm({
           />
         </Field>
         <div className="flex justify-end">
-          <Button type="submit">Save web address</Button>
+          <Button type="submit">{tr("settings.saveWebAddress")}</Button>
         </div>
       </form>
     </Card>
@@ -148,32 +148,33 @@ function TenantForm({
 }
 
 function ProfileForm({ profile }: { profile: Profile }) {
+  const tr = useT();
   const [state, action, pending] = useActionState<ActionState, FormData>(
     updateProfileAction,
     {},
   );
   return (
     <Card>
-      <h2 className="font-semibold text-ink">Business profile</h2>
+      <h2 className="font-semibold text-ink">{tr("settings.businessProfile")}</h2>
       <form action={action} className="mt-4 space-y-4">
         <Status state={state} />
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Name" htmlFor="s-name">
+          <Field label={tr("common.name")} htmlFor="s-name">
             <Input id="s-name" name="name" defaultValue={profile.name} required />
           </Field>
-          <Field label="Type" htmlFor="s-type">
+          <Field label={tr("settings.type")} htmlFor="s-type">
             <Select id="s-type" name="type" defaultValue={profile.type}>
-              <option value="RESTAURANT">Restaurant</option>
-              <option value="CAFE">Café</option>
-              <option value="HOTEL">Hotel</option>
-              <option value="CLOUD_KITCHEN">Cloud kitchen</option>
-              <option value="BAR">Bar</option>
+              <option value="RESTAURANT">{tr("settings.typeRestaurant")}</option>
+              <option value="CAFE">{tr("settings.typeCafe")}</option>
+              <option value="HOTEL">{tr("settings.typeHotel")}</option>
+              <option value="CLOUD_KITCHEN">{tr("settings.typeCloudKitchen")}</option>
+              <option value="BAR">{tr("settings.typeBar")}</option>
             </Select>
           </Field>
-          <Field label="Phone" htmlFor="s-phone">
+          <Field label={tr("settings.phone")} htmlFor="s-phone">
             <Input id="s-phone" name="phone" defaultValue={profile.phone ?? ""} />
           </Field>
-          <Field label="Email" htmlFor="s-email">
+          <Field label={tr("settings.email")} htmlFor="s-email">
             <Input
               id="s-email"
               name="email"
@@ -182,7 +183,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
             />
           </Field>
         </div>
-        <Field label="Address" htmlFor="s-addr">
+        <Field label={tr("settings.address")} htmlFor="s-addr">
           <Input
             id="s-addr"
             name="addressLine"
@@ -190,13 +191,13 @@ function ProfileForm({ profile }: { profile: Profile }) {
           />
         </Field>
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="City" htmlFor="s-city">
+          <Field label={tr("settings.city")} htmlFor="s-city">
             <Input id="s-city" name="city" defaultValue={profile.city ?? ""} />
           </Field>
-          <Field label="State" htmlFor="s-state">
+          <Field label={tr("settings.state")} htmlFor="s-state">
             <Input id="s-state" name="state" defaultValue={profile.state ?? ""} />
           </Field>
-          <Field label="PIN" htmlFor="s-pin">
+          <Field label={tr("settings.pin")} htmlFor="s-pin">
             <Input
               id="s-pin"
               name="postalCode"
@@ -204,7 +205,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
             />
           </Field>
         </div>
-        <Field label="FSSAI licence number" htmlFor="s-fssai" hint="Printed on bills">
+        <Field label={tr("settings.fssaiNumber")} htmlFor="s-fssai" hint={tr("settings.fssaiHint")}>
           <Input
             id="s-fssai"
             name="fssaiNumber"
@@ -212,7 +213,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
             placeholder="e.g. 12345678901234"
           />
         </Field>
-        <Field label="Logo URL" htmlFor="s-logo" hint="Shown on the diner menu & bill">
+        <Field label={tr("settings.logoUrl")} htmlFor="s-logo" hint={tr("settings.logoUrlHint")}>
           <Input
             id="s-logo"
             name="logoUrl"
@@ -223,7 +224,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
         </Field>
         <div className="flex justify-end">
           <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Save profile"}
+            {pending ? tr("common.saving") : tr("settings.saveProfile")}
           </Button>
         </div>
       </form>
@@ -232,6 +233,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
 }
 
 function OperationsForm({ config }: { config: Config }) {
+  const tr = useT();
   const [state, action, pending] = useActionState<ActionState, FormData>(
     updateOperationsAction,
     {},
@@ -239,28 +241,28 @@ function OperationsForm({ config }: { config: Config }) {
   const [gstMode, setGstMode] = useState(config.gstMode);
   return (
     <Card>
-      <h2 className="font-semibold text-ink">Operations, payments &amp; tax</h2>
+      <h2 className="font-semibold text-ink">{tr("settings.operationsTitle")}</h2>
       <form action={action} className="mt-4 space-y-4">
         <Status state={state} />
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Order confirmation" htmlFor="o-confirm">
+          <Field label={tr("settings.orderConfirmation")} htmlFor="o-confirm">
             <Select
               id="o-confirm"
               name="orderConfirmation"
               defaultValue={config.orderConfirmation}
             >
-              <option value="AUTO">Auto-confirm (straight to kitchen)</option>
-              <option value="WAITER_CONFIRM">Waiter confirms first</option>
+              <option value="AUTO">{tr("settings.orderConfirmAuto")}</option>
+              <option value="WAITER_CONFIRM">{tr("settings.orderConfirmWaiter")}</option>
             </Select>
           </Field>
-          <Field label="Payment timing" htmlFor="o-timing">
+          <Field label={tr("settings.paymentTiming")} htmlFor="o-timing">
             <Select
               id="o-timing"
               name="paymentTiming"
               defaultValue={config.paymentTiming}
             >
-              <option value="PAY_AFTER">Pay after (request bill at end)</option>
-              <option value="PAY_BEFORE">Pay before (at order time)</option>
+              <option value="PAY_AFTER">{tr("settings.payAfter")}</option>
+              <option value="PAY_BEFORE">{tr("settings.payBefore")}</option>
             </Select>
           </Field>
         </div>
@@ -271,7 +273,7 @@ function OperationsForm({ config }: { config: Config }) {
               name="onlinePaymentEnabled"
               defaultChecked={config.onlinePaymentEnabled}
             />
-            Online payment (Razorpay)
+            {tr("settings.onlinePayment")}
           </label>
           <label className="flex items-center gap-2">
             <input
@@ -279,31 +281,28 @@ function OperationsForm({ config }: { config: Config }) {
               name="counterPaymentEnabled"
               defaultChecked={config.counterPaymentEnabled}
             />
-            Pay at counter
+            {tr("settings.payAtCounter")}
           </label>
         </div>
         <fieldset className="rounded-lg border border-sand-200 p-3">
           <legend className="px-1 text-sm font-medium text-ink/70">
-            Takeaway &amp; delivery
+            {tr("settings.takeawayDelivery")}
           </legend>
           <div className="flex flex-wrap gap-4 text-sm">
             <label className="flex items-center gap-2">
               <input type="checkbox" name="pickupEnabled" defaultChecked={config.pickupEnabled} />
-              Offer pickup
+              {tr("settings.offerPickup")}
             </label>
             <label className="flex items-center gap-2">
               <input type="checkbox" name="deliveryEnabled" defaultChecked={config.deliveryEnabled} />
-              Offer delivery (diner enters address)
+              {tr("settings.offerDelivery")}
             </label>
           </div>
-          <p className="mt-2 text-xs text-ink/45">
-            When on, diners choose a fulfilment type at checkout. Default for cloud
-            kitchens.
-          </p>
+          <p className="mt-2 text-xs text-ink/45">{tr("settings.takeawayDeliveryHint")}</p>
         </fieldset>
         <fieldset className="rounded-lg border border-sand-200 p-3">
           <legend className="px-1 text-sm font-medium text-ink/70">
-            Service hours
+            {tr("settings.serviceHours")}
           </legend>
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -311,10 +310,10 @@ function OperationsForm({ config }: { config: Config }) {
               name="orderingPaused"
               defaultChecked={config.orderingPaused}
             />
-            Pause new orders now (temporary stop, ignores hours)
+            {tr("settings.pauseOrders")}
           </label>
           <div className="mt-3 grid gap-4 sm:grid-cols-3">
-            <Field label="Opens at" htmlFor="o-open" hint="Leave blank for 24h">
+            <Field label={tr("settings.opensAt")} htmlFor="o-open" hint={tr("settings.blankFor24h")}>
               <Input
                 id="o-open"
                 name="openTime"
@@ -322,7 +321,7 @@ function OperationsForm({ config }: { config: Config }) {
                 defaultValue={config.openTime ?? ""}
               />
             </Field>
-            <Field label="Closes at" htmlFor="o-close" hint="Leave blank for 24h">
+            <Field label={tr("settings.closesAt")} htmlFor="o-close" hint={tr("settings.blankFor24h")}>
               <Input
                 id="o-close"
                 name="closeTime"
@@ -330,7 +329,7 @@ function OperationsForm({ config }: { config: Config }) {
                 defaultValue={config.closeTime ?? ""}
               />
             </Field>
-            <Field label="Timezone" htmlFor="o-tz" hint="IANA, e.g. Asia/Kolkata">
+            <Field label={tr("settings.timezone")} htmlFor="o-tz" hint={tr("settings.timezoneHint")}>
               <Input
                 id="o-tz"
                 name="timezone"
@@ -339,16 +338,12 @@ function OperationsForm({ config }: { config: Config }) {
               />
             </Field>
           </div>
-          <p className="mt-2 text-xs text-ink/45">
-            Outside these hours (in the venue timezone) diners can browse the menu
-            but can&apos;t place orders. Happy-hour and item availability windows
-            also use this timezone.
-          </p>
+          <p className="mt-2 text-xs text-ink/45">{tr("settings.serviceHoursHint")}</p>
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <Field
-              label="Default prep time (minutes)"
+              label={tr("settings.defaultPrepTime")}
               htmlFor="o-prep"
-              hint="Shown to diners as 'ready in ~N min'"
+              hint={tr("settings.defaultPrepHint")}
             >
               <Input
                 id="o-prep"
@@ -361,9 +356,9 @@ function OperationsForm({ config }: { config: Config }) {
               />
             </Field>
             <Field
-              label="Minimum order amount"
+              label={tr("settings.minOrderAmount")}
               htmlFor="o-minorder"
-              hint="0 = no minimum"
+              hint={tr("settings.minOrderHint")}
             >
               <Input
                 id="o-minorder"
@@ -378,9 +373,9 @@ function OperationsForm({ config }: { config: Config }) {
         </fieldset>
 
         <Field
-          label="Bill footer message"
+          label={tr("settings.billFooter")}
           htmlFor="o-footer"
-          hint="Printed at the bottom of every bill (blank = a friendly default)"
+          hint={tr("settings.billFooterHint")}
         >
           <Input
             id="o-footer"
@@ -391,19 +386,19 @@ function OperationsForm({ config }: { config: Config }) {
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="GST mode" htmlFor="o-gst">
+          <Field label={tr("settings.gstMode")} htmlFor="o-gst">
             <Select
               id="o-gst"
               name="gstMode"
               value={gstMode}
               onChange={(e) => setGstMode(e.target.value)}
             >
-              <option value="NONE">No GST</option>
-              <option value="EXCLUSIVE">Exclusive (added on top)</option>
-              <option value="INCLUSIVE">Inclusive (in price)</option>
+              <option value="NONE">{tr("settings.gstNone")}</option>
+              <option value="EXCLUSIVE">{tr("settings.gstExclusive")}</option>
+              <option value="INCLUSIVE">{tr("settings.gstInclusive")}</option>
             </Select>
           </Field>
-          <Field label="GST %" htmlFor="o-pct">
+          <Field label={tr("settings.gstPercent")} htmlFor="o-pct">
             <Input
               id="o-pct"
               name="gstPercentage"
@@ -413,7 +408,7 @@ function OperationsForm({ config }: { config: Config }) {
               disabled={gstMode === "NONE"}
             />
           </Field>
-          <Field label="GSTIN" htmlFor="o-num">
+          <Field label={tr("settings.gstin")} htmlFor="o-num">
             <Input
               id="o-num"
               name="gstNumber"
@@ -424,12 +419,9 @@ function OperationsForm({ config }: { config: Config }) {
         </div>
         <fieldset className="rounded-lg border border-sand-200 p-3">
           <legend className="px-1 text-sm font-medium text-ink/70">
-            Menu languages
+            {tr("settings.menuLanguages")}
           </legend>
-          <p className="mb-2 text-xs text-ink/45">
-            English is always available. Pick extra languages diners can switch
-            to (add translations per item in the Menu editor).
-          </p>
+          <p className="mb-2 text-xs text-ink/45">{tr("settings.menuLanguagesHint")}</p>
           <div className="flex flex-wrap gap-3">
             {LANGUAGES.filter((l) => l.code !== "en").map((l) => (
               <label
@@ -452,7 +444,7 @@ function OperationsForm({ config }: { config: Config }) {
 
         <fieldset className="rounded-lg border border-sand-200 p-3">
           <legend className="px-1 text-sm font-medium text-ink/70">
-            Happy hour
+            {tr("settings.happyHour")}
           </legend>
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -460,10 +452,10 @@ function OperationsForm({ config }: { config: Config }) {
               name="happyHourEnabled"
               defaultChecked={config.happyHourEnabled}
             />
-            Enable an automatic discount during a daily window
+            {tr("settings.happyHourEnable")}
           </label>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <Field label="From" htmlFor="hh-from">
+            <Field label={tr("settings.from")} htmlFor="hh-from">
               <Input
                 id="hh-from"
                 name="happyHourFrom"
@@ -471,7 +463,7 @@ function OperationsForm({ config }: { config: Config }) {
                 defaultValue={config.happyHourFrom ?? ""}
               />
             </Field>
-            <Field label="To" htmlFor="hh-to">
+            <Field label={tr("settings.to")} htmlFor="hh-to">
               <Input
                 id="hh-to"
                 name="happyHourTo"
@@ -479,7 +471,7 @@ function OperationsForm({ config }: { config: Config }) {
                 defaultValue={config.happyHourTo ?? ""}
               />
             </Field>
-            <Field label="% off" htmlFor="hh-pct">
+            <Field label={tr("settings.percentOff")} htmlFor="hh-pct">
               <Input
                 id="hh-pct"
                 name="happyHourPercent"
@@ -494,16 +486,12 @@ function OperationsForm({ config }: { config: Config }) {
 
         <fieldset className="rounded-lg border border-sand-200 p-3">
           <legend className="px-1 text-sm font-medium text-ink/70">
-            Kitchen printer
+            {tr("settings.kitchenPrinter")}
           </legend>
-          <p className="mb-3 text-xs text-ink/50">
-            Optional. Add a network thermal printer (ESC/POS) to send tickets
-            straight from the kitchen screen. Leave blank to print via the
-            browser. Find the printer&apos;s IP in its self-test page.
-          </p>
+          <p className="mb-3 text-xs text-ink/50">{tr("settings.kitchenPrinterHint")}</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <div className="sm:col-span-2">
-              <Field label="Printer IP address" htmlFor="kot-host">
+              <Field label={tr("settings.printerIp")} htmlFor="kot-host">
                 <Input
                   id="kot-host"
                   name="kotPrinterHost"
@@ -512,7 +500,7 @@ function OperationsForm({ config }: { config: Config }) {
                 />
               </Field>
             </div>
-            <Field label="Port" htmlFor="kot-port">
+            <Field label={tr("settings.port")} htmlFor="kot-port">
               <Input
                 id="kot-port"
                 name="kotPrinterPort"
@@ -527,20 +515,17 @@ function OperationsForm({ config }: { config: Config }) {
 
         <fieldset className="rounded-lg border border-sand-200 p-3">
           <legend className="px-1 text-sm font-medium text-ink/70">
-            Modules
+            {tr("settings.modules")}
           </legend>
-          <p className="mb-3 text-xs text-ink/50">
-            Turn on only what this venue uses — the rest stay hidden from the
-            dashboard.
-          </p>
+          <p className="mb-3 text-xs text-ink/50">{tr("settings.modulesHint")}</p>
           <div className="grid gap-2 sm:grid-cols-2">
             {[
-              { name: "featureReservations", label: "Reservations & waitlist", on: config.featureReservations },
-              { name: "featureRooms", label: "Hotel rooms (in-room dining)", on: config.featureRooms },
-              { name: "featureBanquets", label: "Banquets & events", on: config.featureBanquets },
-              { name: "featureBar", label: "Bar counter", on: config.featureBar },
-              { name: "featureAttendance", label: "Staff attendance (clock-in/out)", on: config.featureAttendance },
-              { name: "requireDinerLocation", label: "Require diners at the venue to order", on: config.requireDinerLocation },
+              { name: "featureReservations", label: tr("settings.moduleReservations"), on: config.featureReservations },
+              { name: "featureRooms", label: tr("settings.moduleRooms"), on: config.featureRooms },
+              { name: "featureBanquets", label: tr("settings.moduleBanquets"), on: config.featureBanquets },
+              { name: "featureBar", label: tr("settings.moduleBar"), on: config.featureBar },
+              { name: "featureAttendance", label: tr("settings.moduleAttendance"), on: config.featureAttendance },
+              { name: "requireDinerLocation", label: tr("settings.moduleRequireLocation"), on: config.requireDinerLocation },
             ].map((f) => (
               <label key={f.name} className="flex items-center gap-2 text-sm text-ink/80">
                 <input type="checkbox" name={f.name} defaultChecked={f.on} />
@@ -559,9 +544,9 @@ function OperationsForm({ config }: { config: Config }) {
         />
 
         <Field
-          label="Review link (Google Maps, etc.)"
+          label={tr("settings.reviewLink")}
           htmlFor="o-review"
-          hint="Diners who rate 4★+ are nudged to review here"
+          hint={tr("settings.reviewLinkHint")}
         >
           <Input
             id="o-review"
@@ -573,7 +558,7 @@ function OperationsForm({ config }: { config: Config }) {
         </Field>
         <div className="flex justify-end">
           <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Save settings"}
+            {pending ? tr("common.saving") : tr("settings.saveSettings")}
           </Button>
         </div>
       </form>
@@ -582,23 +567,19 @@ function OperationsForm({ config }: { config: Config }) {
 }
 
 function PaymentForm({ config }: { config: Config }) {
+  const tr = useT();
   const [state, action, pending] = useActionState<ActionState, FormData>(
     updatePaymentCredsAction,
     {},
   );
   return (
     <Card>
-      <h2 className="font-semibold text-ink">
-        Payment &amp; messaging credentials
-      </h2>
-      <p className="mt-1 text-sm text-ink/55">
-        Optional per-restaurant keys. Leave blank to use the platform defaults
-        from environment variables.
-      </p>
+      <h2 className="font-semibold text-ink">{tr("settings.credentialsTitle")}</h2>
+      <p className="mt-1 text-sm text-ink/55">{tr("settings.credentialsDesc")}</p>
       <form action={action} className="mt-4 space-y-4">
         <Status state={state} />
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Razorpay Key ID" htmlFor="r-id">
+          <Field label={tr("settings.razorpayKeyId")} htmlFor="r-id">
             <Input
               id="r-id"
               name="razorpayKeyId"
@@ -607,11 +588,11 @@ function PaymentForm({ config }: { config: Config }) {
             />
           </Field>
           <Field
-            label="Razorpay Key Secret"
+            label={tr("settings.razorpayKeySecret")}
             htmlFor="r-secret"
             hint={
               config.hasRazorpaySecret
-                ? "A secret is saved. Leave blank to keep it."
+                ? tr("settings.razorpaySecretSaved")
                 : undefined
             }
           >
@@ -624,7 +605,7 @@ function PaymentForm({ config }: { config: Config }) {
           </Field>
         </div>
         <Field
-          label="WhatsApp sender"
+          label={tr("settings.whatsappSender")}
           htmlFor="w-from"
           hint="e.g. whatsapp:+14155238886"
         >
@@ -636,9 +617,9 @@ function PaymentForm({ config }: { config: Config }) {
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field
-            label="UPI ID (for scan-to-pay)"
+            label={tr("settings.upiId")}
             htmlFor="upi-id"
-            hint="Bill QR pays this UPI ID directly"
+            hint={tr("settings.upiIdHint")}
           >
             <Input
               id="upi-id"
@@ -647,7 +628,7 @@ function PaymentForm({ config }: { config: Config }) {
               placeholder="yourcafe@oksbi"
             />
           </Field>
-          <Field label="UPI payee name" htmlFor="upi-name">
+          <Field label={tr("settings.upiPayeeName")} htmlFor="upi-name">
             <Input
               id="upi-name"
               name="upiName"
@@ -658,7 +639,7 @@ function PaymentForm({ config }: { config: Config }) {
         </div>
         <div className="flex justify-end">
           <Button type="submit" disabled={pending}>
-            {pending ? "Saving…" : "Save credentials"}
+            {pending ? tr("common.saving") : tr("settings.saveCredentials")}
           </Button>
         </div>
       </form>
@@ -680,6 +661,7 @@ function VenueLocation({
   orderRadiusM: number;
   requireDinerLocation: boolean;
 }) {
+  const tr = useT();
   const [lat, setLat] = useState<number | null>(latitude);
   const [lng, setLng] = useState<number | null>(longitude);
   const [status, setStatus] = useState<string | null>(null);
@@ -687,17 +669,17 @@ function VenueLocation({
 
   function capture() {
     if (!("geolocation" in navigator)) {
-      setStatus("Geolocation isn't available on this device.");
+      setStatus(tr("settings.geoUnavailable"));
       return;
     }
-    setStatus("Locating…");
+    setStatus(tr("settings.locating"));
     navigator.geolocation.getCurrentPosition(
       (p) => {
         setLat(p.coords.latitude);
         setLng(p.coords.longitude);
-        setStatus("Location captured — save settings to apply.");
+        setStatus(tr("settings.locationCaptured"));
       },
-      () => setStatus("Couldn't get location. Allow access and try again."),
+      () => setStatus(tr("settings.locationFailed")),
       { enableHighAccuracy: true, timeout: 10_000 },
     );
   }
@@ -705,34 +687,29 @@ function VenueLocation({
   return (
     <fieldset className="rounded-lg border border-sand-200 p-3">
       <legend className="px-1 text-sm font-medium text-ink/70">
-        Venue location (attendance &amp; ordering)
+        {tr("settings.venueLocation")}
       </legend>
-      <p className="mb-3 text-xs text-ink/50">
-        Set this from a device at the restaurant. Used to verify staff clock-in/out
-        and (if enabled above) that diners are on-site when they order.
-      </p>
+      <p className="mb-3 text-xs text-ink/50">{tr("settings.venueLocationHint")}</p>
       {missing && (
         <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-          ⚠ &ldquo;Require diners at the venue&rdquo; is on but no location is set, so
-          diners can&apos;t be verified — orders will go through unverified until you
-          capture the venue location below.
+          ⚠ {tr("settings.venueLocationMissing")}
         </p>
       )}
       <input type="hidden" name="latitude" value={lat ?? ""} />
       <input type="hidden" name="longitude" value={lng ?? ""} />
       <div className="flex flex-wrap items-center gap-3">
         <Button type="button" variant="secondary" onClick={capture}>
-          Use my current location
+          {tr("settings.useCurrentLocation")}
         </Button>
         <span className="text-xs text-ink/55">
           {lat != null && lng != null
             ? `${lat.toFixed(5)}, ${lng.toFixed(5)}`
-            : "Not set"}
+            : tr("settings.notSet")}
         </span>
       </div>
       {status && <p className="mt-2 text-xs text-ink/55">{status}</p>}
       <div className="mt-3 grid max-w-md gap-3 sm:grid-cols-2">
-        <Field label="Staff clock-in radius (m)" htmlFor="o-radius">
+        <Field label={tr("settings.staffClockInRadius")} htmlFor="o-radius">
           <Input
             id="o-radius"
             name="geofenceRadiusM"
@@ -742,7 +719,7 @@ function VenueLocation({
             defaultValue={geofenceRadiusM}
           />
         </Field>
-        <Field label="Diner ordering radius (m)" htmlFor="o-order-radius">
+        <Field label={tr("settings.dinerOrderingRadius")} htmlFor="o-order-radius">
           <Input
             id="o-order-radius"
             name="orderRadiusM"

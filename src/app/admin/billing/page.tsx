@@ -1,4 +1,6 @@
 import { Check } from "lucide-react";
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { PLANS, planByTier } from "@/lib/plans";
 import { subscriptionState } from "@/lib/subscription";
@@ -8,23 +10,26 @@ import { PlanCheckout } from "./plan-checkout";
 import { AutoRenew } from "./auto-renew";
 
 export default async function BillingPage() {
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const { restaurant } = await getCurrentRestaurant("settings");
   const sub = subscriptionState(restaurant);
   const current = planByTier(sub.tier);
 
+  const dayWord = (n: number | null | undefined) =>
+    n === 1 ? t(d, "billing.day") : t(d, "billing.days");
   const statusLine =
     sub.status === "TRIAL"
-      ? `Free trial of ${current.name} — ${sub.daysLeft} day${sub.daysLeft === 1 ? "" : "s"} left.`
+      ? `${t(d, "billing.freeTrialOf")} ${current.name} — ${sub.daysLeft} ${dayWord(sub.daysLeft)} ${t(d, "billing.left")}`
       : sub.status === "ACTIVE"
-        ? `${current.name} plan — renews in ${sub.daysLeft} day${sub.daysLeft === 1 ? "" : "s"}.`
+        ? `${current.name} ${t(d, "billing.planRenewsIn")} ${sub.daysLeft} ${dayWord(sub.daysLeft)}.`
         : sub.status === "EXPIRED"
-          ? `Your ${current.name} subscription has expired — you're on Free-tier limits until you renew.`
-          : "You're on the Free plan.";
+          ? `${t(d, "billing.expiredLine.before")} ${current.name} ${t(d, "billing.expiredLine.after")}`
+          : t(d, "billing.onFreePlan");
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-display text-3xl font-medium text-ink">Plan &amp; billing</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "billing.title")}</h1>
         <p className="text-sm text-ink/45">{statusLine}</p>
       </div>
 
@@ -37,8 +42,8 @@ export default async function BillingPage() {
           }`}
         >
           {sub.status === "EXPIRED"
-            ? "Renew below to restore your plan's features and limits."
-            : `Your trial ends in ${sub.daysLeft} day${sub.daysLeft === 1 ? "" : "s"} — subscribe to keep your features.`}
+            ? t(d, "billing.renewToRestore")
+            : `${t(d, "billing.trialEndsIn")} ${sub.daysLeft} ${dayWord(sub.daysLeft)} — ${t(d, "billing.subscribeToKeep")}`}
         </div>
       )}
 
@@ -61,14 +66,14 @@ export default async function BillingPage() {
                 <h2 className="font-display text-xl text-ink">{p.name}</h2>
                 {p.highlight && !isCurrent && (
                   <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-600">
-                    Popular
+                    {t(d, "billing.popular")}
                   </span>
                 )}
               </div>
               <p className="mt-1 text-sm text-ink/55">{p.tagline}</p>
               <p className="mt-3 font-display text-3xl text-ink">
-                {isFree ? "Free" : formatMoney(p.price)}
-                {!isFree && <span className="text-sm text-ink/45"> /mo</span>}
+                {isFree ? t(d, "billing.free") : formatMoney(p.price)}
+                {!isFree && <span className="text-sm text-ink/45"> {t(d, "billing.perMo")}</span>}
               </p>
               <ul className="mt-4 flex-1 space-y-1.5">
                 {p.features.map((f) => (
@@ -82,11 +87,11 @@ export default async function BillingPage() {
                 {isCurrent ? (
                   isFree ? (
                     <div className="rounded-lg bg-sand-100 py-2 text-center text-sm font-medium text-ink/60">
-                      Current plan
+                      {t(d, "billing.currentPlan")}
                     </div>
                   ) : (
                     <>
-                      <PlanCheckout tier={p.tier} label="Extend · 30 days" variant="secondary" />
+                      <PlanCheckout tier={p.tier} label={t(d, "billing.extend30Days")} variant="secondary" />
                       <AutoRenew tier={p.tier} enabled={restaurant.planAutoRenew} />
                     </>
                   )
@@ -96,7 +101,7 @@ export default async function BillingPage() {
                       type="submit"
                       className="w-full rounded-lg border border-sand-300 py-2 text-sm font-medium text-ink/70 hover:bg-sand-100"
                     >
-                      Switch to Free
+                      {t(d, "billing.switchToFree")}
                     </button>
                   </form>
                 ) : (
@@ -104,8 +109,8 @@ export default async function BillingPage() {
                     tier={p.tier}
                     label={
                       sub.status === "EXPIRED" && p.tier === sub.tier
-                        ? "Renew"
-                        : `Subscribe · ${formatMoney(p.price)}/mo`
+                        ? t(d, "billing.renew")
+                        : `${t(d, "billing.subscribe")} · ${formatMoney(p.price)}${t(d, "billing.perMoShort")}`
                     }
                   />
                 )}
@@ -115,8 +120,7 @@ export default async function BillingPage() {
         })}
       </div>
       <p className="text-xs text-ink/40">
-        Subscriptions are billed per 30-day period (pay-to-extend). Paying before
-        expiry adds to your remaining days.
+        {t(d, "billing.billingNote")}
       </p>
     </div>
   );

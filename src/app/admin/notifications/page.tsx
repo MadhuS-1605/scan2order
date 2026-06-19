@@ -6,6 +6,8 @@ import {
   CalendarClock,
   PartyPopper,
 } from "lucide-react";
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t, type Dict } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { getNotificationFeed, type Notif } from "@/lib/notifications/feed";
 import { LiveStream } from "@/components/live-stream";
@@ -27,16 +29,17 @@ const TINT: Record<Notif["kind"], string> = {
   banquet: "bg-amber-100 text-amber-700",
 };
 
-function ago(d: Date): string {
-  const m = Math.floor((Date.now() - d.getTime()) / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+function ago(dict: Dict, at: Date): string {
+  const m = Math.floor((Date.now() - at.getTime()) / 60000);
+  if (m < 1) return t(dict, "notifications.justNow");
+  if (m < 60) return `${m}${t(dict, "notifications.minutesAgo")}`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  if (h < 24) return `${h}${t(dict, "notifications.hoursAgo")}`;
+  return at.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
 export default async function NotificationsPage() {
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const { restaurant } = await getCurrentRestaurant("overview");
   const feed = await getNotificationFeed(restaurant.id);
 
@@ -45,16 +48,16 @@ export default async function NotificationsPage() {
       <LiveStream />
       <MarkNotificationsSeen />
       <div>
-        <h1 className="font-display text-3xl font-medium text-ink">Notifications</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "notifications.title")}</h1>
         <p className="text-sm text-ink/45">
-          New orders, service calls, low stock, reservations &amp; event enquiries.
+          {t(d, "notifications.subtitle")}
         </p>
       </div>
 
       {feed.length === 0 ? (
         <Card>
           <p className="py-6 text-center text-sm text-ink/45">
-            All caught up — no alerts right now. 🎉
+            {t(d, "notifications.allCaughtUp")} 🎉
           </p>
         </Card>
       ) : (
@@ -81,7 +84,7 @@ export default async function NotificationsPage() {
                         {n.detail}
                       </span>
                     </span>
-                    <time className="shrink-0 text-xs text-ink/40">{ago(n.at)}</time>
+                    <time className="shrink-0 text-xs text-ink/40">{ago(d, n.at)}</time>
                   </Link>
                 </li>
               );

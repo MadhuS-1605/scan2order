@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { formatDuration } from "@/lib/utils";
@@ -9,6 +11,7 @@ import { MarkAttendanceForm } from "./mark-form";
 
 export default async function AttendancePage() {
   const { restaurant } = await getCurrentRestaurant("attendance");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   const now = new Date();
   const startOfToday = new Date(now);
@@ -35,10 +38,9 @@ export default async function AttendancePage() {
     <div className="space-y-5">
       <LiveStream />
       <div>
-        <h1 className="font-display text-3xl font-medium text-ink">Attendance</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "attendance.title")}</h1>
         <p className="text-sm text-ink/45">
-          Staff clock in/out from their device (verified at the venue). Mark or
-          correct shifts here. Showing today.
+          {t(d, "attendance.subtitle")}
         </p>
       </div>
 
@@ -48,10 +50,10 @@ export default async function AttendancePage() {
         <div className="space-y-5">
           <Card>
             <h2 className="mb-3 font-semibold text-ink">
-              On shift now ({onShift.length})
+              {`${t(d, "attendance.onShiftNow")} (${onShift.length})`}
             </h2>
             {onShift.length === 0 ? (
-              <p className="text-sm text-ink/45">No one is clocked in right now.</p>
+              <p className="text-sm text-ink/45">{t(d, "attendance.noOneClockedIn")}</p>
             ) : (
               <ul className="space-y-2">
                 {onShift.map((p) => (
@@ -63,7 +65,7 @@ export default async function AttendancePage() {
                       <Clock className="h-4 w-4 text-olive-600" />
                       {p.adminUser.name}
                       <span className="text-xs font-normal text-ink/45">
-                        in at {timeFmt(p.clockInAt)} ·{" "}
+                        {t(d, "attendance.inAt")} {timeFmt(p.clockInAt)} ·{" "}
                         {formatDuration((now.getTime() - p.clockInAt.getTime()) / 60_000)}
                       </span>
                     </span>
@@ -73,7 +75,7 @@ export default async function AttendancePage() {
                         type="submit"
                         className="rounded-lg border border-sand-300 bg-surface px-3 py-1 text-xs font-medium text-ink/70 hover:border-brand-300 hover:bg-sand-100"
                       >
-                        Clock out
+                        {t(d, "attendance.clockOut")}
                       </button>
                     </form>
                   </li>
@@ -83,9 +85,9 @@ export default async function AttendancePage() {
           </Card>
 
           <Card>
-            <h2 className="mb-3 font-semibold text-ink">Today&apos;s shifts</h2>
+            <h2 className="mb-3 font-semibold text-ink">{t(d, "attendance.todaysShifts")}</h2>
             {punches.length === 0 ? (
-              <p className="text-sm text-ink/45">No attendance recorded today.</p>
+              <p className="text-sm text-ink/45">{t(d, "attendance.noAttendanceToday")}</p>
             ) : (
               <ul className="divide-y divide-sand-100">
                 {punches.map((p) => (
@@ -94,12 +96,12 @@ export default async function AttendancePage() {
                       <p className="text-sm font-medium text-ink">
                         {p.adminUser.name}
                         <span className="ml-2 rounded bg-sand-100 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-ink/45">
-                          {p.source === "MANAGER" ? "Marked" : "Self"}
+                          {p.source === "MANAGER" ? t(d, "attendance.marked") : t(d, "attendance.self")}
                         </span>
                       </p>
                       <p className="text-xs text-ink/50">
                         {timeFmt(p.clockInAt)} —{" "}
-                        {p.clockOutAt ? timeFmt(p.clockOutAt) : "on shift"}
+                        {p.clockOutAt ? timeFmt(p.clockOutAt) : t(d, "attendance.onShift")}
                       </p>
                     </div>
                     <span className="shrink-0 text-sm font-medium text-ink/70">

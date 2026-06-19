@@ -1,12 +1,15 @@
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { SettingsForms } from "./settings-forms";
 
 export default async function SettingsPage() {
   const { restaurant, config } = await getCurrentRestaurant("settings");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   return (
     <div className="space-y-5">
-      <h1 className="font-display text-3xl font-medium text-ink">Settings</h1>
+      <h1 className="font-display text-3xl font-medium text-ink">{t(d, "settings.title")}</h1>
       <SettingsForms
         tenant={{
           subdomain: restaurant.subdomain,

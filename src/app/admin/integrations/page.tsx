@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import {
@@ -10,6 +12,7 @@ import { ProviderCard } from "./integrations-cards";
 
 export default async function IntegrationsPage() {
   const { restaurant } = await getCurrentRestaurant("settings");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   const existing = await prisma.integration.findMany({
     where: { restaurantId: restaurant.id },
@@ -19,11 +22,8 @@ export default async function IntegrationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-medium text-ink">Integrations</h1>
-        <p className="text-sm text-ink/45">
-          Connect your POS, hotel PMS, accounting, SSO and webhooks. Webhooks fire
-          live on order events; the rest store credentials ready to wire up.
-        </p>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "integrations.title")}</h1>
+        <p className="text-sm text-ink/45">{t(d, "integrations.intro")}</p>
       </div>
 
       {CATEGORY_ORDER.map((cat) => {

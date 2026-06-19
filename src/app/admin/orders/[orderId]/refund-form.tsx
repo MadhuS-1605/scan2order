@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { refundOrderAction, type RefundResult } from "@/lib/orders/actions";
 import { Button, Input, Alert } from "@/components/ui";
+import { useT } from "@/components/admin/i18n-provider";
 
 // Staff refund form. Defaults to the full refundable amount; allow a smaller
 // (partial) amount. Online payments refund via Razorpay; otherwise it records a
@@ -18,6 +19,7 @@ export function RefundForm({
   currency: string;
   online: boolean;
 }) {
+  const tr = useT();
   const [state, action, pending] = useActionState<RefundResult | null, FormData>(
     async (_prev, fd) => refundOrderAction(fd),
     null,
@@ -26,8 +28,8 @@ export function RefundForm({
   if (state?.ok) {
     return (
       <p className="text-sm font-medium text-olive-700">
-        ✓ Refunded {currency} {state.amount.toFixed(2)}
-        {online ? " via the payment gateway." : " (recorded)."}
+        ✓ {tr("refund.refunded")} {currency} {state.amount.toFixed(2)}
+        {online ? ` ${tr("refund.viaGateway")}` : ` ${tr("refund.recordedNote")}`}
       </p>
     );
   }
@@ -39,7 +41,7 @@ export function RefundForm({
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-sm">
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/55">
-            Amount ({currency})
+            {tr("refund.amount")} ({currency})
           </span>
           <Input
             name="amount"
@@ -53,19 +55,21 @@ export function RefundForm({
         </label>
         <label className="flex-1 text-sm">
           <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/55">
-            Reason (optional)
+            {tr("refund.reason")} ({tr("common.optional")})
           </span>
-          <Input name="reason" placeholder="e.g. item unavailable" />
+          <Input name="reason" placeholder={tr("refund.reasonPlaceholder")} />
         </label>
         <Button type="submit" variant="danger" disabled={pending}>
-          {pending ? "Refunding…" : online ? "Refund online" : "Record refund"}
+          {pending
+            ? tr("refund.refunding")
+            : online
+              ? tr("refund.refundOnline")
+              : tr("refund.recordRefund")}
         </Button>
       </div>
       <p className="text-xs text-ink/45">
-        Up to {currency} {refundable.toFixed(2)} refundable.
-        {online
-          ? " This calls the payment gateway to return the money."
-          : " This records a manual (cash/counter) refund."}
+        {`${tr("refund.upTo")} ${currency} ${refundable.toFixed(2)} ${tr("refund.refundableSuffix")}`}
+        {online ? ` ${tr("refund.gatewayHint")}` : ` ${tr("refund.manualHint")}`}
       </p>
     </form>
   );

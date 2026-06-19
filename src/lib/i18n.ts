@@ -3,14 +3,17 @@
 // locale is stored in the `sto_admin_locale` cookie. Translate incrementally:
 // add keys here + render with `t(...)` (server) or `useT()` (client).
 
-export type Locale = "en" | "hi";
+export type Locale = "en" | "kn" | "hi";
 export const ADMIN_LOCALES: { code: Locale; label: string }[] = [
   { code: "en", label: "English" },
+  { code: "kn", label: "ಕನ್ನಡ" },
   { code: "hi", label: "हिंदी" },
 ];
 export const ADMIN_LOCALE_COOKIE = "sto_admin_locale";
 
 export type Dict = Record<string, string>;
+
+import { screenEn, screenHi, screenKn } from "./i18n-screens";
 
 const en: Dict = {
   "nav.Main": "Main",
@@ -42,6 +45,37 @@ const en: Dict = {
   "nav.Plan & billing": "Plan & billing",
   "nav.Settings": "Settings",
   "common.signOut": "Sign out",
+  "common.save": "Save",
+  "common.cancel": "Cancel",
+  "common.delete": "Delete",
+  "common.edit": "Edit",
+  "common.add": "Add",
+  "common.remove": "Remove",
+  "common.close": "Close",
+  "common.back": "Back",
+  "common.search": "Search",
+  "common.loading": "Loading…",
+  "common.none": "None",
+  "common.yes": "Yes",
+  "common.no": "No",
+  "common.confirm": "Confirm",
+  "common.saving": "Saving…",
+  "common.actions": "Actions",
+  "common.status": "Status",
+  "common.date": "Date",
+  "common.time": "Time",
+  "common.total": "Total",
+  "common.name": "Name",
+  "common.optional": "Optional",
+  "common.all": "All",
+  "common.today": "Today",
+  "common.update": "Update",
+  "common.create": "Create",
+  "common.view": "View",
+  "common.print": "Print",
+  "common.export": "Export",
+  "common.enabled": "Enabled",
+  "common.disabled": "Disabled",
 };
 
 const hi: Dict = {
@@ -74,9 +108,109 @@ const hi: Dict = {
   "nav.Plan & billing": "प्लान और बिलिंग",
   "nav.Settings": "सेटिंग्स",
   "common.signOut": "साइन आउट",
+  "common.save": "सहेजें",
+  "common.cancel": "रद्द करें",
+  "common.delete": "हटाएँ",
+  "common.edit": "संपादित करें",
+  "common.add": "जोड़ें",
+  "common.remove": "हटाएँ",
+  "common.close": "बंद करें",
+  "common.back": "वापस",
+  "common.search": "खोजें",
+  "common.loading": "लोड हो रहा है…",
+  "common.none": "कोई नहीं",
+  "common.yes": "हाँ",
+  "common.no": "नहीं",
+  "common.confirm": "पुष्टि करें",
+  "common.saving": "सहेजा जा रहा है…",
+  "common.actions": "क्रियाएँ",
+  "common.status": "स्थिति",
+  "common.date": "तारीख",
+  "common.time": "समय",
+  "common.total": "कुल",
+  "common.name": "नाम",
+  "common.optional": "वैकल्पिक",
+  "common.all": "सभी",
+  "common.today": "आज",
+  "common.update": "अपडेट करें",
+  "common.create": "बनाएँ",
+  "common.view": "देखें",
+  "common.print": "प्रिंट करें",
+  "common.export": "एक्सपोर्ट",
+  "common.enabled": "सक्षम",
+  "common.disabled": "अक्षम",
 };
 
-const DICTS: Record<Locale, Dict> = { en, hi };
+const kn: Dict = {
+  "nav.Main": "ಮುಖ್ಯ",
+  "nav.Manage": "ನಿರ್ವಹಣೆ",
+  "nav.Insights": "ಒಳನೋಟಗಳು",
+  "nav.Business": "ವ್ಯವಹಾರ",
+  "nav.Overview": "ಅವಲೋಕನ",
+  "nav.Notifications": "ಅಧಿಸೂಚನೆಗಳು",
+  "nav.Orders": "ಆರ್ಡರ್‌ಗಳು",
+  "nav.Floor": "ಫ್ಲೋರ್",
+  "nav.Kitchen": "ಅಡುಗೆಮನೆ",
+  "nav.Bar": "ಬಾರ್",
+  "nav.Monitor": "ಮಾನಿಟರ್",
+  "nav.Menu": "ಮೆನು",
+  "nav.Coupons": "ಕೂಪನ್‌ಗಳು",
+  "nav.Inventory": "ದಾಸ್ತಾನು",
+  "nav.Tables & QR": "ಟೇಬಲ್‌ಗಳು & QR",
+  "nav.Reservations": "ಕಾಯ್ದಿರಿಸುವಿಕೆಗಳು",
+  "nav.Rooms": "ಕೊಠಡಿಗಳು",
+  "nav.Banquets": "ಔತಣಕೂಟಗಳು",
+  "nav.Analytics": "ವಿಶ್ಲೇಷಣೆ",
+  "nav.Feedback": "ಪ್ರತಿಕ್ರಿಯೆ",
+  "nav.Export": "ರಫ್ತು",
+  "nav.Staff": "ಸಿಬ್ಬಂದಿ",
+  "nav.Attendance": "ಹಾಜರಾತಿ",
+  "nav.Properties": "ಪ್ರಾಪರ್ಟಿಗಳು",
+  "nav.Audit log": "ಆಡಿಟ್ ಲಾಗ್",
+  "nav.Integrations": "ಇಂಟಿಗ್ರೇಶನ್‌ಗಳು",
+  "nav.Plan & billing": "ಪ್ಲಾನ್ & ಬಿಲ್ಲಿಂಗ್",
+  "nav.Settings": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+  "common.signOut": "ಸೈನ್ ಔಟ್",
+  "common.save": "ಉಳಿಸಿ",
+  "common.cancel": "ರದ್ದುಮಾಡಿ",
+  "common.delete": "ಅಳಿಸಿ",
+  "common.edit": "ಸಂಪಾದಿಸಿ",
+  "common.add": "ಸೇರಿಸಿ",
+  "common.remove": "ತೆಗೆದುಹಾಕಿ",
+  "common.close": "ಮುಚ್ಚಿ",
+  "common.back": "ಹಿಂದೆ",
+  "common.search": "ಹುಡುಕಿ",
+  "common.loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ…",
+  "common.none": "ಯಾವುದೂ ಇಲ್ಲ",
+  "common.yes": "ಹೌದು",
+  "common.no": "ಇಲ್ಲ",
+  "common.confirm": "ದೃಢೀಕರಿಸಿ",
+  "common.saving": "ಉಳಿಸಲಾಗುತ್ತಿದೆ…",
+  "common.actions": "ಕ್ರಿಯೆಗಳು",
+  "common.status": "ಸ್ಥಿತಿ",
+  "common.date": "ದಿನಾಂಕ",
+  "common.time": "ಸಮಯ",
+  "common.total": "ಒಟ್ಟು",
+  "common.name": "ಹೆಸರು",
+  "common.optional": "ಐಚ್ಛಿಕ",
+  "common.all": "ಎಲ್ಲಾ",
+  "common.today": "ಇಂದು",
+  "common.update": "ಅಪ್‌ಡೇಟ್ ಮಾಡಿ",
+  "common.create": "ರಚಿಸಿ",
+  "common.view": "ವೀಕ್ಷಿಸಿ",
+  "common.print": "ಮುದ್ರಿಸಿ",
+  "common.export": "ರಫ್ತು",
+  "common.enabled": "ಸಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
+  "common.disabled": "ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
+};
+
+// Per-screen keys live in i18n-screens.ts (merged here) so screen translations
+// stay separate from the nav/common base.
+const DICTS: Record<Locale, Dict> = {
+  en: { ...en, ...screenEn },
+  kn: { ...kn, ...screenKn },
+  hi: { ...hi, ...screenHi },
+};
 
 export function dictFor(locale: string | undefined): Dict {
   return DICTS[(locale as Locale)] ?? en;

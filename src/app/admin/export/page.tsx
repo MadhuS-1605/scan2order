@@ -1,25 +1,28 @@
 import { Download, ShoppingBag, Users, UtensilsCrossed, Star } from "lucide-react";
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { Card } from "@/components/ui";
 
 const EXPORTS = [
-  { type: "orders", label: "Orders", desc: "Every order with items, totals & payment.", icon: ShoppingBag },
-  { type: "customers", label: "Customers", desc: "Diners, loyalty points & order counts.", icon: Users },
-  { type: "menu", label: "Menu", desc: "Items, prices, availability & stock.", icon: UtensilsCrossed },
-  { type: "feedback", label: "Feedback", desc: "Ratings and comments.", icon: Star },
+  { type: "orders", labelKey: "export.ordersLabel", descKey: "export.ordersDesc", icon: ShoppingBag },
+  { type: "customers", labelKey: "export.customersLabel", descKey: "export.customersDesc", icon: Users },
+  { type: "menu", labelKey: "export.menuLabel", descKey: "export.menuDesc", icon: UtensilsCrossed },
+  { type: "feedback", labelKey: "export.feedbackLabel", descKey: "export.feedbackDesc", icon: Star },
 ];
 
 export default async function ExportPage() {
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   await getCurrentRestaurant("analytics");
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="font-display text-3xl font-medium text-ink">
-          Data export
+          {t(d, "export.title")}
         </h1>
         <p className="text-sm text-ink/45">
-          Download your data as CSV (opens in Excel / Google Sheets).
+          {t(d, "export.subtitle")}
         </p>
       </div>
 
@@ -31,8 +34,8 @@ export default async function ExportPage() {
                 <e.icon className="h-5 w-5" strokeWidth={1.75} />
               </div>
               <div>
-                <p className="font-medium text-ink">{e.label}</p>
-                <p className="text-xs text-ink/50">{e.desc}</p>
+                <p className="font-medium text-ink">{t(d, e.labelKey)}</p>
+                <p className="text-xs text-ink/50">{t(d, e.descKey)}</p>
               </div>
             </div>
             <a

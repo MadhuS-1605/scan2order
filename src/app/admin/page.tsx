@@ -1,14 +1,17 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { formatMoney, toNumber, formatDuration } from "@/lib/utils";
 import { Clock } from "lucide-react";
 import { StatusBadge } from "@/components/ui";
 import { ACTIVE_STATUSES } from "@/lib/orders/status";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 
 export default async function AdminOverview() {
   const { restaurant, config } = await getCurrentRestaurant("overview");
   const rid = restaurant.id;
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -49,24 +52,24 @@ export default async function AdminOverview() {
   const now = Date.now();
 
   const stats = [
-    { label: "Orders today", value: String(ordersToday) },
+    { label: t(d, "dashboard.ordersToday"), value: String(ordersToday) },
     {
-      label: "Revenue today",
+      label: t(d, "dashboard.revenueToday"),
       value: formatMoney(revenueToday, restaurant.config!.currency),
     },
-    { label: "Awaiting confirmation", value: String(pending), accent: pending > 0 },
-    { label: "Active orders", value: String(active) },
+    { label: t(d, "dashboard.awaitingConfirmation"), value: String(pending), accent: pending > 0 },
+    { label: t(d, "dashboard.activeOrders"), value: String(active) },
   ];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-3xl font-medium text-ink">Overview</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "dashboard.overview")}</h1>
         <Link
           href="/admin/orders"
           className="text-sm font-medium text-brand-600"
         >
-          View all orders →
+          {t(d, "dashboard.viewAllOrders")} →
         </Link>
       </div>
 
@@ -93,14 +96,14 @@ export default async function AdminOverview() {
       {config.featureAttendance && (
         <div className="rounded-2xl border border-sand-200 bg-surface">
           <div className="flex items-center justify-between border-b border-sand-100 px-5 py-4">
-            <h2 className="font-semibold text-ink">On shift now ({onShift.length})</h2>
+            <h2 className="font-semibold text-ink">{t(d, "dashboard.onShiftNow")} ({onShift.length})</h2>
             <Link href="/admin/attendance" className="text-sm font-medium text-brand-600">
-              Attendance →
+              {t(d, "nav.Attendance")} →
             </Link>
           </div>
           {onShift.length === 0 ? (
             <p className="px-5 py-6 text-center text-sm text-ink/55">
-              No one is clocked in right now.
+              {t(d, "dashboard.noOneClockedIn")}
             </p>
           ) : (
             <ul className="flex flex-wrap gap-2 px-5 py-4">
@@ -123,11 +126,11 @@ export default async function AdminOverview() {
 
       <div className="rounded-2xl border border-sand-200 bg-surface">
         <div className="border-b border-sand-100 px-5 py-4">
-          <h2 className="font-semibold text-ink">Recent orders</h2>
+          <h2 className="font-semibold text-ink">{t(d, "dashboard.recentOrders")}</h2>
         </div>
         {recent.length === 0 ? (
           <p className="px-5 py-8 text-center text-sm text-ink/55">
-            No orders yet. Share your table QR codes to start taking orders.
+            {t(d, "dashboard.noOrdersYet")}
           </p>
         ) : (
           <ul className="divide-y divide-sand-100">

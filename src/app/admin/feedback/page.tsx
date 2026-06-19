@@ -1,9 +1,12 @@
 import { Star } from "lucide-react";
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { Card } from "@/components/ui";
 
 export default async function FeedbackPage() {
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const { restaurant } = await getCurrentRestaurant("analytics");
 
   const feedback = await prisma.feedback.findMany({
@@ -24,7 +27,7 @@ export default async function FeedbackPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="font-display text-3xl font-medium text-ink">Feedback</h1>
+      <h1 className="font-display text-3xl font-medium text-ink">{t(d, "feedback.title")}</h1>
 
       <div className="grid gap-4 sm:grid-cols-[240px_1fr]">
         <Card className="text-center">
@@ -41,7 +44,7 @@ export default async function FeedbackPage() {
               />
             ))}
           </div>
-          <p className="mt-1 text-sm text-ink/45">{count} ratings</p>
+          <p className="mt-1 text-sm text-ink/45">{count} {t(d, "feedback.ratings")}</p>
         </Card>
 
         <Card>
@@ -63,9 +66,9 @@ export default async function FeedbackPage() {
       </div>
 
       <Card>
-        <h2 className="mb-3 font-semibold text-ink">Recent comments</h2>
+        <h2 className="mb-3 font-semibold text-ink">{t(d, "feedback.recentComments")}</h2>
         {feedback.filter((f) => f.comment).length === 0 ? (
-          <p className="text-sm text-ink/45">No written feedback yet.</p>
+          <p className="text-sm text-ink/45">{t(d, "feedback.noWrittenFeedback")}</p>
         ) : (
           <ul className="divide-y divide-sand-100">
             {feedback

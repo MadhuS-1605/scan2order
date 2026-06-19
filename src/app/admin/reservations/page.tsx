@@ -1,25 +1,28 @@
 import { Users, Clock } from "lucide-react";
+import { cookies } from "next/headers";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { getBaseUrl } from "@/lib/request";
+import { ADMIN_LOCALE_COOKIE, dictFor, t, type Dict } from "@/lib/i18n";
 import { Button, StatusBadge } from "@/components/ui";
 import { LiveStream } from "@/components/live-stream";
 import { setReservationStatusAction } from "@/lib/reservations/actions";
 
-const NEXT_ACTIONS: Record<string, { status: string; label: string; danger?: boolean }[]> = {
+const NEXT_ACTIONS: Record<string, { status: string; labelKey: string; danger?: boolean }[]> = {
   PENDING: [
-    { status: "CONFIRMED", label: "Confirm" },
-    { status: "CANCELLED", label: "Decline", danger: true },
+    { status: "CONFIRMED", labelKey: "reservations.confirm" },
+    { status: "CANCELLED", labelKey: "reservations.decline", danger: true },
   ],
   CONFIRMED: [
-    { status: "SEATED", label: "Seat" },
-    { status: "NO_SHOW", label: "No-show", danger: true },
+    { status: "SEATED", labelKey: "reservations.seat" },
+    { status: "NO_SHOW", labelKey: "reservations.noShow", danger: true },
   ],
   SEATED: [],
 };
 
 export default async function ReservationsPage() {
   const { restaurant } = await getCurrentRestaurant("orders");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
 
@@ -50,30 +53,30 @@ export default async function ReservationsPage() {
       <LiveStream />
       <div className="flex flex-wrap items-end justify-between gap-3">
         <h1 className="font-display text-3xl font-medium text-ink">
-          Reservations
+          {t(d, "reservations.title")}
         </h1>
         <a
           href={bookUrl}
           target="_blank"
           className="rounded-lg border border-sand-300 bg-surface px-3 py-1.5 text-xs text-ink/60 hover:border-brand-300"
         >
-          Booking link: <span className="text-brand-600">{bookUrl}</span>
+          {t(d, "reservations.bookingLink")}: <span className="text-brand-600">{bookUrl}</span>
         </a>
       </div>
 
       <section>
         <h2 className="mb-2 flex items-center gap-1.5 font-display text-lg text-ink">
           <Clock className="h-4 w-4 text-ink/40" />
-          Waitlist ({waitlist.length})
+          {t(d, "reservations.waitlist")} ({waitlist.length})
         </h2>
         {waitlist.length === 0 ? (
           <p className="rounded-xl border border-dashed border-sand-300 bg-surface p-6 text-center text-sm text-ink/45">
-            Nobody waiting.
+            {t(d, "reservations.nobodyWaiting")}
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {waitlist.map((r) => (
-              <ResCard key={r.id} r={r} />
+              <ResCard key={r.id} r={r} d={d} />
             ))}
           </div>
         )}
@@ -82,16 +85,16 @@ export default async function ReservationsPage() {
       <section>
         <h2 className="mb-2 flex items-center gap-1.5 font-display text-lg text-ink">
           <Users className="h-4 w-4 text-ink/40" />
-          Upcoming reservations ({reservations.length})
+          {t(d, "reservations.upcoming")} ({reservations.length})
         </h2>
         {reservations.length === 0 ? (
           <p className="rounded-xl border border-dashed border-sand-300 bg-surface p-6 text-center text-sm text-ink/45">
-            No upcoming reservations.
+            {t(d, "reservations.noUpcoming")}
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {reservations.map((r) => (
-              <ResCard key={r.id} r={r} showTime />
+              <ResCard key={r.id} r={r} d={d} showTime />
             ))}
           </div>
         )}
@@ -102,6 +105,7 @@ export default async function ReservationsPage() {
 
 function ResCard({
   r,
+  d,
   showTime,
 }: {
   r: {
@@ -113,6 +117,7 @@ function ResCard({
     notes: string | null;
     status: string;
   };
+  d: Dict;
   showTime?: boolean;
 }) {
   const actions = NEXT_ACTIONS[r.status] ?? [];
@@ -123,7 +128,7 @@ function ResCard({
           <p className="font-medium text-ink">
             {r.customerName}{" "}
             <span className="text-sm font-normal text-ink/45">
-              · {r.partySize} {r.partySize === 1 ? "guest" : "guests"}
+              · {r.partySize} {r.partySize === 1 ? t(d, "reservations.guest") : t(d, "reservations.guests")}
             </span>
           </p>
           <p className="text-xs text-ink/50">{r.customerPhone}</p>
@@ -153,7 +158,7 @@ function ResCard({
                 variant={a.danger ? "danger" : "primary"}
                 type="submit"
               >
-                {a.label}
+                {t(d, a.labelKey)}
               </Button>
             </form>
           ))}

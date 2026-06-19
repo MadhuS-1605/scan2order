@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { modifierSummary } from "@/lib/utils";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { AutoPrint } from "./auto-print";
 
 // Thermal-width (80mm) kitchen ticket designed for the browser print dialog.
@@ -13,6 +15,7 @@ export default async function KotPage({
 }) {
   const { orderId } = await params;
   const { restaurant } = await getCurrentRestaurant("kitchen");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const order = await prisma.order.findFirst({
     where: { id: orderId, restaurantId: restaurant.id },
     include: { table: true, items: true },
@@ -34,18 +37,22 @@ export default async function KotPage({
       <AutoPrint />
       <div className="mx-auto w-[80mm] max-w-full p-2 font-mono text-[13px] leading-tight">
         <div className="text-center">
-          <p className="text-sm font-bold tracking-wide">*** KITCHEN ***</p>
+          <p className="text-sm font-bold tracking-wide">*** {t(d, "kot.kitchen")} ***</p>
           <p className="font-semibold">{restaurant.name}</p>
         </div>
         <hr className="my-2 border-t border-dashed border-black" />
         <div className="flex items-baseline justify-between">
           <span className="text-xl font-extrabold">KOT #{order.orderNumber}</span>
           <span className="text-base font-bold">
-            {order.table?.label ?? "Takeaway"}
+            {order.table?.label ?? t(d, "kot.takeaway")}
           </span>
         </div>
         <p>{when}</p>
-        {order.customerName && <p>Customer: {order.customerName}</p>}
+        {order.customerName && (
+          <p>
+            {t(d, "kot.customer")}: {order.customerName}
+          </p>
+        )}
         <hr className="my-2 border-t border-dashed border-black" />
         <ul className="space-y-1.5">
           {order.items.map((it) => {
@@ -66,12 +73,12 @@ export default async function KotPage({
         {order.notes && (
           <>
             <hr className="my-2 border-t border-dashed border-black" />
-            <p className="font-semibold">Note: {order.notes}</p>
+            <p className="font-semibold">{t(d, "kot.note")}: {order.notes}</p>
           </>
         )}
         <hr className="my-2 border-t border-dashed border-black" />
         <p className="no-print mt-3 text-center text-[11px] text-neutral-500">
-          Press Ctrl/⌘+P to reprint · close this tab when done
+          {t(d, "kot.reprintHint")}
         </p>
       </div>
     </div>

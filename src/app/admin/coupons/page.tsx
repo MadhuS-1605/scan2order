@@ -1,8 +1,11 @@
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { CouponManager } from "./coupon-manager";
 
 export default async function CouponsPage() {
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const { restaurant } = await getCurrentRestaurant("menu");
 
   const coupons = await prisma.coupon.findMany({
@@ -13,9 +16,9 @@ export default async function CouponsPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-display text-3xl font-medium text-ink">Coupons</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "coupons.title")}</h1>
         <p className="text-sm text-ink/45">
-          Discount codes diners enter at the bill.
+          {t(d, "coupons.subtitle")}
         </p>
       </div>
       <CouponManager

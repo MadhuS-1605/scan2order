@@ -1,4 +1,6 @@
 import { Building2, Check } from "lucide-react";
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { switchPropertyAction } from "@/lib/properties/actions";
@@ -6,16 +8,17 @@ import { formatMoney } from "@/lib/utils";
 import { Card } from "@/components/ui";
 import { AddPropertyForm } from "./add-property-form";
 
-const TYPE_LABELS: Record<string, string> = {
-  RESTAURANT: "Restaurant",
-  CAFE: "Café",
-  HOTEL: "Hotel",
-  CLOUD_KITCHEN: "Cloud kitchen",
-  BAR: "Bar",
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  RESTAURANT: "properties.typeRestaurant",
+  CAFE: "properties.typeCafe",
+  HOTEL: "properties.typeHotel",
+  CLOUD_KITCHEN: "properties.typeCloudKitchen",
+  BAR: "properties.typeBar",
 };
 
 export default async function PropertiesPage() {
   const { restaurant, session } = await getCurrentRestaurant("properties");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   const me = await prisma.adminUser.findUnique({
     where: { id: session.sub },
@@ -57,10 +60,9 @@ export default async function PropertiesPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-display text-3xl font-medium text-ink">Properties</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "properties.title")}</h1>
         <p className="text-sm text-ink/45">
-          Manage every outlet under one login. Switch the active property to run
-          its floor, kitchen and menu.
+          {t(d, "properties.subtitle")}
         </p>
       </div>
 
@@ -68,12 +70,12 @@ export default async function PropertiesPage() {
         <div className="grid gap-3 sm:grid-cols-2">
           <Card>
             <p className="text-xs uppercase tracking-wide text-ink/45">
-              Today across {properties.length} properties
+              {`${t(d, "properties.todayAcross")} ${properties.length} ${t(d, "properties.propertiesWord")}`}
             </p>
             <p className="font-display text-3xl text-ink">
               {formatMoney(totalRevenue)}
             </p>
-            <p className="text-sm text-ink/50">{totalOrders} orders</p>
+            <p className="text-sm text-ink/50">{`${totalOrders} ${t(d, "properties.orders")}`}</p>
           </Card>
         </div>
       )}
@@ -96,7 +98,7 @@ export default async function PropertiesPage() {
                 <div>
                   <p className="font-medium text-ink">{p.name}</p>
                   <p className="text-xs text-ink/50">
-                    {TYPE_LABELS[p.type] ?? p.type}
+                    {TYPE_LABEL_KEYS[p.type] ? t(d, TYPE_LABEL_KEYS[p.type]) : p.type}
                     {p.city && ` · ${p.city}`}
                   </p>
                 </div>
@@ -106,11 +108,11 @@ export default async function PropertiesPage() {
                   <p className="font-medium text-ink">
                     {formatMoney(s.revenue)}
                   </p>
-                  <p className="text-xs text-ink/45">{s.orders} today</p>
+                  <p className="text-xs text-ink/45">{`${s.orders} ${t(d, "common.today")}`}</p>
                 </div>
                 {active ? (
                   <span className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white">
-                    <Check className="h-4 w-4" /> Active
+                    <Check className="h-4 w-4" /> {t(d, "properties.active")}
                   </span>
                 ) : (
                   <form action={switchPropertyAction}>
@@ -119,7 +121,7 @@ export default async function PropertiesPage() {
                       type="submit"
                       className="rounded-lg border border-sand-300 bg-surface px-3 py-2 text-sm font-medium text-ink/70 transition-colors hover:bg-sand-100"
                     >
-                      Switch
+                      {t(d, "properties.switch")}
                     </button>
                   </form>
                 )}

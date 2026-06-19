@@ -8,6 +8,7 @@ import {
   setOrderItemQtyAction,
 } from "@/lib/orders/staff-actions";
 import { Button } from "@/components/ui";
+import { useT } from "@/components/admin/i18n-provider";
 import { formatMoney } from "@/lib/utils";
 
 type Line = {
@@ -29,6 +30,7 @@ export function OrderItemsEditor({
   menu: { id: string; name: string }[];
   currency: string;
 }) {
+  const tr = useT();
   const router = useRouter();
   const [pending, start] = useTransition();
   const [addId, setAddId] = useState(menu[0]?.id ?? "");
@@ -71,7 +73,7 @@ export function OrderItemsEditor({
                 <button
                   className="px-2 py-1 text-ink/70"
                   onClick={() => setQty(it.id, it.quantity - 1)}
-                  aria-label="decrease"
+                  aria-label={tr("orderItems.decrease")}
                 >
                   <Minus className="h-3.5 w-3.5" />
                 </button>
@@ -79,14 +81,14 @@ export function OrderItemsEditor({
                 <button
                   className="px-2 py-1 text-ink/70"
                   onClick={() => setQty(it.id, it.quantity + 1)}
-                  aria-label="increase"
+                  aria-label={tr("orderItems.increase")}
                 >
                   <Plus className="h-3.5 w-3.5" />
                 </button>
               </span>
               <button
                 onClick={() => setQty(it.id, 0)}
-                aria-label="remove item"
+                aria-label={tr("orderItems.removeItem")}
                 className="text-ink/30 hover:text-red-600"
               >
                 <Trash2 className="h-4 w-4" />
@@ -109,7 +111,7 @@ export function OrderItemsEditor({
           ))}
         </select>
         <Button size="sm" variant="secondary" onClick={add} disabled={!addId}>
-          <Plus className="h-3.5 w-3.5" /> Add item
+          <Plus className="h-3.5 w-3.5" /> {tr("orderItems.addItem")}
         </Button>
       </div>
     </div>

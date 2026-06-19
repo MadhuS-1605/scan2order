@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { Wine } from "lucide-react";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
@@ -6,6 +7,7 @@ import { modifierSummary, seatLabel } from "@/lib/utils";
 import { LiveStream } from "@/components/live-stream";
 import { ACTIVE_STATUSES } from "@/lib/orders/status";
 import { toggleItemPreparedAction } from "@/lib/orders/actions";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 
 // Bar counter KDS — a prep board of drink (BAR-station) items across open
 // orders. Bar staff tick each drink "Ready" (a per-item ack, independent of the
@@ -14,6 +16,7 @@ import { toggleItemPreparedAction } from "@/lib/orders/actions";
 export default async function BarScreen() {
   const { restaurant, config } = await getCurrentRestaurant("kitchen");
   if (!config.featureBar) redirect("/admin");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   const orders = await prisma.order.findMany({
     where: { restaurantId: restaurant.id, status: { in: ACTIVE_STATUSES } },
@@ -40,15 +43,14 @@ export default async function BarScreen() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="flex items-center gap-2 font-display text-3xl font-medium text-ink">
           <Wine className="h-7 w-7 text-brand-600" strokeWidth={1.75} />
-          Bar counter
+          {t(d, "bar.title")}
         </h1>
-        <span className="text-sm text-ink/45">{tickets.length} to pour</span>
+        <span className="text-sm text-ink/45">{tickets.length} {t(d, "bar.toPour")}</span>
       </div>
 
       {tickets.length === 0 ? (
         <p className="rounded-xl border border-dashed border-sand-300 p-10 text-center text-sm text-ink/40">
-          No drink orders right now. Tag drink categories as “Bar” in Menu so
-          their orders appear here.
+          {t(d, "bar.noDrinkOrders")}
         </p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -90,7 +92,7 @@ export default async function BarScreen() {
                             : "border-olive-500/40 bg-olive-500/10 text-olive-700 hover:bg-olive-500/20"
                         }`}
                       >
-                        {it.preparedAt ? "Undo" : "Ready"}
+                        {it.preparedAt ? t(d, "bar.undo") : t(d, "bar.ready")}
                       </button>
                     </form>
                   </li>

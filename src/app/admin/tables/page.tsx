@@ -1,15 +1,18 @@
 import Image from "next/image";
+import { cookies } from "next/headers";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { qrDataUrl, tableMenuUrl } from "@/lib/qr";
 import { getBaseUrl } from "@/lib/request";
 import { deleteTableAction } from "@/lib/onboarding/actions";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { Card } from "@/components/ui";
 import { AddTableForm, PrintButton } from "./tables-manager";
 
 export default async function TablesPage() {
   const { restaurant, config } = await getCurrentRestaurant("tables");
   const baseUrl = await getBaseUrl();
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const selfService = config.serviceModel === "SELF_SERVICE";
 
   const tables = await prisma.restaurantTable.findMany({
@@ -47,19 +50,17 @@ export default async function TablesPage() {
     return (
       <div className="space-y-5">
         <div className="flex items-center justify-between">
-          <h1 className="font-display text-3xl font-medium text-ink">Ordering QR</h1>
+          <h1 className="font-display text-3xl font-medium text-ink">{t(d, "tables.orderingQr")}</h1>
           {qr && <PrintButton />}
         </div>
         <p className="max-w-prose text-sm text-ink/55">
-          This is a self-service venue, so there are no tables. Print this single
-          QR and place it at your counter — guests scan it, order, pay, and pick
-          up by their order number.
+          {t(d, "tables.selfServiceIntro")}
         </p>
         {qr ? (
           <Card id="qr-print-area" className="max-w-xs text-center">
             <Image
               src={qr.qr}
-              alt="Venue ordering QR"
+              alt={t(d, "tables.venueOrderingQr")}
               width={200}
               height={200}
               unoptimized
@@ -71,30 +72,37 @@ export default async function TablesPage() {
               download="ordering-qr.png"
               className="mt-2 inline-block text-sm font-medium text-brand-600 print:hidden"
             >
-              Download QR
+              {t(d, "tables.downloadQr")}
             </a>
           </Card>
         ) : (
-          <p className="text-sm text-ink/55">Your ordering QR is being set up.</p>
+          <p className="text-sm text-ink/55">{t(d, "tables.qrBeingSetUp")}</p>
         )}
       </div>
     );
   }
 
+  // Precomputed inside `.map` below the table item is named `t`, shadowing the
+  // `t()` translate fn — so capture these strings up front.
+  const dRoom = t(d, "tables.room");
+  const dSeats = t(d, "tables.seats");
+  const dDownload = t(d, "tables.download");
+  const dRemove = t(d, "common.remove");
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-3xl font-medium text-ink">Tables &amp; QR</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "tables.tablesAndQr")}</h1>
         {withQr.length > 0 && <PrintButton />}
       </div>
 
       <Card className="max-w-md">
-        <h2 className="mb-3 font-semibold text-ink">Add a table or room</h2>
+        <h2 className="mb-3 font-semibold text-ink">{t(d, "tables.addTableOrRoom")}</h2>
         <AddTableForm />
       </Card>
 
       {withQr.length === 0 ? (
-        <p className="text-sm text-ink/55">No tables yet.</p>
+        <p className="text-sm text-ink/55">{t(d, "tables.noTablesYet")}</p>
       ) : (
         <div
           id="qr-print-area"
@@ -107,22 +115,22 @@ export default async function TablesPage() {
             >
               <Image
                 src={t.qr}
-                alt={`QR for ${t.label}`}
+                alt={`${d["tables.qrForAlt"] ?? "QR for"} ${t.label}`}
                 width={180}
                 height={180}
                 unoptimized
                 className="mx-auto h-44 w-44"
               />
               <p className="mt-2 font-semibold text-ink">
-                {t.kind === "ROOM" ? `Room ${t.label}` : t.label}
+                {t.kind === "ROOM" ? `${dRoom} ${t.label}` : t.label}
               </p>
               <p className="text-xs text-ink/55">
                 {t.kind === "ROOM" && (
                   <span className="mr-1 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand-600">
-                    Room
+                    {dRoom}
                   </span>
                 )}
-                {t.seats} seats
+                {t.seats} {dSeats}
               </p>
               <p className="mt-1 break-all text-[10px] text-ink/45">
                 {t.url}
@@ -133,12 +141,12 @@ export default async function TablesPage() {
                   download={`qr-${t.label}.png`}
                   className="font-medium text-brand-600"
                 >
-                  Download
+                  {dDownload}
                 </a>
                 <form action={deleteTableAction}>
                   <input type="hidden" name="id" value={t.id} />
                   <button className="text-red-600" type="submit">
-                    Remove
+                    {dRemove}
                   </button>
                 </form>
               </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useT } from "@/components/admin/i18n-provider";
 import {
   startPlanCheckoutAction,
   verifyPlanPaymentAction,
@@ -36,6 +37,7 @@ export function PlanCheckout({
   variant?: "primary" | "secondary";
 }) {
   const router = useRouter();
+  const tr = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,12 +53,12 @@ export function PlanCheckout({
       if (intent.mock) {
         const r = await mockActivatePlanAction(tier);
         if (r.ok) router.refresh();
-        else setError(r.error ?? "Could not activate plan.");
+        else setError(r.error ?? tr("billing.activateError"));
         return;
       }
       const Razorpay = await loadRazorpay();
       if (!Razorpay) {
-        setError("Could not load the payment gateway.");
+        setError(tr("billing.gatewayLoadError"));
         return;
       }
       const rzp = new Razorpay({
@@ -77,7 +79,7 @@ export function PlanCheckout({
             signature: resp.razorpay_signature,
           });
           if (v.ok) router.refresh();
-          else setError(v.error ?? "Verification failed.");
+          else setError(v.error ?? tr("billing.verificationFailed"));
         },
       });
       rzp.open();
@@ -98,7 +100,7 @@ export function PlanCheckout({
             : "border border-sand-300 text-ink/70 hover:bg-sand-100"
         }`}
       >
-        {busy ? "Processing…" : label}
+        {busy ? tr("billing.processing") : label}
       </button>
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>

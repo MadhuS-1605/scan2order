@@ -7,6 +7,7 @@ import {
   addBanquetItemAction,
 } from "@/lib/banquets/actions";
 import { Button, Input, Select, Field } from "@/components/ui";
+import { useT } from "@/components/admin/i18n-provider";
 
 const EVENT_TYPES = [
   "Wedding",
@@ -18,6 +19,7 @@ const EVENT_TYPES = [
 ];
 
 export function NewBanquetForm() {
+  const tr = useT();
   const ref = useRef<HTMLFormElement>(null);
   return (
     <form
@@ -28,13 +30,13 @@ export function NewBanquetForm() {
       }}
       className="grid gap-3 sm:grid-cols-2"
     >
-      <Field label="Customer name" htmlFor="b-name">
+      <Field label={tr("banquets.customerName")} htmlFor="b-name">
         <Input id="b-name" name="customerName" required placeholder="Asha Rao" />
       </Field>
-      <Field label="Mobile" htmlFor="b-phone">
+      <Field label={tr("banquets.mobile")} htmlFor="b-phone">
         <Input id="b-phone" name="customerPhone" inputMode="tel" placeholder="98765 43210" />
       </Field>
-      <Field label="Event type" htmlFor="b-type">
+      <Field label={tr("banquets.eventType")} htmlFor="b-type">
         <Select id="b-type" name="eventType" defaultValue="Wedding">
           {EVENT_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -43,24 +45,24 @@ export function NewBanquetForm() {
           ))}
         </Select>
       </Field>
-      <Field label="Date & time" htmlFor="b-date">
+      <Field label={tr("banquets.dateTime")} htmlFor="b-date">
         <Input id="b-date" name="eventDate" type="datetime-local" required />
       </Field>
-      <Field label="Guests" htmlFor="b-guests">
+      <Field label={tr("banquets.guests")} htmlFor="b-guests">
         <Input id="b-guests" name="guestCount" type="number" min="1" defaultValue="50" />
       </Field>
-      <Field label="Hall / space" htmlFor="b-hall">
+      <Field label={tr("banquets.hallSpace")} htmlFor="b-hall">
         <Input id="b-hall" name="hall" placeholder="Banquet Hall A" />
       </Field>
-      <Field label="Advance collected" htmlFor="b-advance">
+      <Field label={tr("banquets.advanceCollected")} htmlFor="b-advance">
         <Input id="b-advance" name="advanceAmount" type="number" min="0" step="0.01" defaultValue="0" />
       </Field>
-      <Field label="Notes" htmlFor="b-notes">
+      <Field label={tr("banquets.notes")} htmlFor="b-notes">
         <Input id="b-notes" name="notes" placeholder="Veg only, stage setup…" />
       </Field>
       <div className="sm:col-span-2">
         <Button type="submit" className="w-full">
-          Create booking
+          {tr("banquets.createBooking")}
         </Button>
       </div>
     </form>
@@ -74,10 +76,11 @@ export function AddPreorderItem({
   bookingId: string;
   menu: { id: string; name: string; price: number }[];
 }) {
+  const tr = useT();
   const [itemId, setItemId] = useState(menu[0]?.id ?? "");
   const [qty, setQty] = useState("10");
   if (menu.length === 0)
-    return <p className="text-xs text-ink/40">Add menu items first.</p>;
+    return <p className="text-xs text-ink/40">{tr("banquets.addMenuItemsFirst")}</p>;
 
   return (
     <form action={addBanquetItemAction} className="flex flex-wrap items-end gap-2">
@@ -103,7 +106,7 @@ export function AddPreorderItem({
         className="w-20 rounded-lg border border-sand-300 bg-surface px-2 py-1.5 text-sm"
       />
       <Button type="submit" variant="secondary" size="sm">
-        <Plus className="h-3.5 w-3.5" /> Add
+        <Plus className="h-3.5 w-3.5" /> {tr("common.add")}
       </Button>
     </form>
   );

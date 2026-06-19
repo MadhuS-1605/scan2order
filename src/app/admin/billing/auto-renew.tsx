@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useT } from "@/components/admin/i18n-provider";
 import {
   startAutoRenewAction,
   verifyAutoRenewAction,
@@ -28,15 +29,16 @@ function loadRazorpay(): Promise<RazorpayCtor | null> {
 // Toggle auto-renew (Razorpay subscription / eMandate) for the current paid plan.
 export function AutoRenew({ tier, enabled }: { tier: string; enabled: boolean }) {
   const router = useRouter();
+  const tr = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (enabled) {
     return (
       <form action={cancelAutoRenewAction} className="mt-2 text-center">
-        <span className="text-xs text-olive-700">↻ Auto-renew on</span>{" "}
+        <span className="text-xs text-olive-700">↻ {tr("billing.autoRenewOn")}</span>{" "}
         <button type="submit" className="text-xs text-ink/45 underline hover:text-red-600">
-          cancel
+          {tr("billing.cancelLower")}
         </button>
       </form>
     );
@@ -53,7 +55,7 @@ export function AutoRenew({ tier, enabled }: { tier: string; enabled: boolean })
       }
       const Razorpay = await loadRazorpay();
       if (!Razorpay) {
-        setError("Could not load the payment gateway.");
+        setError(tr("billing.gatewayLoadError"));
         return;
       }
       const rzp = new Razorpay({
@@ -72,7 +74,7 @@ export function AutoRenew({ tier, enabled }: { tier: string; enabled: boolean })
             signature: resp.razorpay_signature,
           });
           if (v.ok) router.refresh();
-          else setError(v.error ?? "Verification failed.");
+          else setError(v.error ?? tr("billing.verificationFailed"));
         },
       });
       rzp.open();
@@ -89,7 +91,7 @@ export function AutoRenew({ tier, enabled }: { tier: string; enabled: boolean })
         disabled={busy}
         className="text-xs font-medium text-brand-600 underline hover:text-brand-700 disabled:opacity-60"
       >
-        {busy ? "Setting up…" : "Set up auto-renew"}
+        {busy ? tr("billing.settingUp") : tr("billing.setUpAutoRenew")}
       </button>
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>

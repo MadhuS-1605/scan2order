@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PartyPopper, Trash2, Users, CalendarDays } from "lucide-react";
+import { cookies } from "next/headers";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { formatMoney, toNumber } from "@/lib/utils";
@@ -9,6 +10,7 @@ import {
   deleteBanquetAction,
   convertBanquetToKitchenAction,
 } from "@/lib/banquets/actions";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { Card } from "@/components/ui";
 import { NewBanquetForm, AddPreorderItem } from "./banquets-manager";
 
@@ -18,22 +20,23 @@ const STATUS_STYLES: Record<string, string> = {
   COMPLETED: "bg-olive-500/15 text-olive-700",
   CANCELLED: "bg-red-100 text-red-600",
 };
-const NEXT: Record<string, { label: string; status: string }[]> = {
+const NEXT: Record<string, { labelKey: string; status: string }[]> = {
   ENQUIRY: [
-    { label: "Confirm", status: "CONFIRMED" },
-    { label: "Decline", status: "CANCELLED" },
+    { labelKey: "banquets.confirm", status: "CONFIRMED" },
+    { labelKey: "banquets.decline", status: "CANCELLED" },
   ],
   CONFIRMED: [
-    { label: "Mark done", status: "COMPLETED" },
-    { label: "Cancel", status: "CANCELLED" },
+    { labelKey: "banquets.markDone", status: "COMPLETED" },
+    { labelKey: "banquets.cancel", status: "CANCELLED" },
   ],
   COMPLETED: [],
-  CANCELLED: [{ label: "Reopen", status: "CONFIRMED" }],
+  CANCELLED: [{ labelKey: "banquets.reopen", status: "CONFIRMED" }],
 };
 
 export default async function BanquetsPage() {
   const { restaurant, config } = await getCurrentRestaurant("orders");
   const cur = config.currency;
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   const [bookings, menuItems] = await Promise.all([
     prisma.banquetBooking.findMany({
@@ -53,17 +56,16 @@ export default async function BanquetsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="font-display text-3xl font-medium text-ink">
-          Banquets &amp; events
+          {t(d, "banquets.title")}
         </h1>
         <p className="text-sm text-ink/45">
-          Function-hall bookings, parties and corporate events — with a pre-agreed
-          menu and advance.
+          {t(d, "banquets.subtitle")}
         </p>
       </div>
 
       <Card>
         <h2 className="mb-3 flex items-center gap-2 font-medium text-ink">
-          <PartyPopper className="h-4 w-4 text-brand-600" /> New booking
+          <PartyPopper className="h-4 w-4 text-brand-600" /> {t(d, "banquets.newBooking")}
         </h2>
         <NewBanquetForm />
       </Card>
@@ -71,7 +73,7 @@ export default async function BanquetsPage() {
       {bookings.length === 0 ? (
         <Card>
           <p className="text-sm text-ink/55">
-            No bookings yet. Add one above, or share your enquiry page:{" "}
+            {t(d, "banquets.emptyState")}{" "}
             <span className="font-medium text-ink/70">/banquet/{restaurant.slug}</span>
           </p>
         </Card>
@@ -105,7 +107,7 @@ export default async function BanquetsPage() {
                       </span>
                       <span className="flex items-center gap-1">
                         <Users className="h-3.5 w-3.5" />
-                        {b.guestCount} pax
+                        {b.guestCount} {t(d, "banquets.pax")}
                       </span>
                       {b.hall && <span>· {b.hall}</span>}
                       <span>· {b.customerPhone}</span>
@@ -129,10 +131,10 @@ export default async function BanquetsPage() {
                 {/* Pre-order menu */}
                 <div className="rounded-lg border border-sand-200 p-3">
                   <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/45">
-                    Pre-ordered menu
+                    {t(d, "banquets.preOrderedMenu")}
                   </p>
                   {b.items.length === 0 ? (
-                    <p className="text-xs text-ink/40">No items added yet.</p>
+                    <p className="text-xs text-ink/40">{t(d, "banquets.noItemsYet")}</p>
                   ) : (
                     <ul className="mb-2 space-y-1 text-sm">
                       {b.items.map((it) => (
@@ -161,12 +163,12 @@ export default async function BanquetsPage() {
                 {/* Money + actions */}
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-sand-100 pt-3">
                   <div className="text-sm">
-                    <span className="text-ink/55">Est. total </span>
+                    <span className="text-ink/55">{t(d, "banquets.estTotal")} </span>
                     <span className="font-semibold text-ink">{formatMoney(total, cur)}</span>
                     {advance > 0 && (
                       <span className="text-ink/55">
                         {" "}
-                        · advance {formatMoney(advance, cur)} · balance{" "}
+                        · {t(d, "banquets.advance")} {formatMoney(advance, cur)} · {t(d, "banquets.balance")}{" "}
                         <span className="font-medium text-ink">{formatMoney(balance, cur)}</span>
                       </span>
                     )}
@@ -177,7 +179,7 @@ export default async function BanquetsPage() {
                         href={`/admin/orders/${b.convertedOrderId}`}
                         className="rounded-lg border border-olive-500/40 bg-olive-500/10 px-3 py-1.5 text-xs font-medium text-olive-700 hover:bg-olive-500/20"
                       >
-                        ✓ Order sent — view
+                        ✓ {t(d, "banquets.orderSentView")}
                       </Link>
                     ) : (
                       b.status === "CONFIRMED" &&
@@ -188,7 +190,7 @@ export default async function BanquetsPage() {
                             type="submit"
                             className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
                           >
-                            Send to kitchen
+                            {t(d, "banquets.sendToKitchen")}
                           </button>
                         </form>
                       )
@@ -201,13 +203,13 @@ export default async function BanquetsPage() {
                           type="submit"
                           className="rounded-lg border border-sand-300 bg-surface px-3 py-1.5 text-xs font-medium text-ink/70 hover:bg-sand-100"
                         >
-                          {n.label}
+                          {t(d, n.labelKey)}
                         </button>
                       </form>
                     ))}
                     <form action={deleteBanquetAction}>
                       <input type="hidden" name="id" value={b.id} />
-                      <button className="text-ink/30 hover:text-red-600" type="submit" title="Delete">
+                      <button className="text-ink/30 hover:text-red-600" type="submit" title={t(d, "common.delete")}>
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </form>

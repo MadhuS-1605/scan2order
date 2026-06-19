@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { formatMoney, toNumber, seatLabel } from "@/lib/utils";
 import { StatusBadge, Card } from "@/components/ui";
 import { Pager } from "@/components/admin/pager";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 
 const PAGE_SIZE = 50;
 
@@ -14,6 +16,7 @@ export default async function OrderHistoryPage({
   searchParams: Promise<{ page?: string }>;
 }) {
   const { restaurant, config } = await getCurrentRestaurant("orders");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const cur = config.currency;
   const page = Math.max(1, Number((await searchParams).page) || 1);
 
@@ -41,21 +44,21 @@ export default async function OrderHistoryPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl font-medium text-ink">
-            Past orders
+            {t(d, "history.pastOrders")}
           </h1>
-          <p className="text-sm text-ink/45">Completed &amp; cancelled orders.</p>
+          <p className="text-sm text-ink/45">{t(d, "history.subtitle")}</p>
         </div>
         <Link
           href="/admin/orders"
           className="inline-flex items-center gap-1.5 rounded-lg border border-sand-300 bg-surface px-3 py-1.5 text-sm text-ink/70 hover:bg-sand-100"
         >
-          <ArrowLeft className="h-4 w-4" /> Live orders
+          <ArrowLeft className="h-4 w-4" /> {t(d, "history.liveOrders")}
         </Link>
       </div>
 
       {orders.length === 0 ? (
         <Card>
-          <p className="text-sm text-ink/55">No past orders yet.</p>
+          <p className="text-sm text-ink/55">{t(d, "history.empty")}</p>
         </Card>
       ) : (
         <Card className="p-0">
@@ -81,7 +84,10 @@ export default async function OrderHistoryPage({
                         hour: "2-digit",
                         minute: "2-digit",
                       })}{" "}
-                      · {o._count.items} item{o._count.items > 1 ? "s" : ""}
+                      · {o._count.items}{" "}
+                      {o._count.items > 1
+                        ? t(d, "history.items")
+                        : t(d, "history.item")}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -96,7 +102,9 @@ export default async function OrderHistoryPage({
                             : "text-ink/45"
                         }`}
                       >
-                        {o.paymentStatus === "PAID" ? "Paid" : "Unpaid"}
+                        {o.paymentStatus === "PAID"
+                          ? t(d, "history.paid")
+                          : t(d, "history.unpaid")}
                       </span>
                     </span>
                     <StatusBadge status={o.status} />

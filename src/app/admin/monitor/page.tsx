@@ -1,11 +1,14 @@
+import { cookies } from "next/headers";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { LiveStream } from "@/components/live-stream";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 
 // Wall-mounted customer monitor: shows order numbers as they move from
 // "Preparing" to "Ready" so diners know when to collect / expect their food.
 export default async function MonitorScreen() {
   const { restaurant } = await getCurrentRestaurant("monitor");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   const orders = await prisma.order.findMany({
     where: {
@@ -29,7 +32,7 @@ export default async function MonitorScreen() {
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-sand-200 bg-surface p-6">
           <h2 className="mb-5 text-center text-sm font-semibold uppercase tracking-widest text-brand-600">
-            Preparing
+            {t(d, "monitor.preparing")}
           </h2>
           <div className="flex flex-wrap justify-center gap-4">
             {preparing.length === 0 ? (
@@ -49,7 +52,7 @@ export default async function MonitorScreen() {
 
         <section className="rounded-2xl border border-olive-500/30 bg-olive-500/5 p-6">
           <h2 className="mb-5 text-center text-sm font-semibold uppercase tracking-widest text-olive-600">
-            Ready — please collect
+            {t(d, "monitor.readyPleaseCollect")}
           </h2>
           <div className="flex flex-wrap justify-center gap-4">
             {ready.length === 0 ? (

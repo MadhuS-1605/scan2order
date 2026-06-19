@@ -1,17 +1,22 @@
+import { cookies } from "next/headers";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { formatMoney, toNumber, seatLabel } from "@/lib/utils";
 import { LiveStream } from "@/components/live-stream";
 import { FreeTableActions } from "@/components/admin/free-table";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 
-function fmtIdle(mins: number): string {
-  if (mins < 1) return "just now";
-  return mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ${mins % 60}m ago`;
+function fmtIdle(mins: number, d: ReturnType<typeof dictFor>): string {
+  if (mins < 1) return t(d, "floor.justNow");
+  return mins < 60
+    ? `${mins}${t(d, "floor.mAgo")}`
+    : `${Math.floor(mins / 60)}h ${mins % 60}m ${t(d, "floor.ago")}`;
 }
 
 export default async function FloorPage() {
   const { restaurant, config } = await getCurrentRestaurant("orders");
   const cur = config.currency;
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   const [tables, open] = await Promise.all([
     prisma.restaurantTable.findMany({
@@ -47,15 +52,15 @@ export default async function FloorPage() {
     <div className="space-y-5">
       <LiveStream />
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="font-display text-3xl font-medium text-ink">Floor</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "floor.title")}</h1>
         <span className="text-sm text-ink/45">
-          {occupiedCount} occupied · {tables.length - occupiedCount} free
+          {occupiedCount} {t(d, "floor.occupiedLower")} · {tables.length - occupiedCount} {t(d, "floor.freeLower")}
         </span>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {tables.map((t) => {
-          const list = byTable.get(t.id) ?? [];
+        {tables.map((tbl) => {
+          const list = byTable.get(tbl.id) ?? [];
           const occupied = list.length > 0;
           const total = list.reduce((s, o) => s + toNumber(o.totalAmount), 0);
           const newest = occupied
@@ -65,7 +70,7 @@ export default async function FloorPage() {
 
           return (
             <div
-              key={t.id}
+              key={tbl.id}
               className={`flex flex-col rounded-2xl border p-4 ${
                 occupied
                   ? "border-brand-300 bg-brand-50"
@@ -74,7 +79,7 @@ export default async function FloorPage() {
             >
               <div className="flex items-center justify-between">
                 <span className="font-display text-lg text-ink">
-                  {seatLabel(t)}
+                  {seatLabel(tbl)}
                 </span>
                 <span
                   className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
@@ -83,7 +88,7 @@ export default async function FloorPage() {
                       : "bg-olive-500/15 text-olive-700"
                   }`}
                 >
-                  {occupied ? "Occupied" : "Free"}
+                  {occupied ? t(d, "floor.occupied") : t(d, "floor.free")}
                 </span>
               </div>
 
@@ -93,19 +98,21 @@ export default async function FloorPage() {
                     {formatMoney(total, cur)}
                   </p>
                   <p className="text-xs text-ink/55">
-                    {list.length} order{list.length > 1 ? "s" : ""} · last{" "}
-                    {fmtIdle(Math.floor((now - newest) / 60000))}
+                    {list.length}{" "}
+                    {list.length > 1 ? t(d, "floor.orders") : t(d, "floor.order")} ·{" "}
+                    {t(d, "floor.last")}{" "}
+                    {fmtIdle(Math.floor((now - newest) / 60000), d)}
                   </p>
                   <FreeTableActions
-                    tableId={t.id}
+                    tableId={tbl.id}
                     anyOrderId={anyOrderId ?? ""}
-                    label={seatLabel(t)}
+                    label={seatLabel(tbl)}
                     total={total}
                     currency={cur}
                   />
                 </>
               ) : (
-                <p className="mt-2 text-sm text-ink/40">Available</p>
+                <p className="mt-2 text-sm text-ink/40">{t(d, "floor.available")}</p>
               )}
             </div>
           );
@@ -114,7 +121,7 @@ export default async function FloorPage() {
 
       {tables.length === 0 && (
         <p className="rounded-2xl border border-dashed border-sand-300 bg-surface p-12 text-center text-sm text-ink/55">
-          No tables yet. Add tables in Tables &amp; QR.
+          {t(d, "floor.noTablesYet")}
         </p>
       )}
     </div>

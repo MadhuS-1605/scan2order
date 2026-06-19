@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { modifierSummary, seatLabel } from "@/lib/utils";
@@ -6,51 +7,53 @@ import { LiveStream } from "@/components/live-stream";
 import { KitchenAlert } from "@/components/admin/kitchen-alert";
 import { setOrderStatusAction } from "@/lib/orders/actions";
 import { KITCHEN_STATUSES } from "@/lib/orders/status";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { PrintButton } from "./print-button";
 
 const COLUMNS: {
   status: "CONFIRMED" | "PREPARING" | "READY";
-  title: string;
+  titleKey: string;
   next: "PREPARING" | "READY" | "SERVED";
-  action: string;
+  actionKey: string;
   accent: string;
   dot: string;
 }[] = [
   {
     status: "CONFIRMED",
-    title: "New",
+    titleKey: "kitchen.colNew",
     next: "PREPARING",
-    action: "Start preparing",
+    actionKey: "kitchen.startPreparing",
     accent: "border-l-blue-400",
     dot: "bg-blue-400",
   },
   {
     status: "PREPARING",
-    title: "Preparing",
+    titleKey: "kitchen.colPreparing",
     next: "READY",
-    action: "Mark ready",
+    actionKey: "kitchen.markReady",
     accent: "border-l-brand-500",
     dot: "bg-brand-500",
   },
   {
     status: "READY",
-    title: "Ready to serve",
+    titleKey: "kitchen.colReadyToServe",
     next: "SERVED",
-    action: "Mark served",
+    actionKey: "kitchen.markServed",
     accent: "border-l-olive-500",
     dot: "bg-olive-500",
   },
 ];
 
-function elapsed(from: Date): string {
+function elapsed(from: Date, d: ReturnType<typeof dictFor>): string {
   const mins = Math.floor((Date.now() - from.getTime()) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min`;
+  if (mins < 1) return t(d, "kitchen.justNow");
+  if (mins < 60) return `${mins} ${t(d, "kitchen.min")}`;
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
 export default async function KitchenScreen() {
   const { restaurant } = await getCurrentRestaurant("kitchen");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
 
   const orders = await prisma.order.findMany({
     where: { restaurantId: restaurant.id, status: { in: KITCHEN_STATUSES } },
@@ -81,9 +84,9 @@ export default async function KitchenScreen() {
       <KitchenAlert />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-display text-3xl font-medium text-ink">
-          Kitchen <span className="text-ink/40">— {restaurant.name}</span>
+          {t(d, "kitchen.title")} <span className="text-ink/40">— {restaurant.name}</span>
         </h1>
-        <span className="text-sm text-ink/45">{orders.length} in progress</span>
+        <span className="text-sm text-ink/45">{orders.length} {t(d, "kitchen.inProgress")}</span>
       </div>
 
       {awaitingCount > 0 && (
@@ -92,10 +95,12 @@ export default async function KitchenScreen() {
           className="flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-100"
         >
           <span>
-            ⚠ {awaitingCount} order{awaitingCount > 1 ? "s" : ""} awaiting
-            confirmation — not yet sent to the kitchen
+            ⚠ {awaitingCount}{" "}
+            {awaitingCount > 1
+              ? t(d, "kitchen.ordersAwaitingConfirmation")
+              : t(d, "kitchen.orderAwaitingConfirmation")}
           </span>
-          <span className="shrink-0">Review on orders board →</span>
+          <span className="shrink-0">{t(d, "kitchen.reviewOnOrdersBoard")} →</span>
         </Link>
       )}
 
@@ -105,7 +110,7 @@ export default async function KitchenScreen() {
             <h2 className="mb-3 flex items-center justify-between text-sm font-semibold uppercase tracking-wide text-ink/50">
               <span className="flex items-center gap-2">
                 <span className={`h-2 w-2 rounded-full ${col.dot}`} />
-                {col.title}
+                {t(d, col.titleKey)}
               </span>
               <span className="rounded-full bg-sand-200 px-2 py-0.5 text-xs text-ink/60">
                 {col.orders.length}
@@ -114,7 +119,7 @@ export default async function KitchenScreen() {
             <div className="space-y-3">
               {col.orders.length === 0 && (
                 <p className="rounded-xl border border-dashed border-sand-300 p-6 text-center text-sm text-ink/35">
-                  Nothing here
+                  {t(d, "kitchen.nothingHere")}
                 </p>
               )}
               {col.orders.map((o) => (
@@ -133,7 +138,7 @@ export default async function KitchenScreen() {
                       </p>
                     </div>
                     <span className="text-xs text-ink/40">
-                      {elapsed(o.confirmedAt ?? o.createdAt)}
+                      {elapsed(o.confirmedAt ?? o.createdAt, d)}
                     </span>
                   </div>
 
@@ -171,7 +176,7 @@ export default async function KitchenScreen() {
                       type="submit"
                       className="w-full rounded-lg bg-brand-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 active:translate-y-px"
                     >
-                      {col.action}
+                      {t(d, col.actionKey)}
                     </button>
                   </form>
 

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Building2, ChevronDown } from "lucide-react";
 import { switchPropertyAction } from "@/lib/properties/actions";
+import { useT } from "@/components/admin/i18n-provider";
 
 type Property = { id: string; name: string };
 
@@ -15,6 +16,7 @@ export function PropertySwitcher({
   properties: Property[];
   currentId: string;
 }) {
+  const tr = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const current = properties.find((p) => p.id === currentId);
@@ -36,14 +38,14 @@ export function PropertySwitcher({
       >
         <Building2 className="h-4 w-4 text-brand-600" />
         <span className="hidden max-w-[10rem] truncate sm:inline">
-          {current?.name ?? "Property"}
+          {current?.name ?? tr("properties.propertyFallback")}
         </span>
         <ChevronDown className="h-3.5 w-3.5 text-ink/40" />
       </button>
       {open && (
         <div className="absolute right-0 z-20 mt-1 w-60 overflow-hidden rounded-xl border border-sand-200 bg-surface shadow-lg">
           <p className="px-3 pt-2 text-[11px] uppercase tracking-wide text-ink/40">
-            Switch property
+            {tr("properties.switchProperty")}
           </p>
           <ul className="py-1">
             {properties.map((p) => (
@@ -61,7 +63,7 @@ export function PropertySwitcher({
                   >
                     {p.name}
                     {p.id === currentId && (
-                      <span className="text-xs text-brand-500">Active</span>
+                      <span className="text-xs text-brand-500">{tr("properties.active")}</span>
                     )}
                   </button>
                 </form>

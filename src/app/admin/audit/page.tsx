@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { AUDIT_LABELS } from "@/lib/audit";
@@ -12,6 +14,7 @@ export default async function AuditPage({
   searchParams: Promise<{ page?: string }>;
 }) {
   const { restaurant } = await getCurrentRestaurant("settings");
+  const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const page = Math.max(1, Number((await searchParams).page) || 1);
 
   const where = { restaurantId: restaurant.id };
@@ -28,16 +31,16 @@ export default async function AuditPage({
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-display text-3xl font-medium text-ink">Audit log</h1>
+        <h1 className="font-display text-3xl font-medium text-ink">{t(d, "audit.title")}</h1>
         <p className="text-sm text-ink/45">
-          Who changed what — staff, settings, payments, coupons.
+          {t(d, "audit.subtitle")}
         </p>
       </div>
 
       <Card className="p-0">
         {logs.length === 0 ? (
           <p className="p-6 text-center text-sm text-ink/45">
-            No activity recorded yet.
+            {t(d, "audit.noActivity")}
           </p>
         ) : (
           <ul className="divide-y divide-sand-100">
@@ -54,7 +57,7 @@ export default async function AuditPage({
                     )}
                   </p>
                   <p className="text-xs text-ink/45">
-                    {l.actorName ?? "System"}
+                    {l.actorName ?? t(d, "audit.system")}
                   </p>
                 </div>
                 <time className="shrink-0 text-xs text-ink/40">
