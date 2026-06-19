@@ -29,12 +29,15 @@ export const restaurantTypeEnum = z.enum([
 export const profileSchema = z.object({
   name: z.string().min(2, "Restaurant name is required").max(120),
   type: restaurantTypeEnum,
+  serviceModel: z.enum(["TABLE_SERVICE", "SELF_SERVICE"]).default("TABLE_SERVICE"),
   phone: z.string().max(20).optional().or(z.literal("")),
   email: z.string().email().optional().or(z.literal("")),
   addressLine: z.string().max(200).optional().or(z.literal("")),
   city: z.string().max(80).optional().or(z.literal("")),
   state: z.string().max(80).optional().or(z.literal("")),
   postalCode: z.string().max(12).optional().or(z.literal("")),
+  fssaiNumber: z.string().max(30).optional().or(z.literal("")),
+  logoUrl: z.string().url().max(500).optional().or(z.literal("")),
 });
 
 export const settingsSchema = z.object({
@@ -95,6 +98,8 @@ export const placeOrderSchema = z.object({
   customerName: z.string().max(80).optional(),
   customerPhone: z.string().max(20).optional(),
   paymentMethod: z.enum(["ONLINE", "COUNTER"]).optional(),
+  fulfillment: z.enum(["DINE_IN", "PICKUP", "DELIVERY"]).optional(),
+  deliveryAddress: z.string().max(400).optional(),
   notes: z.string().max(300).optional(),
   // Ties this order to the diner's current dining session (rounds before the
   // bill is settled). Client-generated; reused across rounds.

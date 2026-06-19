@@ -33,13 +33,31 @@ export function slugify(input: string): string {
 }
 
 // "HH:mm" current-time availability check for a menu item window.
+// Current minutes-since-midnight in an IANA timezone (e.g. "Asia/Kolkata").
+// Falls back to the server's local time when no tz is given. All venue
+// time-of-day logic must pass the venue timezone so it doesn't drift on a
+// UTC host.
+export function minutesOfDayInTz(tz?: string, date: Date = new Date()): number {
+  if (!tz) return date.getHours() * 60 + date.getMinutes();
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0") % 24;
+  const m = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return h * 60 + m;
+}
+
 export function isWithinWindow(
   from: string | null,
   to: string | null,
+  tz?: string,
   now: Date = new Date(),
 ): boolean {
   if (!from || !to) return true;
-  const mins = now.getHours() * 60 + now.getMinutes();
+  const mins = minutesOfDayInTz(tz, now);
   const [fh, fm] = from.split(":").map(Number);
   const [th, tm] = to.split(":").map(Number);
   const start = fh * 60 + fm;
@@ -47,6 +65,25 @@ export function isWithinWindow(
   // Handle windows that span midnight (e.g. 22:00 -> 02:00)
   if (start <= end) return mins >= start && mins <= end;
   return mins >= start || mins <= end;
+}
+
+// Whether the venue is currently accepting new diner orders, considering the
+// manual pause switch and the daily ordering window (both in venue tz).
+export function venueOrderingOpen(cfg: {
+  orderingPaused: boolean;
+  openTime: string | null;
+  closeTime: string | null;
+  timezone: string;
+}): { open: boolean; reason: "paused" | "closed" | null } {
+  if (cfg.orderingPaused) return { open: false, reason: "paused" };
+  if (
+    cfg.openTime &&
+    cfg.closeTime &&
+    !isWithinWindow(cfg.openTime, cfg.closeTime, cfg.timezone)
+  ) {
+    return { open: false, reason: "closed" };
+  }
+  return { open: true, reason: null };
 }
 
 // Summarise an OrderItem.modifiers JSON snapshot into "Full · Extra cheese".
@@ -66,10 +103,11 @@ export function happyHourPercentNow(
     to: string | null;
     percent: number;
   },
+  tz?: string,
   now: Date = new Date(),
 ): number {
   if (!hh.enabled || hh.percent <= 0) return 0;
-  if (!isWithinWindow(hh.from, hh.to, now)) return 0;
+  if (!isWithinWindow(hh.from, hh.to, tz, now)) return 0;
   return hh.percent;
 }
 
@@ -79,7 +117,11 @@ export function seatLabel(
   table: { label: string; kind?: string } | null | undefined,
 ): string {
   if (!table) return "Takeaway";
-  return table.kind === "ROOM" ? `Room ${table.label}` : table.label;
+  if (table.kind === "ROOM") return `Room ${table.label}`;
+  // Self-service venue's single ordering/pickup point — show "Pickup", not a
+  // table number, since there are no tables.
+  if (table.kind === "COUNTER") return "Pickup";
+  return table.label;
 }
 
 // Great-circle distance in metres between two lat/lng points (haversine). Used

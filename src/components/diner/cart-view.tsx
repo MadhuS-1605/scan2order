@@ -25,13 +25,18 @@ export function CartView({
 }: {
   restaurantId: string;
   happyHourPercent: number;
-  restaurant: { name: string; currency: string; groupName?: string | null };
+  restaurant: { name: string; currency: string; groupName?: string | null; logoUrl?: string | null };
   table: { label: string; kind?: string };
   items: Item[];
 }) {
   const hhFactor = happyHourPercent > 0 ? 1 - happyHourPercent / 100 : 1;
   const cur = restaurant.currency;
-  const seat = `${table.kind === "ROOM" ? "Room" : "Table"} ${table.label}`;
+  const seat =
+    table.kind === "ROOM"
+      ? `Room ${table.label}`
+      : table.kind === "COUNTER"
+        ? "Pickup"
+        : `Table ${table.label}`;
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const { cart, ready, count, addLine, setNote } = useCart(restaurantId);
 
@@ -44,6 +49,7 @@ export function CartView({
       <CustomerHeader
         restaurantName={restaurant.name}
         groupName={restaurant.groupName}
+        logoUrl={restaurant.logoUrl}
         seat={seat}
       />
       <div className="mx-auto max-w-lg space-y-4 px-4 py-6 sm:py-8">

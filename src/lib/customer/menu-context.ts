@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/db";
-import { isWithinWindow, toNumber, happyHourPercentNow } from "@/lib/utils";
+import {
+  isWithinWindow,
+  toNumber,
+  happyHourPercentNow,
+  venueOrderingOpen,
+} from "@/lib/utils";
+import { subscriptionState } from "@/lib/subscription";
+import { planLimits } from "@/lib/plans";
 import { parseLanguages } from "@/lib/languages";
 import { getActiveTableToken } from "@/lib/table-session";
 import type { Item } from "@/lib/customer/cart";
@@ -7,15 +14,23 @@ import type { Item } from "@/lib/customer/cart";
 export type MenuContext = {
   qrToken: string;
   restaurantId: string;
-  restaurant: { name: string; currency: string; groupName: string | null };
+  restaurant: { name: string; currency: string; groupName: string | null; logoUrl: string | null };
   table: { label: string; kind: string };
   config: {
     paymentTiming: string;
     onlinePaymentEnabled: boolean;
     counterPaymentEnabled: boolean;
     requireDinerLocation: boolean;
+    serviceModel: string;
+    requirePrepayment: boolean;
+    minOrderAmount: number;
+    pickupEnabled: boolean;
+    deliveryEnabled: boolean;
   };
   happyHourPercent: number;
+  // Whether the venue is currently accepting orders (business hours + manual
+  // pause). When closed, the diner can browse but not order.
+  ordering: { open: boolean; reason: "paused" | "closed" | null };
   languages: string[];
   categories: { id: string; name: string; icon: string | null }[];
   items: Item[];
@@ -60,13 +75,22 @@ export async function getMenuContext(): Promise<MenuContext | null> {
   if (!table || !table.isActive || !table.restaurant.config) return null;
   const { restaurant } = table;
   const config = restaurant.config!;
+  // Effective plan (a lapsed paid plan falls back to Free) → whether online
+  // payment is allowed right now.
+  const planOnline = planLimits(
+    subscriptionState({
+      planTier: restaurant.planTier,
+      planActiveUntil: restaurant.planActiveUntil,
+      planIsTrial: restaurant.planIsTrial,
+    }).effectiveTier,
+  ).onlinePayments;
 
-  const now = new Date();
-  const available = restaurant.menuItems.filter(
-    (i) =>
-      i.isAvailable &&
-      isWithinWindow(i.availableFrom, i.availableTo, now) &&
-      !(i.trackStock && i.stockQty <= 0),
+  const tz = config.timezone;
+  // Show items even when outside their time window — the diner sees what's on
+  // the menu and when it's available (the row renders disabled). Only manually
+  // unavailable or out-of-stock items are hidden.
+  const shown = restaurant.menuItems.filter(
+    (i) => i.isAvailable && !(i.trackStock && i.stockQty <= 0),
   );
 
   const happyHourPercent = happyHourPercentNow(
@@ -76,10 +100,10 @@ export async function getMenuContext(): Promise<MenuContext | null> {
       to: config.happyHourTo,
       percent: toNumber(config.happyHourPercent),
     },
-    now,
+    tz,
   );
 
-  const items: Item[] = available.map((i) => ({
+  const items: Item[] = shown.map((i) => ({
     id: i.id,
     name: i.name,
     description: i.description,
@@ -90,6 +114,7 @@ export async function getMenuContext(): Promise<MenuContext | null> {
     isChefSpecial: i.isChefSpecial,
     availableFrom: i.availableFrom,
     availableTo: i.availableTo,
+    availableNow: isWithinWindow(i.availableFrom, i.availableTo, tz),
     imageUrl: i.imageUrl,
     translations: i.translations as Record<
       string,
@@ -103,10 +128,12 @@ export async function getMenuContext(): Promise<MenuContext | null> {
         required: g.required,
         minSelect: g.minSelect,
         maxSelect: g.maxSelect,
+        translations: g.translations as Record<string, { name?: string }> | null,
         options: g.options.map((o) => ({
           id: o.id,
           name: o.name,
           priceDelta: toNumber(o.priceDelta),
+          translations: o.translations as Record<string, { name?: string }> | null,
         })),
       })),
   }));
@@ -118,15 +145,30 @@ export async function getMenuContext(): Promise<MenuContext | null> {
       name: restaurant.name,
       currency: config.currency,
       groupName: restaurant.group?.name ?? null,
+      logoUrl: restaurant.logoUrl,
     },
     table: { label: table.label, kind: table.kind },
     config: {
       paymentTiming: config.paymentTiming,
-      onlinePaymentEnabled: config.onlinePaymentEnabled,
+      // Real-time plan gate: online payment only when the active plan allows it
+      // (a lapsed paid plan / Free tier can't take online payments), regardless
+      // of the stored flag.
+      onlinePaymentEnabled: config.onlinePaymentEnabled && planOnline,
       counterPaymentEnabled: config.counterPaymentEnabled,
       requireDinerLocation: config.requireDinerLocation,
+      serviceModel: config.serviceModel,
+      requirePrepayment: config.requirePrepayment,
+      minOrderAmount: config.minOrderAmount,
+      pickupEnabled: config.pickupEnabled,
+      deliveryEnabled: config.deliveryEnabled,
     },
     happyHourPercent,
+    ordering: venueOrderingOpen({
+      orderingPaused: config.orderingPaused,
+      openTime: config.openTime,
+      closeTime: config.closeTime,
+      timezone: config.timezone,
+    }),
     languages: parseLanguages(config.languages),
     categories: restaurant.categories.map((c) => ({
       id: c.id,

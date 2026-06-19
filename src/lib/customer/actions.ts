@@ -10,6 +10,7 @@ import {
   toNumber,
   happyHourPercentNow,
   distanceMeters,
+  venueOrderingOpen,
 } from "@/lib/utils";
 import { getActiveTableToken } from "@/lib/table-session";
 import { recordAudit } from "@/lib/audit";
@@ -96,6 +97,23 @@ export async function placeOrderAction(
   const { restaurant } = table;
   const config = restaurant.config!;
 
+  // Venue must be open: respects the manual pause switch and daily hours (tz-aware).
+  const ordering = venueOrderingOpen({
+    orderingPaused: config.orderingPaused,
+    openTime: config.openTime,
+    closeTime: config.closeTime,
+    timezone: config.timezone,
+  });
+  if (!ordering.open) {
+    return {
+      ok: false,
+      error:
+        ordering.reason === "paused"
+          ? "Sorry, we've paused new orders for a moment — please try again shortly."
+          : "Sorry, we're closed right now and can't take orders.",
+    };
+  }
+
   // Rate-limit per table: dedup rapid double-submits and cap burst spam so one
   // valid scan can't flood the kitchen with fake orders.
   if (!(await rateLimit(`order:${table.id}`, { windowMs: 60_000, max: 6, minGapMs: 5_000 }))) {
@@ -136,17 +154,29 @@ export async function placeOrderAction(
     }
   }
 
-  // Resolve the dining session. Rounds at the same table share one session until
-  // the bill is settled; later rounds inherit the diner's name/phone so we don't
-  // ask again. A new session id is minted if the client didn't supply one.
-  const sessionId = data.sessionId ?? randomUUID();
+  // Resolve the dining session — TABLE-shared billing. Everyone ordering at the
+  // same table joins its current open bill: reuse the dining session of any open
+  // (active, unpaid) order already at this table; otherwise start a fresh one.
+  // Settling or clearing the table empties the open set, so the next party gets
+  // a clean session and never sees the previous party's orders.
+  const openAtTable = await prisma.order.findFirst({
+    where: {
+      restaurantId: restaurant.id,
+      tableId: table.id,
+      status: { not: "CANCELLED" },
+      paymentStatus: { not: "PAID" },
+    },
+    orderBy: { createdAt: "asc" },
+    select: { diningSessionId: true },
+  });
+  const sessionId = openAtTable?.diningSessionId ?? randomUUID();
   let sessionName = data.customerName ?? null;
   let sessionPhone = data.customerPhone ?? null;
-  if (data.sessionId && (!sessionName || !sessionPhone)) {
-    // Reuse this device's earlier round (by session, regardless of table — the
-    // party may have moved tables) so we don't re-ask for name/phone.
+  if (!sessionName || !sessionPhone) {
+    // Carry the name/phone already on this table's bill so later orders in the
+    // group don't have to re-enter it.
     const prior = await prisma.order.findFirst({
-      where: { diningSessionId: data.sessionId, restaurantId: restaurant.id },
+      where: { diningSessionId: sessionId, restaurantId: restaurant.id },
       orderBy: { createdAt: "desc" },
       select: { customerName: true, customerPhone: true },
     });
@@ -164,9 +194,9 @@ export async function placeOrderAction(
   });
   const byId = new Map(menuItems.map((m) => [m.id, m]));
 
-  const now = new Date();
+  const tz = config.timezone;
   // Happy-hour discount applies to the whole line (base + modifiers), checked
-  // authoritatively at placement time.
+  // authoritatively at placement time (venue tz).
   const hhPercent = happyHourPercentNow(
     {
       enabled: config.happyHourEnabled,
@@ -174,7 +204,7 @@ export async function placeOrderAction(
       to: config.happyHourTo,
       percent: toNumber(config.happyHourPercent),
     },
-    now,
+    tz,
   );
   const hhFactor = hhPercent > 0 ? 1 - hhPercent / 100 : 1;
   type ModSnap = { group: string; name: string; priceDelta: number };
@@ -190,7 +220,7 @@ export async function placeOrderAction(
   for (const line of data.items) {
     const mi = byId.get(line.menuItemId);
     if (!mi) return { ok: false, error: "An item is no longer on the menu." };
-    if (!mi.isAvailable || !isWithinWindow(mi.availableFrom, mi.availableTo, now)) {
+    if (!mi.isAvailable || !isWithinWindow(mi.availableFrom, mi.availableTo, tz)) {
       return { ok: false, error: `"${mi.name}" is currently unavailable.` };
     }
 
@@ -235,9 +265,29 @@ export async function placeOrderAction(
     toNumber(config.gstPercentage),
   );
 
-  // Confirmation routing. Presence-unverified orders are always held for a human
-  // (PLACED) — they never auto-fire to the kitchen, even at AUTO venues.
-  const hold = presence === "UNVERIFIED";
+  // Enforce the venue's minimum order (on this round's subtotal).
+  if (config.minOrderAmount > 0 && totals.subtotal < config.minOrderAmount) {
+    return {
+      ok: false,
+      error: `Minimum order is ${config.currency} ${config.minOrderAmount}. Please add a little more.`,
+    };
+  }
+
+  // Fulfilment — only honour modes the venue enabled; delivery needs an address.
+  let fulfillment: "DINE_IN" | "PICKUP" | "DELIVERY" = "DINE_IN";
+  if (data.fulfillment === "PICKUP" && config.pickupEnabled) fulfillment = "PICKUP";
+  else if (data.fulfillment === "DELIVERY" && config.deliveryEnabled) fulfillment = "DELIVERY";
+  const deliveryAddress =
+    fulfillment === "DELIVERY" ? (data.deliveryAddress?.trim() ?? "") : "";
+  if (fulfillment === "DELIVERY" && deliveryAddress.length < 8) {
+    return { ok: false, error: "Please enter a delivery address." };
+  }
+
+  // Confirmation routing. An order is held as PLACED (never auto-fires to the
+  // kitchen) when: presence is unverified (location withheld), OR the venue is
+  // pay-first (requirePrepayment) and the order isn't paid yet — it confirms
+  // automatically once payment is captured (see settleSession / markPaidAction).
+  const hold = presence === "UNVERIFIED" || config.requirePrepayment;
   const autoConfirm = config.orderConfirmation === "AUTO" && !hold;
   const status = autoConfirm ? "CONFIRMED" : "PLACED";
 
@@ -300,6 +350,8 @@ export async function placeOrderAction(
         totalAmount: totals.total,
         gstMode: config.gstMode,
         notes: data.notes ?? null,
+        fulfillment,
+        deliveryAddress: deliveryAddress || null,
         presence,
         distanceM,
         confirmedAt: autoConfirm ? new Date() : null,

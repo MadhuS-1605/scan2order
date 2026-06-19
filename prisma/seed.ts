@@ -23,12 +23,17 @@ async function main() {
       slug: SLUG,
       subdomain: "spicegarden",
       type: "RESTAURANT",
+      // Demo runs on an active Starter plan so it showcases online payments.
+      planTier: "STARTER",
+      planActiveUntil: new Date(Date.now() + 365 * 86_400_000),
+      planIsTrial: false,
       phone: "+91 98765 43210",
       email: "demo@spicegarden.in",
       addressLine: "12 MG Road",
       city: "Bengaluru",
       state: "Karnataka",
       postalCode: "560001",
+      fssaiNumber: "12345678901234",
       config: {
         create: {
           orderConfirmation: "WAITER_CONFIRM",
@@ -292,6 +297,7 @@ async function main() {
         customerName: spec.name ?? null,
         paymentStatus: spec.paid ? "PAID" : "UNPAID",
         paymentMethod: spec.paid ? "COUNTER" : null,
+        amountPaid: spec.paid ? totals.total : 0,
         subtotal: totals.subtotal,
         taxAmount: totals.taxAmount,
         totalAmount: totals.total,

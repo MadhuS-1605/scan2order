@@ -98,6 +98,13 @@ enum PaymentMethod {
 enum TableKind {
   TABLE
   ROOM
+  COUNTER // self-service venue's single ordering/pickup point (no physical tables)
+}
+
+/// How guests order at a venue.
+enum ServiceModel {
+  TABLE_SERVICE // per-table QR; dine-in service (restaurants, cafes, hotels)
+  SELF_SERVICE // single venue QR; order, prepay, pick up by number (counter / QSR / takeaway)
 }
 
 enum PaymentProvider {
@@ -113,6 +120,15 @@ enum OtpPurpose {
 enum BillDeliveryMethod {
   DOWNLOAD
   WHATSAPP
+  EMAIL
+}
+
+// How an order is fulfilled. DINE_IN is the default (QR at a table); PICKUP and
+// DELIVERY support counter/cloud-kitchen ordering.
+enum Fulfillment {
+  DINE_IN
+  PICKUP
+  DELIVERY
 }
 
 enum PushRole {
@@ -199,6 +215,14 @@ model Restaurant {
   groupId     String?
   group       PropertyGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   planTier    PlanTier       @default(FREE)
+  // Paid/trial period end for the current tier. null on FREE (free forever).
+  // When a paid tier's window lapses, the venue falls back to FREE-tier limits.
+  planActiveUntil DateTime?
+  planIsTrial     Boolean   @default(false)
+  // Auto-renew (Razorpay subscription / eMandate). When active, subscription.charged
+  // webhooks extend planActiveUntil each cycle.
+  planAutoRenew         Boolean @default(false)
+  razorpaySubscriptionId String?
   type        RestaurantType @default(RESTAURANT)
   email       String?
   phone       String?
@@ -207,6 +231,8 @@ model Restaurant {
   state       String?
   country     String         @default("India")
   postalCode  String?
+  // FSSAI food-licence number, printed on the bill (Indian compliance).
+  fssaiNumber String?
   logoUrl     String?
   // Restaurant-chosen username used as the public subdomain (e.g. "spicegarden"
   // -> spicegarden.scan.to). Unique across the platform.
@@ -222,6 +248,8 @@ model Restaurant {
   menuItems         MenuItem[]
   tables            RestaurantTable[]
   orders            Order[]
+  refunds           Refund[]
+  planPayments      PlanPayment[]
   pushSubscriptions PushSubscription[]
   serviceRequests   ServiceRequest[]
   coupons           Coupon[]
@@ -270,6 +298,33 @@ model OnboardingConfig {
   restaurantId String     @unique
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
+  serviceModel          ServiceModel          @default(TABLE_SERVICE)
+  // Pay-first: hold the order out of the kitchen until it is paid (then it
+  // auto-confirms). Default on for self-service venues.
+  requirePrepayment     Boolean               @default(false)
+
+  // Venue local timezone (IANA, e.g. "Asia/Kolkata"). All time-of-day logic
+  // (business hours, item availability windows, happy hour) is evaluated here,
+  // NOT in the server's timezone.
+  timezone       String  @default("Asia/Kolkata")
+  // Daily ordering window in venue-local "HH:MM". null/null = open 24h. May span
+  // midnight (e.g. 18:00 -> 02:00).
+  openTime       String?
+  closeTime      String?
+  // Manual kill-switch: stop accepting new diner orders right now (e.g. kitchen
+  // swamped, closing early), independent of business hours.
+  orderingPaused Boolean @default(false)
+  // Custom thank-you / footer line printed on the bill (falls back to a built-in
+  // friendly quote when blank).
+  billFooterMessage String?
+  // Default kitchen prep estimate (minutes) shown to the diner as "ready in ~N".
+  defaultPrepMinutes Int @default(15)
+  // Minimum order subtotal (venue currency, whole units). 0 = no minimum.
+  minOrderAmount Int @default(0)
+  // Takeaway / delivery ordering (e.g. cloud kitchens). When on, the diner picks
+  // a fulfilment type at checkout; delivery also captures an address.
+  pickupEnabled   Boolean @default(false)
+  deliveryEnabled Boolean @default(false)
   orderConfirmation     OrderConfirmationMode @default(AUTO)
   paymentTiming         PaymentTiming         @default(PAY_AFTER)
   onlinePaymentEnabled  Boolean               @default(false)
@@ -415,6 +470,8 @@ model ModifierGroup {
   minSelect  Int      @default(0)
   maxSelect  Int      @default(1)
   sortOrder  Int      @default(0)
+  // Per-language name overrides: { hi: { name }, kn: { name } } — mirrors MenuItem.
+  translations Json?
 
   options ModifierOption[]
 
@@ -430,6 +487,8 @@ model ModifierOption {
   priceDelta  Decimal       @default(0) @db.Decimal(10, 2)
   sortOrder   Int           @default(0)
   isAvailable Boolean       @default(true)
+  // Per-language name overrides: { hi: { name }, kn: { name } }.
+  translations Json?
 
   @@index([groupId])
   @@map("modifier_options")
@@ -502,6 +561,10 @@ model Order {
   customerName  String?
   customerPhone String?
 
+  // Fulfilment. DINE_IN by default; DELIVERY carries the address.
+  fulfillment     Fulfillment @default(DINE_IN)
+  deliveryAddress String?
+
   paymentStatus PaymentStatus  @default(UNPAID)
   paymentMethod PaymentMethod?
 
@@ -545,6 +608,7 @@ model Order {
 
   items             OrderItem[]
   payments          Payment[]
+  refunds           Refund[]
   bill              Bill?
   feedback          Feedback?
   pushSubscriptions PushSubscription[]
@@ -571,6 +635,9 @@ model OrderItem {
   lineTotal     Decimal  @db.Decimal(10, 2)
   // Snapshot of chosen modifiers: [{ group, name, priceDelta }]
   modifiers     Json?
+  // Per-item "prepared" ack, used by the bar KDS to tick off drinks
+  // independently of the overall order status.
+  preparedAt    DateTime?
 
   @@index([orderId])
   @@map("order_items")
@@ -579,6 +646,52 @@ model OrderItem {
 // ---------------------------------------------------------------------------
 // Payments & billing
 // ---------------------------------------------------------------------------
+
+// A tenant's payment toward their own subscription (distinct from diner order
+// payments). Pay-to-extend: a successful payment adds `periodDays` to the plan.
+model PlanPayment {
+  id                String        @id @default(cuid())
+  restaurantId      String
+  restaurant        Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tier              PlanTier
+  amount            Decimal       @db.Decimal(10, 2)
+  periodDays        Int           @default(30)
+  status            PaymentStatus @default(PENDING)
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([restaurantId])
+  @@index([razorpayOrderId])
+  @@map("plan_payments")
+}
+
+enum RefundStatus {
+  DONE // money returned (gateway refund created, or manual cash/counter refund)
+  FAILED // gateway refused — staff must retry / handle manually
+}
+
+// A refund issued against a paid order. Online refunds carry the gateway refund
+// id; counter/cash refunds are recorded as a manual note (no gateway call).
+model Refund {
+  id              String       @id @default(cuid())
+  restaurantId    String
+  restaurant      Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  orderId         String
+  order           Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount          Decimal      @db.Decimal(10, 2)
+  reason          String?
+  method          PaymentMethod
+  gatewayRefundId String? // Razorpay refund id, when refunded online
+  status          RefundStatus @default(DONE)
+  createdByName   String?
+  createdAt       DateTime     @default(now())
+
+  @@index([orderId])
+  @@index([restaurantId])
+  @@map("refunds")
+}
 
 model Payment {
   id       String          @id @default(cuid())
@@ -776,6 +889,9 @@ model BanquetBooking {
   status        BanquetStatus @default(ENQUIRY)
   advanceAmount Decimal       @default(0) @db.Decimal(10, 2)
   notes         String?
+  // Set once the booking's pre-order has been fired to the kitchen as a real
+  // Order — links to it and prevents converting twice.
+  convertedOrderId String?
   items         BanquetItem[]
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

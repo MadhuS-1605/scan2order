@@ -7,9 +7,16 @@ import { emitEvent } from "@/lib/realtime/bus";
 import { notifyOrderCustomer, notifyRestaurant } from "@/lib/push";
 import { awardPointsForOrder } from "@/lib/loyalty";
 import { recordAudit } from "@/lib/audit";
-import { toNumber } from "@/lib/utils";
+import { toNumber, formatMoney } from "@/lib/utils";
 import { round2 } from "@/lib/pricing";
+import {
+  resolveRazorpayCreds,
+  refundRazorpayPayment,
+} from "@/lib/payments/razorpay";
+import { refundableAmount, clampRefund } from "@/lib/billing/refund-math";
 import type { OrderStatus } from "@/lib/orders/status";
+
+export type RefundResult = { ok: true; amount: number } | { ok: false; error: string };
 
 async function ownedOrder(orderId: string, restaurantId: string) {
   const order = await prisma.order.findFirst({
@@ -35,9 +42,13 @@ async function notifyCustomer(order: OwnedOrder, status: OrderStatus) {
       tag,
     });
   } else if (status === "READY") {
+    // Self-service (counter) venues = pickup; table/room venues = served.
+    const pickup = order.table.kind === "COUNTER";
     await notifyOrderCustomer(order.id, {
       title: `Order #${order.orderNumber} is ready! 🍽️`,
-      body: "Your food is ready to be served.",
+      body: pickup
+        ? "Please collect it at the counter."
+        : "Your food is ready to be served.",
       url,
       tag,
     });
@@ -156,11 +167,14 @@ export async function markPaidAction(formData: FormData): Promise<void> {
   const orderId = String(formData.get("orderId"));
   const order = await ownedOrder(orderId, restaurantId);
 
-  const sessionOrders = order.tableId
+  // Settle the diner's dining session (their consolidated bill), not the whole
+  // table — so separate parties at a shared table are billed independently and
+  // this matches what the diner sees/pays. Sessionless POS orders settle alone.
+  const sessionOrders = order.diningSessionId
     ? await prisma.order.findMany({
         where: {
           restaurantId,
-          tableId: order.tableId,
+          diningSessionId: order.diningSessionId,
           status: { not: "CANCELLED" },
           paymentStatus: { not: "PAID" },
         },
@@ -176,18 +190,126 @@ export async function markPaidAction(formData: FormData): Promise<void> {
     Math.max(0, totalSum - toNumber(primary?.discountAmount ?? 0)) +
       toNumber(primary?.tipAmount ?? 0),
   );
+  // Pay-first venues hold the order out of the kitchen until paid — taking the
+  // counter payment here releases it (PLACED -> CONFIRMED).
+  const cfg = await prisma.onboardingConfig.findUnique({
+    where: { restaurantId },
+    select: { requirePrepayment: true },
+  });
+  const confirmOnPay = cfg?.requirePrepayment ?? false;
   for (const o of sessionOrders) {
+    const justConfirmed = confirmOnPay && o.status === "PLACED";
     await prisma.order.update({
       where: { id: o.id },
       data: {
         paymentStatus: "PAID",
         paymentMethod: "COUNTER",
         amountPaid: o.id === primary?.id ? payable : 0,
+        ...(justConfirmed ? { status: "CONFIRMED", confirmedAt: new Date() } : {}),
       },
     });
+    if (justConfirmed) {
+      emitEvent({ type: "order.created", restaurantId, orderId: o.id, status: "CONFIRMED" });
+    }
     await awardPointsForOrder(o.id);
   }
   revalidateAdmin();
+}
+
+// Bar KDS: tick a drink item as prepared (or undo). Per-item ack that's
+// independent of the overall order status, so the bar can pour without
+// touching the kitchen's flow. Gated by the kitchen permission (the bar board).
+export async function toggleItemPreparedAction(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminWithPermission("kitchen");
+  const itemId = String(formData.get("itemId"));
+  const item = await prisma.orderItem.findFirst({
+    where: { id: itemId, order: { restaurantId } },
+    select: { id: true, preparedAt: true, orderId: true },
+  });
+  if (!item) return;
+  await prisma.orderItem.update({
+    where: { id: item.id },
+    data: { preparedAt: item.preparedAt ? null : new Date() },
+  });
+  emitEvent({ type: "order.updated", restaurantId, orderId: item.orderId });
+  revalidatePath("/admin/bar");
+}
+
+// Staff-initiated refund (permission "refunds" -> OWNER/MANAGER). Full or
+// partial. Online payments are returned via Razorpay using the captured payment
+// id; counter/cash refunds are recorded as a manual note. The order flips to
+// REFUNDED once fully refunded. Refunds target the order that holds the payment
+// (the bill's primary order, where amountPaid > 0).
+export async function refundOrderAction(formData: FormData): Promise<RefundResult> {
+  const session = await requireAdminWithPermission("refunds");
+  const { restaurantId } = session;
+  const orderId = String(formData.get("orderId"));
+  const reason = String(formData.get("reason") ?? "").trim() || null;
+
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, restaurantId },
+    include: {
+      payments: true,
+      refunds: true,
+      restaurant: { include: { config: true } },
+    },
+  });
+  if (!order) return { ok: false, error: "Order not found." };
+
+  const paid = toNumber(order.amountPaid);
+  const refundable = refundableAmount(
+    paid,
+    order.refunds.map((r) => ({ amount: toNumber(r.amount), status: r.status })),
+  );
+  if (refundable <= 0) {
+    return { ok: false, error: "Nothing left to refund on this order." };
+  }
+  const amount = clampRefund(Number(formData.get("amount")), refundable);
+  if (amount <= 0) return { ok: false, error: "Enter a valid refund amount." };
+  const already = round2(paid - refundable);
+
+  const method = order.paymentMethod ?? "COUNTER";
+  const currency = order.restaurant.config?.currency ?? "INR";
+
+  let gatewayRefundId: string | null = null;
+  if (method === "ONLINE") {
+    const pay = order.payments.find((p) => p.razorpayPaymentId);
+    const creds = order.restaurant.config
+      ? resolveRazorpayCreds(order.restaurant.config)
+      : null;
+    if (!pay?.razorpayPaymentId || !creds) {
+      return {
+        ok: false,
+        error: "No online payment on file to refund — record a manual refund instead.",
+      };
+    }
+    try {
+      const res = await refundRazorpayPayment(creds, pay.razorpayPaymentId, amount);
+      gatewayRefundId = res.id;
+    } catch {
+      await prisma.refund.create({
+        data: { restaurantId, orderId, amount, reason, method, status: "FAILED", createdByName: session.name },
+      });
+      await recordAudit(restaurantId, session, "order.refund_failed", `#${order.orderNumber} · ${formatMoney(amount, currency)}`);
+      return { ok: false, error: "The payment gateway rejected the refund. Try again, or refund manually." };
+    }
+  }
+
+  await prisma.refund.create({
+    data: { restaurantId, orderId, amount, reason, method, gatewayRefundId, status: "DONE", createdByName: session.name },
+  });
+  if (round2(already + amount) >= paid) {
+    await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: "REFUNDED" } });
+  }
+  await recordAudit(
+    restaurantId,
+    session,
+    "order.refunded",
+    `#${order.orderNumber} · ${formatMoney(amount, currency)}${reason ? ` · ${reason}` : ""}`,
+  );
+  emitEvent({ type: "order.updated", restaurantId, orderId });
+  revalidateAdmin();
+  return { ok: true, amount };
 }
 
 // Waiter moves an order (or the whole party) to a different table. With

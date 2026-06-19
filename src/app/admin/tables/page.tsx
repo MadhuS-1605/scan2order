@@ -8,8 +8,9 @@ import { Card } from "@/components/ui";
 import { AddTableForm, PrintButton } from "./tables-manager";
 
 export default async function TablesPage() {
-  const { restaurant } = await getCurrentRestaurant("tables");
+  const { restaurant, config } = await getCurrentRestaurant("tables");
   const baseUrl = await getBaseUrl();
+  const selfService = config.serviceModel === "SELF_SERVICE";
 
   const tables = await prisma.restaurantTable.findMany({
     where: { restaurantId: restaurant.id },
@@ -17,10 +18,16 @@ export default async function TablesPage() {
   });
 
   const withQr = await Promise.all(
-    tables.map(async (t) => {
+    tables
+      // Self-service shows only the single COUNTER (venue) QR; table service
+      // shows the real tables and never the COUNTER pseudo-table.
+      .filter((t) => (selfService ? t.kind === "COUNTER" : t.kind !== "COUNTER"))
+      .map(async (t) => {
       const url = tableMenuUrl(
         baseUrl,
-        restaurant.subdomain ?? restaurant.slug,
+        // `||` (not `??`) so an empty-string subdomain falls back to the slug —
+        // otherwise the QR host becomes "https://.<domain>/..." and is broken.
+        restaurant.subdomain || restaurant.slug,
         t.label,
       );
       return {
@@ -33,6 +40,46 @@ export default async function TablesPage() {
       };
     }),
   );
+
+  // Self-service venue: one venue-wide ordering QR, no tables to manage.
+  if (selfService) {
+    const qr = withQr[0];
+    return (
+      <div className="space-y-5">
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-3xl font-medium text-ink">Ordering QR</h1>
+          {qr && <PrintButton />}
+        </div>
+        <p className="max-w-prose text-sm text-ink/55">
+          This is a self-service venue, so there are no tables. Print this single
+          QR and place it at your counter — guests scan it, order, pay, and pick
+          up by their order number.
+        </p>
+        {qr ? (
+          <Card id="qr-print-area" className="max-w-xs text-center">
+            <Image
+              src={qr.qr}
+              alt="Venue ordering QR"
+              width={200}
+              height={200}
+              unoptimized
+              className="mx-auto h-52 w-52"
+            />
+            <p className="mt-3 break-all text-[10px] text-ink/45">{qr.url}</p>
+            <a
+              href={qr.qr}
+              download="ordering-qr.png"
+              className="mt-2 inline-block text-sm font-medium text-brand-600 print:hidden"
+            >
+              Download QR
+            </a>
+          </Card>
+        ) : (
+          <p className="text-sm text-ink/55">Your ordering QR is being set up.</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">

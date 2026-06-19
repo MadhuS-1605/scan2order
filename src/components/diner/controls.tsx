@@ -13,17 +13,21 @@ export function Stepper({
   return (
     <div className="flex items-center gap-2 rounded-lg border border-sand-300">
       <button
+        type="button"
         className="px-2.5 py-1 text-ink/70"
         onClick={() => onChange(qty - 1)}
-        aria-label="decrease"
+        aria-label="Decrease quantity"
       >
         −
       </button>
-      <span className="w-5 text-center text-sm font-medium">{qty}</span>
+      <span className="w-5 text-center text-sm font-medium" aria-live="polite">
+        {qty}
+      </span>
       <button
+        type="button"
         className="px-2.5 py-1 text-ink/70"
         onClick={() => onChange(qty + 1)}
-        aria-label="increase"
+        aria-label="Increase quantity"
       >
         +
       </button>

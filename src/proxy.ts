@@ -28,6 +28,8 @@ const RESERVED_PATHS = new Set([
   "admin",
   "api",
   "t",
+  "privacy",
+  "terms",
 ]);
 
 const TABLE_COOKIE = "sto_table";

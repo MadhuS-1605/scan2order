@@ -3,13 +3,20 @@
 // {itemId, qty, optionIds}; names and prices are resolved from the menu items
 // (keyed by id) at render time, so these helpers take the item map as input.
 
-export type ModOption = { id: string; name: string; priceDelta: number };
+type Translations = Record<string, { name?: string }> | null;
+export type ModOption = {
+  id: string;
+  name: string;
+  priceDelta: number;
+  translations?: Translations;
+};
 export type ModGroup = {
   id: string;
   name: string;
   required: boolean;
   minSelect: number;
   maxSelect: number;
+  translations?: Translations;
   options: ModOption[];
 };
 export type Item = {
@@ -23,6 +30,9 @@ export type Item = {
   isChefSpecial: boolean;
   availableFrom: string | null;
   availableTo: string | null;
+  // Whether the item's time window includes "now" (venue tz). Items outside it
+  // are shown but disabled, so diners see what's on the menu and when.
+  availableNow: boolean;
   imageUrl: string | null;
   translations: Record<string, { name?: string; description?: string }> | null;
   modifierGroups: ModGroup[];

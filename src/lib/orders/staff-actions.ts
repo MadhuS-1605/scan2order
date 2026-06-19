@@ -18,6 +18,7 @@ function effectivePrice(
     happyHourFrom: string | null;
     happyHourTo: string | null;
     happyHourPercent: Prisma.Decimal;
+    timezone: string;
   },
 ): number {
   const pct = happyHourPercentNow(
@@ -27,7 +28,7 @@ function effectivePrice(
       to: config.happyHourTo,
       percent: toNumber(config.happyHourPercent),
     },
-    new Date(),
+    config.timezone,
   );
   return Math.round(base * (1 - pct / 100) * 100) / 100;
 }

@@ -11,7 +11,7 @@ import {
   verifyRazorpaySignature,
 } from "@/lib/payments/razorpay";
 import { createOtp, verifyOtp } from "@/lib/messaging/otp";
-import { sendWhatsApp } from "@/lib/messaging/provider";
+import { sendWhatsApp, sendEmail, sendWhatsAppTemplate } from "@/lib/messaging/provider";
 import { awardPointsForOrder } from "@/lib/loyalty";
 
 // Loads an order scoped to the scanned table's QR token (customer-safe access).
@@ -39,20 +39,22 @@ function billNumberFor(order: { orderNumber: number; id: string }): string {
 
 const r2 = round2;
 
-// --- Table bill: every open (non-cancelled, unpaid) order at the table forms
-// ONE consolidated bill, regardless of which diner/device placed it. The
-// earliest open order is the "primary" billing record — it carries the tip,
-// coupon/discount and the running amountPaid for the whole bill. Once settled,
-// those orders drop out and a new party at the table starts a fresh bill; the
-// fallback to [entry] keeps an already-paid bill view rendering. ---
+// --- Session bill: every open (non-cancelled, unpaid) order in the diner's
+// dining session forms ONE consolidated bill — scoped to the session, not the
+// table, so separate parties at a shared table are billed independently and one
+// diner never sees/pays another's orders. The earliest open order is the
+// "primary" billing record — it carries the tip, coupon/discount and the
+// running amountPaid for the whole bill. Once settled, those orders drop out and
+// the next round starts a fresh session; the fallback to [entry] keeps an
+// already-paid bill view rendering (and covers sessionless POS orders). ---
 async function getCustomerSession(orderId: string, qrToken: string) {
   const entry = await getCustomerOrder(orderId, qrToken);
   if (!entry) return null;
-  const open = entry.tableId
+  const open = entry.diningSessionId
     ? await prisma.order.findMany({
         where: {
           restaurantId: entry.restaurantId,
-          tableId: entry.tableId,
+          diningSessionId: entry.diningSessionId,
           status: { not: "CANCELLED" },
           paymentStatus: { not: "PAID" },
         },
@@ -83,6 +85,14 @@ function sessionRemaining(orders: Order[], primary: Order): number {
 
 // Settle the whole session: mark every order paid and award loyalty once each.
 async function settleSession(orders: Order[], primary: Order, method: "ONLINE" | "COUNTER" | "ROOM") {
+  // Pay-first venues hold the order out of the kitchen (PLACED) until paid —
+  // release it to the kitchen (CONFIRMED) now that payment has landed.
+  const cfg = await prisma.onboardingConfig.findUnique({
+    where: { restaurantId: primary.restaurantId },
+    select: { requirePrepayment: true },
+  });
+  const confirmOnPay = cfg?.requirePrepayment ?? false;
+  const now = new Date();
   await prisma.$transaction(
     orders.map((o) =>
       prisma.order.update({
@@ -91,15 +101,24 @@ async function settleSession(orders: Order[], primary: Order, method: "ONLINE" |
           paymentStatus: "PAID",
           paymentMethod: o.paymentMethod ?? method,
           // The whole consolidated bill's payment is recorded on the primary
-          // order; others settle at 0 so SUM(amountPaid) across the table is
+          // order; others settle at 0 so SUM(amountPaid) across the bill is
           // accurate (no double-counting).
           amountPaid: o.id === primary.id ? sessionPayable(orders, primary) : 0,
+          ...(confirmOnPay && o.status === "PLACED"
+            ? { status: "CONFIRMED" as const, confirmedAt: now }
+            : {}),
         },
       }),
     ),
   );
   for (const o of orders) {
-    emitEvent({ type: "order.updated", restaurantId: o.restaurantId, orderId: o.id });
+    // A newly-confirmed prepaid order is "new" to the kitchen.
+    const justConfirmed = confirmOnPay && o.status === "PLACED";
+    emitEvent(
+      justConfirmed
+        ? { type: "order.created", restaurantId: o.restaurantId, orderId: o.id, status: "CONFIRMED" }
+        : { type: "order.updated", restaurantId: o.restaurantId, orderId: o.id },
+    );
     await awardPointsForOrder(o.id);
   }
 }
@@ -143,33 +162,44 @@ export async function applyCouponAction(args: {
     discount = Math.min(discount, toNumber(coupon.maxDiscount));
   discount = r2(Math.min(discount, total));
 
-  // If switching from a different code, release the previous one's count.
-  await prisma.$transaction([
-    prisma.order.update({
-      where: { id: order.id },
-      data: { discountAmount: discount, couponCode: code },
-    }),
-    ...(order.couponCode && order.couponCode !== code
-      ? [
-          prisma.coupon.updateMany({
-            where: {
-              restaurantId: order.restaurantId,
-              code: order.couponCode,
-              usedCount: { gt: 0 },
-            },
-            data: { usedCount: { decrement: 1 } },
-          }),
-        ]
-      : []),
-    ...(order.couponCode !== code
-      ? [
-          prisma.coupon.update({
+  // Apply atomically. The usage count is incremented with a guard
+  // (usedCount < usageLimit) so two concurrent redemptions can't both slip past
+  // the limit — the DB serialises the conditional UPDATE and the loser sees 0
+  // rows affected. (Switching codes also releases the previous code's count.)
+  const newCode = order.couponCode !== code;
+  try {
+    await prisma.$transaction(async (tx) => {
+      if (newCode) {
+        if (coupon.usageLimit !== null) {
+          const inc = await tx.coupon.updateMany({
+            where: { id: coupon.id, usedCount: { lt: coupon.usageLimit } },
+            data: { usedCount: { increment: 1 } },
+          });
+          if (inc.count === 0) throw new Error("COUPON_FULLY_USED");
+        } else {
+          await tx.coupon.update({
             where: { id: coupon.id },
             data: { usedCount: { increment: 1 } },
-          }),
-        ]
-      : []),
-  ]);
+          });
+        }
+        if (order.couponCode) {
+          await tx.coupon.updateMany({
+            where: { restaurantId: order.restaurantId, code: order.couponCode, usedCount: { gt: 0 } },
+            data: { usedCount: { decrement: 1 } },
+          });
+        }
+      }
+      await tx.order.update({
+        where: { id: order.id },
+        data: { discountAmount: discount, couponCode: code },
+      });
+    });
+  } catch (e) {
+    if (e instanceof Error && e.message === "COUPON_FULLY_USED") {
+      return { ok: false, error: "This code has been fully used." };
+    }
+    throw e;
+  }
   return { ok: true, discount };
 }
 
@@ -252,7 +282,11 @@ export async function chargeToRoomAction(args: {
   return { ok: true };
 }
 
-async function ensureBill(order: Order, deliveryMethod?: "DOWNLOAD" | "WHATSAPP", phone?: string) {
+async function ensureBill(
+  order: Order,
+  deliveryMethod?: "DOWNLOAD" | "WHATSAPP" | "EMAIL",
+  phone?: string,
+) {
   const data = {
     subtotal: order.subtotal,
     taxAmount: order.taxAmount,
@@ -360,7 +394,15 @@ export async function verifyPaymentAction(args: {
     args.razorpayPaymentId,
     args.signature,
   );
-  if (!valid) return { ok: false, error: "Payment verification failed." };
+  if (!valid) {
+    // Genuine failure — flag the intent so it doesn't sit stuck as PENDING and
+    // the diner can cleanly retry (a fresh intent is created on the next try).
+    await prisma.payment.updateMany({
+      where: { orderId: primary.id, razorpayOrderId: args.razorpayOrderId, status: "PENDING" },
+      data: { status: "FAILED" },
+    });
+    return { ok: false, error: "Payment verification failed. Please try again." };
+  }
 
   // The Razorpay order must match a payment intent we created for THIS session,
   // and not one already consumed — prevents replaying another order's id.
@@ -394,6 +436,65 @@ export async function verifyPaymentAction(args: {
       restaurantId: primary.restaurantId,
       orderId: primary.id,
     });
+  }
+  return { ok: true };
+}
+
+// Reconcile a payment from a TRUSTED source (the Razorpay webhook) where we have
+// no qrToken/diner session — resolve everything from the stored payment intent.
+// Idempotent: a no-op if already PAID (e.g. the client callback got there first).
+export async function reconcilePaidByRazorpayOrder(
+  razorpayOrderId: string,
+  razorpayPaymentId?: string,
+): Promise<{ ok: boolean }> {
+  const payment = await prisma.payment.findFirst({ where: { razorpayOrderId } });
+  if (!payment) return { ok: false };
+  if (payment.status === "PAID") return { ok: true };
+
+  const primary = await prisma.order.findUnique({
+    where: { id: payment.orderId },
+    include: {
+      table: true,
+      items: true,
+      restaurant: { include: { config: true } },
+      bill: true,
+    },
+  });
+  if (!primary || !primary.restaurant.config) return { ok: false };
+
+  const session: Order[] = primary.diningSessionId
+    ? await prisma.order.findMany({
+        where: {
+          restaurantId: primary.restaurantId,
+          diningSessionId: primary.diningSessionId,
+          status: { not: "CANCELLED" },
+          paymentStatus: { not: "PAID" },
+        },
+        orderBy: { createdAt: "asc" },
+        include: {
+          table: true,
+          items: true,
+          restaurant: { include: { config: true } },
+          bill: true,
+        },
+      })
+    : [primary];
+  const orders = session.length ? session : [primary];
+
+  await prisma.payment.updateMany({
+    where: { id: payment.id },
+    data: { status: "PAID", ...(razorpayPaymentId ? { razorpayPaymentId } : {}) },
+  });
+
+  const newPaid = r2(toNumber(primary.amountPaid) + toNumber(payment.amount));
+  if (newPaid >= sessionPayable(orders, primary) - 0.01) {
+    await settleSession(orders, primary, "ONLINE");
+  } else {
+    await prisma.order.update({
+      where: { id: primary.id },
+      data: { amountPaid: newPaid },
+    });
+    emitEvent({ type: "order.updated", restaurantId: primary.restaurantId, orderId: primary.id });
   }
   return { ok: true };
 }
@@ -447,11 +548,16 @@ export async function requestBillOtpAction(args: {
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not send code." };
   }
-  const res = await sendWhatsApp(
-    phone,
-    `Your verification code for the ${order.restaurant.name} bill is ${code}. It expires in 5 minutes.`,
-    order.restaurant.config!.whatsappFrom,
-  );
+  // Meta Cloud API needs a pre-approved template (body var {{1}} = the code);
+  // Twilio/console use free-form text.
+  const res =
+    env.messaging.provider === "meta"
+      ? await sendWhatsAppTemplate(phone, env.messaging.meta.otpTemplate, [code])
+      : await sendWhatsApp(
+          phone,
+          `Your verification code for the ${order.restaurant.name} bill is ${code}. It expires in 5 minutes.`,
+          order.restaurant.config!.whatsappFrom,
+        );
   if (!res.ok) return { ok: false, error: res.error ?? "Could not send code." };
   return { ok: true, mocked: res.mocked };
 }
@@ -488,14 +594,51 @@ export async function verifyBillOtpAction(args: {
   await ensureBill(order, "WHATSAPP", phone);
 
   const link = `${env.appUrl.replace(/\/$/, "")}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
-  const send = await sendWhatsApp(
-    phone,
-    `Here's your bill from ${order.restaurant.name} (#${order.orderNumber}). ` +
-      `Total: ${order.restaurant.config!.currency} ${toNumber(order.totalAmount).toFixed(2)}.\n` +
-      `Download: ${link}`,
-    order.restaurant.config!.whatsappFrom,
-  );
+  const cur = order.restaurant.config!.currency;
+  const total = toNumber(order.totalAmount).toFixed(2);
+  // Meta template body vars: {{1}} restaurant, {{2}} total, {{3}} bill link.
+  const send =
+    env.messaging.provider === "meta"
+      ? await sendWhatsAppTemplate(phone, env.messaging.meta.billTemplate, [
+          order.restaurant.name,
+          `${cur} ${total}`,
+          link,
+        ])
+      : await sendWhatsApp(
+          phone,
+          `Here's your bill from ${order.restaurant.name} (#${order.orderNumber}). ` +
+            `Total: ${cur} ${total}.\nDownload: ${link}`,
+          order.restaurant.config!.whatsappFrom,
+        );
   if (!send.ok) return { ok: false, error: send.error ?? "Could not send bill." };
+  return { ok: true, mocked: send.mocked };
+}
+
+// Email the bill PDF link to the diner via Resend.
+export async function emailBillAction(args: {
+  orderId: string;
+  qrToken: string;
+  email: string;
+}): Promise<{ ok: boolean; error?: string; mocked?: boolean }> {
+  const order = await getCustomerOrder(args.orderId, args.qrToken);
+  if (!order) return { ok: false, error: "Order not found." };
+  const email = args.email.trim();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return { ok: false, error: "Enter a valid email address." };
+  }
+  await ensureBill(order, "EMAIL");
+  const link = `${env.appUrl.replace(/\/$/, "")}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
+  const name = order.restaurant.name;
+  const cur = order.restaurant.config!.currency;
+  const total = toNumber(order.totalAmount).toFixed(2);
+  const html = `<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;color:#1c1917">
+    <h2 style="margin:0 0 8px">Thanks for dining at ${name}!</h2>
+    <p style="margin:0 0 16px">Here's your bill (#${order.orderNumber}) — total <strong>${cur} ${total}</strong>.</p>
+    <p style="margin:0 0 20px"><a href="${link}" style="background:#d93d0b;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Download your bill (PDF)</a></p>
+    <p style="color:#999;font-size:12px;margin:0">Powered by Scan to Order</p>
+  </div>`;
+  const send = await sendEmail(email, `Your bill from ${name} (#${order.orderNumber})`, html);
+  if (!send.ok) return { ok: false, error: send.error ?? "Could not send the email." };
   return { ok: true, mocked: send.mocked };
 }
 

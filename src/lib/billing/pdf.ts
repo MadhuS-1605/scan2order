@@ -10,9 +10,13 @@ export type BillPdfData = {
     state: string | null;
     phone: string | null;
     gstNumber: string | null;
+    fssaiNumber: string | null;
+    logoUrl: string | null;
   };
+  footerMessage: string | null; // custom bill footer; falls back to a random quote
   billNumber: string;
   date: Date;
+  timezone: string; // venue IANA tz, so the printed time is venue-local (not the server's)
   tableLabel: string | null;
   customerName: string | null;
   token: string; // order number(s) for this visit
@@ -38,6 +42,18 @@ const INNER = W - M * 2;
 
 const money = (n: number): string => n.toFixed(2);
 
+// A light, friendly line printed near the bill footer — varied per print.
+const QUOTES = [
+  "Good food is the foundation of genuine happiness.",
+  "Thank you for dining with us — see you soon!",
+  "Eat well, laugh often, come back hungry.",
+  "Every meal is better when shared. Thanks for visiting!",
+  "Great food, great company — thanks for choosing us.",
+  "A happy tummy is a happy soul. Visit again!",
+  "Made with love, served with a smile.",
+  "Hope it tasted as good as it looked — come back soon!",
+];
+
 export async function generateBillPdf(data: BillPdfData): Promise<Buffer> {
   // Pre-generate the payment QR (PNG) so we can size the page for it.
   let qr: Buffer | null = null;
@@ -49,21 +65,34 @@ export async function generateBillPdf(data: BillPdfData): Promise<Buffer> {
     }
   }
 
+  // Best-effort fetch of the restaurant logo (pdfkit supports PNG/JPEG only).
+  let logo: Buffer | null = null;
+  if (data.restaurant.logoUrl) {
+    try {
+      const res = await fetch(data.restaurant.logoUrl);
+      const ct = res.headers.get("content-type") ?? "";
+      if (res.ok && /(png|jpe?g)/i.test(ct)) {
+        logo = Buffer.from(await res.arrayBuffer());
+      }
+    } catch {
+      logo = null;
+    }
+  }
+
   // Estimate the continuous-roll height from the content.
   const itemLines = data.items.reduce(
     (s, it) => s + Math.max(1, Math.ceil(it.name.length / 26)),
     0,
   );
-  const hasGst = data.gstMode !== "NONE";
   const height =
-    150 + // header + meta
+    (logo ? 52 : 0) + // logo
+    150 + // header + meta (incl. GST/FSSAI lines)
     16 + // table header
     itemLines * 11 +
     data.items.length * 4 +
-    80 + // totals
-    (hasGst ? 60 : 0) + // gst breakup
+    80 + // totals (with inline GST split)
     (qr ? 110 : 0) +
-    60; // footer
+    80; // footer (thank-you + quote)
 
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({
@@ -112,6 +141,15 @@ export async function generateBillPdf(data: BillPdfData): Promise<Buffer> {
 
     // --- Status + header ---
     if (data.paid) center("PAID", 9, "Helvetica-Bold", 3);
+    if (logo) {
+      const box = 46;
+      try {
+        doc.image(logo, (W - box) / 2, y, { fit: [box, box], align: "center" });
+        y += box + 4;
+      } catch {
+        /* unsupported image — skip */
+      }
+    }
     center(data.restaurant.name, 12, "Helvetica-Bold", 2);
     const addr = [
       data.restaurant.addressLine,
@@ -119,7 +157,8 @@ export async function generateBillPdf(data: BillPdfData): Promise<Buffer> {
       data.restaurant.phone ? `Ph: ${data.restaurant.phone}` : null,
     ].filter(Boolean) as string[];
     for (const a of addr) center(a, 6.5, "Helvetica", 0);
-    if (data.restaurant.gstNumber) center(`GST: ${data.restaurant.gstNumber}`, 6.5, "Helvetica", 2);
+    if (data.restaurant.gstNumber) center(`GST: ${data.restaurant.gstNumber}`, 6.5, "Helvetica", 0);
+    if (data.restaurant.fssaiNumber) center(`FSSAI Lic: ${data.restaurant.fssaiNumber}`, 6.5, "Helvetica", 0);
     y += 2;
     rule();
 
@@ -128,8 +167,12 @@ export async function generateBillPdf(data: BillPdfData): Promise<Buffer> {
     // --- Meta ---
     lr(`Bill No: ${data.billNumber}`, `Token: ${data.token}`);
     lr(
-      `Date: ${data.date.toLocaleDateString("en-IN")}`,
-      data.date.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      `Date: ${data.date.toLocaleDateString("en-IN", { timeZone: data.timezone })}`,
+      data.date.toLocaleTimeString("en-IN", {
+        timeZone: data.timezone,
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
     );
     if (data.tableLabel) lr(`Table: ${data.tableLabel}`, data.customerName ?? "");
     else if (data.customerName) lr(`Name: ${data.customerName}`, "");
@@ -181,21 +224,13 @@ export async function generateBillPdf(data: BillPdfData): Promise<Buffer> {
     lr("GRAND TOTAL", "Rs. " + money(data.payable), 11, "Helvetica-Bold");
     rule();
 
-    // --- GST break-up (matches the pattern on Indian bills) ---
-    if (data.gstMode !== "NONE" && data.taxAmount > 0) {
-      const half = data.gstPercentage / 2;
-      doc.font("Helvetica").fontSize(6).fillColor("#000");
-      center("--- GST Break-up ---", 6, "Helvetica", 1);
-      lr(
-        `Taxable: ${money(data.subtotal)}`,
-        `CGST(${half}%): ${money(data.taxAmount / 2)}  SGST(${half}%): ${money(data.taxAmount / 2)}`,
-        6,
-      );
-      y += 3;
-    }
-
     // --- Footer ---
     center(data.paid ? "Thank you, visit again!" : "Please pay at the counter", 7.5, "Helvetica-Bold", 3);
+    // Custom footer message if set, else a friendly varied quote.
+    const footer =
+      data.footerMessage?.trim() ||
+      QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    center(footer, 6.5, "Helvetica", 3);
     if (qr) {
       const qrSize = 100;
       if (data.qrIsUpi) center("Scan to pay", 7.5, "Helvetica-Bold", 2);

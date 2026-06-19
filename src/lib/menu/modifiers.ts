@@ -8,6 +8,19 @@ function revalidate() {
   revalidatePath("/admin/menu");
 }
 
+// Collect per-language name overrides from tr_<lang>_name fields into the
+// translations JSON shape used across the app ({ hi: { name }, … }).
+function collectTranslations(formData: FormData): Record<string, { name: string }> {
+  const t: Record<string, { name: string }> = {};
+  for (const [k, v] of formData.entries()) {
+    const m = k.match(/^tr_([a-z]{2})_name$/);
+    if (!m) continue;
+    const val = String(v).trim();
+    if (val) t[m[1]] = { name: val };
+  }
+  return t;
+}
+
 async function ownsItem(menuItemId: string, restaurantId: string) {
   const item = await prisma.menuItem.findFirst({
     where: { id: menuItemId, restaurantId },
@@ -25,6 +38,7 @@ export async function addModifierGroupAction(formData: FormData): Promise<void> 
   if (!name || !(await ownsItem(menuItemId, restaurantId))) return;
 
   const count = await prisma.modifierGroup.count({ where: { menuItemId } });
+  const tr = collectTranslations(formData);
   await prisma.modifierGroup.create({
     data: {
       menuItemId,
@@ -33,6 +47,7 @@ export async function addModifierGroupAction(formData: FormData): Promise<void> 
       minSelect: required ? 1 : 0,
       maxSelect: required ? 1 : maxSelect,
       sortOrder: count,
+      translations: Object.keys(tr).length ? tr : undefined,
     },
   });
   revalidate();
@@ -65,8 +80,15 @@ export async function addModifierOptionAction(
   if (!group) return;
 
   const count = await prisma.modifierOption.count({ where: { groupId } });
+  const tr = collectTranslations(formData);
   await prisma.modifierOption.create({
-    data: { groupId, name, priceDelta, sortOrder: count },
+    data: {
+      groupId,
+      name,
+      priceDelta,
+      sortOrder: count,
+      translations: Object.keys(tr).length ? tr : undefined,
+    },
   });
   revalidate();
 }

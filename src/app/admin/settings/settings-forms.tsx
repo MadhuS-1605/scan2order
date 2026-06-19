@@ -27,6 +27,8 @@ type Profile = {
   city: string | null;
   state: string | null;
   postalCode: string | null;
+  fssaiNumber: string | null;
+  logoUrl: string | null;
 };
 
 type Config = {
@@ -50,6 +52,15 @@ type Config = {
   featureBanquets: boolean;
   featureBar: boolean;
   featureAttendance: boolean;
+  timezone: string;
+  openTime: string | null;
+  closeTime: string | null;
+  orderingPaused: boolean;
+  billFooterMessage: string | null;
+  defaultPrepMinutes: number;
+  minOrderAmount: number;
+  pickupEnabled: boolean;
+  deliveryEnabled: boolean;
   requireDinerLocation: boolean;
   latitude: number | null;
   longitude: number | null;
@@ -193,6 +204,23 @@ function ProfileForm({ profile }: { profile: Profile }) {
             />
           </Field>
         </div>
+        <Field label="FSSAI licence number" htmlFor="s-fssai" hint="Printed on bills">
+          <Input
+            id="s-fssai"
+            name="fssaiNumber"
+            defaultValue={profile.fssaiNumber ?? ""}
+            placeholder="e.g. 12345678901234"
+          />
+        </Field>
+        <Field label="Logo URL" htmlFor="s-logo" hint="Shown on the diner menu & bill">
+          <Input
+            id="s-logo"
+            name="logoUrl"
+            type="url"
+            defaultValue={profile.logoUrl ?? ""}
+            placeholder="https://…/logo.png"
+          />
+        </Field>
         <div className="flex justify-end">
           <Button type="submit" disabled={pending}>
             {pending ? "Saving…" : "Save profile"}
@@ -254,6 +282,114 @@ function OperationsForm({ config }: { config: Config }) {
             Pay at counter
           </label>
         </div>
+        <fieldset className="rounded-lg border border-sand-200 p-3">
+          <legend className="px-1 text-sm font-medium text-ink/70">
+            Takeaway &amp; delivery
+          </legend>
+          <div className="flex flex-wrap gap-4 text-sm">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="pickupEnabled" defaultChecked={config.pickupEnabled} />
+              Offer pickup
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="deliveryEnabled" defaultChecked={config.deliveryEnabled} />
+              Offer delivery (diner enters address)
+            </label>
+          </div>
+          <p className="mt-2 text-xs text-ink/45">
+            When on, diners choose a fulfilment type at checkout. Default for cloud
+            kitchens.
+          </p>
+        </fieldset>
+        <fieldset className="rounded-lg border border-sand-200 p-3">
+          <legend className="px-1 text-sm font-medium text-ink/70">
+            Service hours
+          </legend>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="orderingPaused"
+              defaultChecked={config.orderingPaused}
+            />
+            Pause new orders now (temporary stop, ignores hours)
+          </label>
+          <div className="mt-3 grid gap-4 sm:grid-cols-3">
+            <Field label="Opens at" htmlFor="o-open" hint="Leave blank for 24h">
+              <Input
+                id="o-open"
+                name="openTime"
+                type="time"
+                defaultValue={config.openTime ?? ""}
+              />
+            </Field>
+            <Field label="Closes at" htmlFor="o-close" hint="Leave blank for 24h">
+              <Input
+                id="o-close"
+                name="closeTime"
+                type="time"
+                defaultValue={config.closeTime ?? ""}
+              />
+            </Field>
+            <Field label="Timezone" htmlFor="o-tz" hint="IANA, e.g. Asia/Kolkata">
+              <Input
+                id="o-tz"
+                name="timezone"
+                defaultValue={config.timezone}
+                placeholder="Asia/Kolkata"
+              />
+            </Field>
+          </div>
+          <p className="mt-2 text-xs text-ink/45">
+            Outside these hours (in the venue timezone) diners can browse the menu
+            but can&apos;t place orders. Happy-hour and item availability windows
+            also use this timezone.
+          </p>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Default prep time (minutes)"
+              htmlFor="o-prep"
+              hint="Shown to diners as 'ready in ~N min'"
+            >
+              <Input
+                id="o-prep"
+                name="defaultPrepMinutes"
+                type="number"
+                min="0"
+                max="180"
+                defaultValue={String(config.defaultPrepMinutes)}
+                className="max-w-[8rem]"
+              />
+            </Field>
+            <Field
+              label="Minimum order amount"
+              htmlFor="o-minorder"
+              hint="0 = no minimum"
+            >
+              <Input
+                id="o-minorder"
+                name="minOrderAmount"
+                type="number"
+                min="0"
+                defaultValue={String(config.minOrderAmount)}
+                className="max-w-[8rem]"
+              />
+            </Field>
+          </div>
+        </fieldset>
+
+        <Field
+          label="Bill footer message"
+          htmlFor="o-footer"
+          hint="Printed at the bottom of every bill (blank = a friendly default)"
+        >
+          <Input
+            id="o-footer"
+            name="billFooterMessage"
+            defaultValue={config.billFooterMessage ?? ""}
+            placeholder="e.g. Thank you for dining with us!"
+          />
+        </Field>
+
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="GST mode" htmlFor="o-gst">
             <Select

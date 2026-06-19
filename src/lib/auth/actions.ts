@@ -11,6 +11,11 @@ import {
   type ActionState,
 } from "@/lib/validation";
 import { landingFor } from "@/lib/auth/permissions";
+import { rateLimit } from "@/lib/ratelimit";
+
+// Throttle login attempts to blunt brute-force: a short burst gap + a cap per
+// 15-minute window, keyed per account.
+const LOGIN_LIMIT = { windowMs: 15 * 60_000, max: 8, minGapMs: 500 };
 
 export async function signupAction(
   _prev: ActionState,
@@ -66,6 +71,10 @@ export async function signinAction(
   }
   const { email, password } = parsed.data;
 
+  if (!(await rateLimit(`login:${email.toLowerCase()}`, LOGIN_LIMIT))) {
+    return { error: "Too many sign-in attempts. Please wait a few minutes and try again." };
+  }
+
   const user = await prisma.adminUser.findUnique({
     where: { email: email.toLowerCase() },
   });
@@ -102,6 +111,10 @@ export async function staffSigninAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const { code, username, password } = parsed.data;
+
+  if (!(await rateLimit(`login:${code.toLowerCase()}:${username.toLowerCase()}`, LOGIN_LIMIT))) {
+    return { error: "Too many sign-in attempts. Please wait a few minutes and try again." };
+  }
 
   const user = await prisma.adminUser.findFirst({
     where: {

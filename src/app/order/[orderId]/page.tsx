@@ -46,21 +46,22 @@ export default async function OrderStatusPage({
   if (!order || !order.table || order.table.qrToken !== tableToken) notFound();
   const qrToken = order.table.qrToken;
 
-  // Table-based bill: open (unpaid) orders at this table share one consolidated
-  // bill. Falls back to this order alone once the table bill is settled.
-  const open = order.tableId
+  // Session-based bill: a diner's own rounds (same dining session) consolidate
+  // into one bill — scoped to the session, never the whole table, so separate
+  // parties at one table never see each other's orders. Includes paid rounds so
+  // the bill stays aggregated after settlement. Falls back to this order alone
+  // for sessionless (e.g. staff POS) orders.
+  const sessionOrders = order.diningSessionId
     ? await prisma.order.findMany({
         where: {
           restaurantId: order.restaurantId,
-          tableId: order.tableId,
+          diningSessionId: order.diningSessionId,
           status: { not: "CANCELLED" },
-          paymentStatus: { not: "PAID" },
         },
         orderBy: { createdAt: "asc" },
         include: { items: true },
       })
-    : [];
-  const sessionOrders = open.length ? open : [order];
+    : [order];
   const primary = sessionOrders[0] ?? order;
 
   const cur = order.restaurant.config?.currency ?? "INR";
@@ -70,9 +71,28 @@ export default async function OrderStatusPage({
   // Location withheld -> order is held for a staff member to approve before it
   // goes to the kitchen. Drives the "waiting for staff" messaging below.
   const held = order.presence === "UNVERIFIED" && order.status === "PLACED";
+  // Pay-first venue: the order is held out of the kitchen until it's paid.
+  const awaitingPrepay =
+    Boolean(order.restaurant.config?.requirePrepayment) &&
+    order.status === "PLACED" &&
+    order.paymentStatus !== "PAID";
   const payAfter = order.restaurant.config?.paymentTiming === "PAY_AFTER";
   const canRate =
     (order.status === "SERVED" || order.status === "COMPLETED") && !order.feedback;
+
+  // Estimated ready time = confirmation + the venue's default prep minutes.
+  // Shown only while the order is actively being prepared. Remaining minutes is
+  // a duration, so it's timezone-independent.
+  const prepMin = order.restaurant.config?.defaultPrepMinutes ?? 0;
+  const etaMin =
+    (order.status === "CONFIRMED" || order.status === "PREPARING") &&
+    prepMin > 0 &&
+    order.confirmedAt
+      ? Math.max(
+          0,
+          Math.ceil((order.confirmedAt.getTime() + prepMin * 60000 - Date.now()) / 60000),
+        )
+      : null;
 
   const sessionTotal = r2(sessionOrders.reduce((s, o) => s + toNumber(o.totalAmount), 0));
   const payable = r2(
@@ -88,6 +108,7 @@ export default async function OrderStatusPage({
         restaurantName={order.restaurant.name}
         groupName={order.restaurant.group?.name}
         seat={seatLabel(order.table)}
+        logoUrl={order.restaurant.logoUrl}
       />
       <div className="mx-auto max-w-lg space-y-4 px-4 py-6 pb-24 sm:py-8 sm:pb-24">
         <div className="overflow-hidden rounded-2xl border border-brand-200 bg-surface text-center">
@@ -108,14 +129,39 @@ export default async function OrderStatusPage({
                 ? "This order was cancelled."
                 : completed
                   ? "Order complete. Enjoy your meal!"
-                  : held
-                    ? "We've received your order — waiting for a staff member to approve it."
-                    : "We've got your order — show this number to collect."}
+                  : awaitingPrepay
+                    ? "Almost there — complete payment to send your order to the kitchen."
+                    : held
+                      ? "We've received your order — waiting for a staff member to approve it."
+                      : "We've got your order — show this number to collect."}
             </p>
+            {etaMin !== null && (
+              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-sm font-medium text-brand-700">
+                🍳 {etaMin > 0 ? `Ready in ~${etaMin} min` : "Ready any moment now"}
+              </p>
+            )}
+            {order.fulfillment === "PICKUP" && (
+              <p className="mt-2 text-sm text-ink/55">🥡 Pickup order</p>
+            )}
+            {order.fulfillment === "DELIVERY" && (
+              <p className="mt-2 text-sm text-ink/55">
+                🛵 Delivery to: {order.deliveryAddress}
+              </p>
+            )}
           </div>
         </div>
 
-        {held && (
+        {awaitingPrepay && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
+            <p className="font-medium">⏳ Waiting for payment</p>
+            <p className="mt-1 text-amber-800/80">
+              Your order goes to the kitchen as soon as it&apos;s paid. Pay now
+              below, or at the counter — this page updates automatically.
+            </p>
+          </div>
+        )}
+
+        {held && !awaitingPrepay && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
             <p className="font-medium">⏳ Waiting for staff approval</p>
             <p className="mt-1 text-amber-800/80">
@@ -242,7 +288,7 @@ export default async function OrderStatusPage({
             href={`/payment?order=${orderId}`}
             className="flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-6 py-3.5 text-center font-medium text-white transition-all hover:bg-brand-700 active:translate-y-px"
           >
-            {payAfter ? "Request bill & pay" : "View bill"}
+            {awaitingPrepay ? "Pay now to confirm" : payAfter ? "Request bill & pay" : "View bill"}
             {multiRound ? ` · ${formatMoney(payable, cur)}` : ""}
             <ArrowRight className="h-4 w-4" />
           </Link>

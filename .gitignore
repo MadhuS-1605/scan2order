@@ -31,8 +31,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files (never commit real secrets; the template IS committed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -40,6 +41,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-.claude
-CLAUDE.md
-AGENTS.md
+
+# local agent settings (CLAUDE.md / AGENTS.md are intentionally committed)
+.claude/
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/e2e/fixtures.json

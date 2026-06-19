@@ -4,12 +4,19 @@
 
 export type PlanTier = "FREE" | "STARTER" | "PRO";
 
+export type PlanLimits = {
+  maxTables: number | null; // null = unlimited
+  maxMenuItems: number | null;
+  onlinePayments: boolean; // may enable Razorpay online payment
+};
+
 export type Plan = {
   tier: PlanTier;
   name: string;
   price: number; // ₹ / month
   tagline: string;
   features: string[];
+  limits: PlanLimits;
   highlight?: boolean;
 };
 
@@ -26,6 +33,7 @@ export const PLANS: Plan[] = [
       "Live kitchen screen",
       "Pay at counter",
     ],
+    limits: { maxTables: 10, maxMenuItems: 50, onlinePayments: false },
   },
   {
     tier: "STARTER",
@@ -40,6 +48,7 @@ export const PLANS: Plan[] = [
       "Coupons, happy hour & loyalty",
       "Analytics & CSV export",
     ],
+    limits: { maxTables: null, maxMenuItems: null, onlinePayments: true },
   },
   {
     tier: "PRO",
@@ -53,9 +62,14 @@ export const PLANS: Plan[] = [
       "Integrations & webhooks",
       "Audit log & priority support",
     ],
+    limits: { maxTables: null, maxMenuItems: null, onlinePayments: true },
   },
 ];
 
 export function planByTier(tier: string): Plan {
   return PLANS.find((p) => p.tier === tier) ?? PLANS[0];
+}
+
+export function planLimits(tier: string): PlanLimits {
+  return planByTier(tier).limits;
 }

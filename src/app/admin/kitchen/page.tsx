@@ -175,7 +175,9 @@ export default async function KitchenScreen() {
                     </button>
                   </form>
 
-                  <PrintButton orderId={o.id} hasPrinter={hasPrinter} />
+                  {col.status === "CONFIRMED" && (
+                    <PrintButton orderId={o.id} hasPrinter={hasPrinter} />
+                  )}
                 </div>
               ))}
             </div>

@@ -14,6 +14,7 @@ type Props =
 type State =
   | "idle"
   | "unsupported"
+  | "ios" // iOS Safari: push needs the app installed to the Home Screen
   | "enabling"
   | "enabled"
   | "denied"
@@ -41,7 +42,13 @@ export function EnableNotifications(props: Props) {
       !("Notification" in window) ||
       !vapid
     ) {
-      setState("unsupported");
+      // iOS Safari only supports web push when installed to the Home Screen
+      // (standalone). Nudge the diner to add it rather than showing nothing.
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      const standalone =
+        window.matchMedia?.("(display-mode: standalone)")?.matches ||
+        (navigator as unknown as { standalone?: boolean }).standalone === true;
+      setState(isIOS && !standalone ? "ios" : "unsupported");
       return;
     }
     if (Notification.permission === "denied") {
@@ -99,6 +106,18 @@ export function EnableNotifications(props: Props) {
 
   const base =
     "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors";
+
+  if (state === "ios") {
+    return (
+      <span
+        className={`${base} text-ink/45`}
+        title="On iPhone, tap Share → Add to Home Screen, then open it from there to get order alerts"
+      >
+        <Bell className="h-4 w-4" />
+        Add to Home Screen for alerts
+      </span>
+    );
+  }
 
   if (state === "enabled") {
     return (

@@ -27,6 +27,7 @@ export function CustomerMenu({
   restaurantId,
   prefill,
   happyHourPercent,
+  ordering = { open: true, reason: null },
   languages,
   restaurant,
   table,
@@ -37,13 +38,15 @@ export function CustomerMenu({
   restaurantId: string;
   prefill?: { itemId: string; qty: number }[];
   happyHourPercent: number;
+  ordering?: { open: boolean; reason: "paused" | "closed" | null };
   languages: string[];
-  restaurant: { name: string; currency: string; groupName?: string | null };
+  restaurant: { name: string; currency: string; groupName?: string | null; logoUrl?: string | null };
   table: { label: string; kind?: string };
   categories: Category[];
   items: Item[];
 }) {
   const hhFactor = happyHourPercent > 0 ? 1 - happyHourPercent / 100 : 1;
+  const orderingOpen = ordering.open;
   const [lang, setLang] = useState("en");
   const [vegOnly, setVegOnly] = useState(false);
   const [query, setQuery] = useState("");
@@ -146,19 +149,35 @@ export function CustomerMenu({
     <div className="min-h-screen bg-grain pb-36">
       <header className="sticky top-0 z-10 border-b border-sand-200 bg-surface px-4 py-3">
         <div className="flex items-center justify-between">
-          <div>
-            {restaurant.groupName &&
-              restaurant.groupName !== restaurant.name && (
-                <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-brand-600">
-                  {restaurant.groupName}
-                </p>
-              )}
-            <h1 className="font-display text-xl leading-tight text-ink">
-              {restaurant.name}
-            </h1>
-            <p className="text-xs uppercase tracking-wide text-ink/45">
-              {table.kind === "ROOM" ? "Room" : "Table"} {table.label}
-            </p>
+          <div className="flex min-w-0 items-center gap-2.5">
+            {restaurant.logoUrl && (
+              <Image
+                src={restaurant.logoUrl}
+                alt=""
+                width={40}
+                height={40}
+                unoptimized
+                className="h-10 w-10 shrink-0 rounded-lg object-contain"
+              />
+            )}
+            <div className="min-w-0">
+              {restaurant.groupName &&
+                restaurant.groupName !== restaurant.name && (
+                  <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-brand-600">
+                    {restaurant.groupName}
+                  </p>
+                )}
+              <h1 className="truncate font-display text-xl leading-tight text-ink">
+                {restaurant.name}
+              </h1>
+              <p className="text-xs uppercase tracking-wide text-ink/45">
+                {table.kind === "ROOM"
+                  ? `Room ${table.label}`
+                  : table.kind === "COUNTER"
+                    ? "Pickup"
+                    : `Table ${table.label}`}
+              </p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {languages.length > 1 && (
@@ -216,6 +235,16 @@ export function CustomerMenu({
         </div>
       </header>
 
+      {!orderingOpen && (
+        <div className="mx-auto mt-3 max-w-2xl px-2 sm:px-4">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
+            {ordering.reason === "paused"
+              ? "🛎️ Ordering is paused right now — please check back in a little while. You can still browse the menu."
+              : "🌙 We're closed right now, so ordering is unavailable. Browse the menu and come back during opening hours."}
+          </div>
+        </div>
+      )}
+
       <div className="mx-auto flex max-w-2xl gap-2 px-2 py-4 sm:gap-4 sm:px-4">
         {/* Left category rail (app-style) — hidden while searching */}
         {!searching && railEntries.length > 1 && (
@@ -268,7 +297,7 @@ export function CustomerMenu({
                       cur={cur}
                       hhFactor={hhFactor}
                       lang={lang}
-                      simpleQty={simpleQty(i.id)}
+                      orderingOpen={orderingOpen} simpleQty={simpleQty(i.id)}
                       totalQty={totalQtyFor(i.id)}
                       onAdd={() => onAdd(i)}
                       onSimpleChange={(qn) => addLine(i.id, [], qn - simpleQty(i.id))}
@@ -293,7 +322,7 @@ export function CustomerMenu({
                     cur={cur}
                     hhFactor={hhFactor}
                     lang={lang}
-                    simpleQty={simpleQty(i.id)}
+                    orderingOpen={orderingOpen} simpleQty={simpleQty(i.id)}
                     totalQty={totalQtyFor(i.id)}
                     onAdd={() => onAdd(i)}
                     onSimpleChange={(q) => addLine(i.id, [], q - simpleQty(i.id))}
@@ -323,7 +352,7 @@ export function CustomerMenu({
                     cur={cur}
                     hhFactor={hhFactor}
                     lang={lang}
-                    simpleQty={simpleQty(i.id)}
+                    orderingOpen={orderingOpen} simpleQty={simpleQty(i.id)}
                     totalQty={totalQtyFor(i.id)}
                     onAdd={() => onAdd(i)}
                     onSimpleChange={(q) => addLine(i.id, [], q - simpleQty(i.id))}
@@ -343,7 +372,7 @@ export function CustomerMenu({
                     cur={cur}
                     hhFactor={hhFactor}
                     lang={lang}
-                    simpleQty={simpleQty(i.id)}
+                    orderingOpen={orderingOpen} simpleQty={simpleQty(i.id)}
                     totalQty={totalQtyFor(i.id)}
                     onAdd={() => onAdd(i)}
                     onSimpleChange={(q) => addLine(i.id, [], q - simpleQty(i.id))}
@@ -473,7 +502,7 @@ function Customizer({
           {item.modifierGroups.map((g) => (
             <div key={g.id}>
               <p className="mb-1.5 text-sm font-medium text-ink">
-                {g.name}
+                {localize({ name: g.name, description: null }, g.translations, lang).name}
                 <span className="ml-2 text-xs font-normal text-ink/45">
                   {g.required
                     ? "Required"
@@ -497,7 +526,7 @@ function Customizer({
                           checked={checked}
                           onChange={() => toggle(g, o.id)}
                         />
-                        {o.name}
+                        {localize({ name: o.name, description: null }, o.translations, lang).name}
                       </span>
                       {g.required && g.maxSelect <= 1 ? (
                         <span className="text-sm font-medium text-ink/70">
@@ -539,6 +568,7 @@ function ItemRow({
   lang,
   simpleQty,
   totalQty,
+  orderingOpen = true,
   onAdd,
   onSimpleChange,
 }: {
@@ -548,13 +578,20 @@ function ItemRow({
   lang: string;
   simpleQty: number;
   totalQty: number;
+  orderingOpen?: boolean;
   onAdd: () => void;
   onSimpleChange: (q: number) => void;
 }) {
   const hasMods = item.modifierGroups.length > 0;
   const { name, description } = localize(item, item.translations, lang);
+  // Off the menu right now (outside its time window) — shown but not orderable.
+  const offWindow = !item.availableNow;
   return (
-    <div className="flex items-start gap-3 rounded-xl border border-sand-200 bg-surface p-3">
+    <div
+      className={`flex items-start gap-3 rounded-xl border border-sand-200 bg-surface p-3 ${
+        offWindow ? "opacity-60" : ""
+      }`}
+    >
       {item.imageUrl ? (
         <Image
           src={item.imageUrl}
@@ -617,8 +654,18 @@ function ItemRow({
           {hasMods && <span className="text-ink/40"> +</span>}
         </p>
       </div>
-      <div className="shrink-0">
-        {hasMods ? (
+      <div className="shrink-0 text-center">
+        {offWindow ? (
+          <span className="block rounded-lg bg-sand-100 px-2.5 py-1.5 text-[11px] font-medium text-ink/50">
+            {item.availableFrom && item.availableTo
+              ? `${fmt12(item.availableFrom)}–${fmt12(item.availableTo)}`
+              : "Unavailable"}
+          </span>
+        ) : !orderingOpen ? (
+          <span className="block rounded-lg bg-sand-100 px-2.5 py-1.5 text-[11px] font-medium text-ink/50">
+            Closed
+          </span>
+        ) : hasMods ? (
           <Button size="sm" variant="secondary" onClick={onAdd}>
             Add{totalQty > 0 ? ` · ${totalQty}` : ""}
           </Button>

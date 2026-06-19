@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { createOtp, verifyOtp } from "@/lib/messaging/otp";
-import { sendWhatsApp } from "@/lib/messaging/provider";
+import { sendWhatsApp, sendWhatsAppTemplate } from "@/lib/messaging/provider";
+import { env } from "@/lib/env";
 import {
   createCustomerSession,
   destroyCustomerSession,
@@ -23,10 +24,13 @@ export async function requestLoginOtpAction(args: {
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Could not send code." };
   }
-  const res = await sendWhatsApp(
-    phone,
-    `Your Scan to Order login code is ${code}. It expires in 5 minutes.`,
-  );
+  const res =
+    env.messaging.provider === "meta"
+      ? await sendWhatsAppTemplate(phone, env.messaging.meta.otpTemplate, [code])
+      : await sendWhatsApp(
+          phone,
+          `Your Scan to Order login code is ${code}. It expires in 5 minutes.`,
+        );
   if (!res.ok) return { ok: false, error: res.error ?? "Could not send code." };
   return { ok: true, mocked: res.mocked };
 }
@@ -64,4 +68,19 @@ export async function updateCustomerNameAction(
 export async function logoutAccountAction(): Promise<void> {
   await destroyCustomerSession();
   redirect("/account");
+}
+
+// Right to erasure (DPDP): delete the customer's profile and strip personal
+// data (name/phone) from their past orders. Order records are kept for the
+// restaurant's books but anonymised; loyalty + feedback links drop via SetNull.
+export async function deleteAccountDataAction(): Promise<void> {
+  const session = await getCustomerSession();
+  if (!session) redirect("/account");
+  await prisma.order.updateMany({
+    where: { customerId: session.customerId },
+    data: { customerId: null, customerName: null, customerPhone: null },
+  });
+  await prisma.customer.delete({ where: { id: session.customerId } });
+  await destroyCustomerSession();
+  redirect("/account?deleted=1");
 }

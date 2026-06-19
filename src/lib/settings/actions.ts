@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireAdminWithPermission } from "@/lib/auth/guards";
 import { recordAudit } from "@/lib/audit";
+import { plan } from "@/lib/plan-limits";
 import {
   profileSchema,
   settingsSchema,
@@ -32,6 +33,8 @@ export async function updateProfileAction(
       city: d.city || null,
       state: d.state || null,
       postalCode: d.postalCode || null,
+      fssaiNumber: d.fssaiNumber || null,
+      logoUrl: d.logoUrl || null,
     },
   });
   revalidatePath("/admin/settings");
@@ -55,6 +58,16 @@ export async function updateOperationsAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const d = parsed.data;
+  // Self-service venues are pay-first by definition — keep PAY_BEFORE +
+  // prepayment on regardless of the form (the settings UI hides pay-after).
+  const svc = await prisma.onboardingConfig.findUnique({
+    where: { restaurantId },
+    select: { serviceModel: true },
+  });
+  const selfService = svc?.serviceModel === "SELF_SERVICE";
+  // Plan gate: only paid (or trial) tiers may take online payments.
+  const limits = await plan(restaurantId);
+  const onlineAllowed = limits.onlinePayments;
   const reviewUrl = String(formData.get("reviewUrl") ?? "").trim();
   const hhFrom = String(formData.get("happyHourFrom") ?? "").trim();
   const hhTo = String(formData.get("happyHourTo") ?? "").trim();
@@ -77,8 +90,9 @@ export async function updateOperationsAction(
     where: { restaurantId },
     data: {
       orderConfirmation: d.orderConfirmation,
-      paymentTiming: d.paymentTiming,
-      onlinePaymentEnabled: d.onlinePaymentEnabled,
+      paymentTiming: selfService ? "PAY_BEFORE" : d.paymentTiming,
+      requirePrepayment: selfService,
+      onlinePaymentEnabled: onlineAllowed && d.onlinePaymentEnabled,
       counterPaymentEnabled: d.counterPaymentEnabled,
       gstMode: d.gstMode,
       gstNumber: d.gstNumber || null,
@@ -91,6 +105,19 @@ export async function updateOperationsAction(
         0,
         Math.min(90, Number(formData.get("happyHourPercent") ?? 0) || 0),
       ),
+      // Service hours + venue timezone (all time-of-day logic uses this tz).
+      timezone: String(formData.get("timezone") ?? "").trim() || "Asia/Kolkata",
+      openTime: String(formData.get("openTime") ?? "").trim() || null,
+      closeTime: String(formData.get("closeTime") ?? "").trim() || null,
+      orderingPaused: formData.get("orderingPaused") === "on",
+      billFooterMessage: String(formData.get("billFooterMessage") ?? "").trim() || null,
+      defaultPrepMinutes: Math.max(
+        0,
+        Math.min(180, Number(formData.get("defaultPrepMinutes") ?? 15) || 15),
+      ),
+      minOrderAmount: Math.max(0, Math.floor(Number(formData.get("minOrderAmount") ?? 0) || 0)),
+      pickupEnabled: formData.get("pickupEnabled") === "on",
+      deliveryEnabled: formData.get("deliveryEnabled") === "on",
       languages: [...langs].join(","),
       kotPrinterHost: printerHost || null,
       kotPrinterPort: Math.max(1, Math.min(65535, printerPort)),

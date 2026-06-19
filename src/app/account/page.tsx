@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Sparkles, Download, RotateCcw } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getCustomerSession } from "@/lib/customer/session";
+import { DeleteDataButton } from "./delete-data-button";
 import { formatMoney, toNumber, modifierSummary } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui";
 import { CustomerTabBar } from "@/components/diner/tab-bar";
@@ -71,11 +72,14 @@ export default async function AccountPage() {
               </h1>
               <p className="text-sm text-ink/55">{customer.phone}</p>
             </div>
-            <form action={logoutAccountAction}>
-              <button className="text-sm text-ink/50 hover:text-ink" type="submit">
-                Sign out
-              </button>
-            </form>
+            <div className="flex flex-col items-end gap-1.5">
+              <form action={logoutAccountAction}>
+                <button className="text-sm text-ink/50 hover:text-ink" type="submit">
+                  Sign out
+                </button>
+              </form>
+              <DeleteDataButton />
+            </div>
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">

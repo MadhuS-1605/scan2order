@@ -6,6 +6,7 @@ import { requireAdmin, requireOnboardedAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { recordAudit } from "@/lib/audit";
 import { validateSubdomain } from "@/lib/subdomain";
+import { syncSubdomain } from "@/lib/cloudflare";
 
 // Live availability check used by the onboarding + settings forms.
 export async function checkSubdomainAction(value: string): Promise<{
@@ -44,10 +45,16 @@ export async function updateTenantAction(formData: FormData): Promise<void> {
       select: { id: true },
     });
     if (!taken) {
+      const prev = await prisma.restaurant.findUnique({
+        where: { id: session.restaurantId },
+        select: { subdomain: true },
+      });
       await prisma.restaurant.update({
         where: { id: session.restaurantId },
         data: { subdomain: sub.value },
       });
+      // Reconcile Cloudflare DNS (drops the previous record on rename).
+      await syncSubdomain(prev?.subdomain, sub.value);
     }
   }
 

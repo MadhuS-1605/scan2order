@@ -7,6 +7,8 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { emitEvent } from "@/lib/realtime/bus";
 import { notifyRestaurant } from "@/lib/push";
 import { recordAudit } from "@/lib/audit";
+import { computeTotals, type GstMode } from "@/lib/pricing";
+import { toNumber } from "@/lib/utils";
 import type { BanquetStatus } from "@prisma/client";
 
 const EVENT_TYPES = [
@@ -119,6 +121,85 @@ export async function setBanquetStatusAction(formData: FormData): Promise<void> 
     where: { id, restaurantId: session.restaurantId },
     data: { status },
   });
+  revalidatePath("/admin/banquets");
+}
+
+// Fire a confirmed banquet's pre-ordered menu to the kitchen as a real Order
+// (so it produces KOTs and a bill). Idempotent: only converts once, only when
+// CONFIRMED with items. The advance paid carries over as amountPaid.
+export async function convertBanquetToKitchenAction(formData: FormData): Promise<void> {
+  const session = await requireBanquetAdmin();
+  const id = String(formData.get("id") ?? "");
+  const booking = await prisma.banquetBooking.findFirst({
+    where: { id, restaurantId: session.restaurantId },
+    include: { items: true, restaurant: { include: { config: true } } },
+  });
+  if (!booking || !booking.restaurant.config) return;
+  if (booking.status !== "CONFIRMED" || booking.items.length === 0 || booking.convertedOrderId) {
+    return;
+  }
+  const config = booking.restaurant.config;
+  const totals = computeTotals(
+    booking.items.map((i) => ({ price: toNumber(i.priceSnapshot), quantity: i.quantity })),
+    config.gstMode as GstMode,
+    toNumber(config.gstPercentage),
+  );
+  const advance = toNumber(booking.advanceAmount);
+  const fullyPaid = advance >= totals.total - 0.01;
+
+  const order = await prisma.$transaction(async (tx) => {
+    const r = await tx.restaurant.update({
+      where: { id: session.restaurantId },
+      data: { orderSeq: { increment: 1 } },
+      select: { orderSeq: true },
+    });
+    const created = await tx.order.create({
+      data: {
+        restaurantId: session.restaurantId,
+        orderNumber: r.orderSeq,
+        status: "CONFIRMED",
+        channel: "STAFF",
+        createdById: session.sub,
+        createdByName: session.name,
+        customerName: booking.customerName,
+        customerPhone: booking.customerPhone,
+        notes: `Banquet · ${booking.eventType} · ${booking.guestCount} guests${
+          booking.hall ? ` · ${booking.hall}` : ""
+        }`,
+        paymentStatus: fullyPaid ? "PAID" : "UNPAID",
+        paymentMethod: advance > 0 ? "COUNTER" : null,
+        amountPaid: advance,
+        subtotal: totals.subtotal,
+        taxAmount: totals.taxAmount,
+        totalAmount: totals.total,
+        gstMode: config.gstMode,
+        confirmedAt: new Date(),
+        items: {
+          create: booking.items.map((i) => ({
+            menuItemId: i.menuItemId,
+            nameSnapshot: i.nameSnapshot,
+            priceSnapshot: i.priceSnapshot,
+            quantity: i.quantity,
+            lineTotal: toNumber(i.priceSnapshot) * i.quantity,
+          })),
+        },
+      },
+    });
+    await tx.banquetBooking.update({
+      where: { id: booking.id },
+      data: { convertedOrderId: created.id },
+    });
+    return created;
+  });
+
+  emitEvent({ type: "order.created", restaurantId: session.restaurantId, orderId: order.id, status: "CONFIRMED" });
+  await notifyRestaurant(session.restaurantId, {
+    title: `Banquet order #${order.orderNumber}`,
+    body: `${booking.eventType} · ${booking.guestCount} guests`,
+    url: "/admin/kitchen",
+    tag: "banquet-order",
+  });
+  await recordAudit(session.restaurantId, session, "banquet.converted", `#${order.orderNumber} · ${booking.eventType}`);
   revalidatePath("/admin/banquets");
 }
 

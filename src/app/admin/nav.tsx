@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
+import { useT } from "@/components/admin/i18n-provider";
 
 export type FeatureFlags = {
   featureReservations: boolean;
@@ -108,6 +109,7 @@ export function NavLinks({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const t = useT();
   const allow = (l: NavLink) =>
     hasPermission(role, l.perm) && (!l.feature || features[l.feature]);
 
@@ -119,7 +121,7 @@ export function NavLinks({
         return (
           <Fragment key={g.heading}>
             <p className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-wider text-ink/35">
-              {g.heading}
+              {t(`nav.${g.heading}`)}
             </p>
             {links.map((l) => {
               const active = l.exact
@@ -138,7 +140,7 @@ export function NavLinks({
                   )}
                 >
                   <l.icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-                  {l.label}
+                  {t(`nav.${l.label}`)}
                 </Link>
               );
             })}

@@ -377,14 +377,24 @@ function ItemRow({
               </Button>
             </div>
           </form>
-          <ModifierEditor item={item} currency={currency} />
+          <ModifierEditor item={item} currency={currency} languages={languages} />
         </details>
       </div>
     </li>
   );
 }
 
-function ModifierEditor({ item, currency }: { item: Item; currency: string }) {
+function ModifierEditor({
+  item,
+  currency,
+  languages,
+}: {
+  item: Item;
+  currency: string;
+  languages: string[];
+}) {
+  // Extra per-language name fields (only for non-English languages the venue uses).
+  const trLangs = languages.filter((l) => l !== "en");
   return (
     <div className="mt-4 border-t border-sand-200 pt-3">
       <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink/45">
@@ -442,7 +452,7 @@ function ModifierEditor({ item, currency }: { item: Item; currency: string }) {
 
             <form
               action={addModifierOptionAction}
-              className="mt-2 flex gap-2"
+              className="mt-2 flex flex-wrap gap-2"
             >
               <input type="hidden" name="groupId" value={g.id} />
               <Input name="name" placeholder="Option (e.g. Extra cheese)" required />
@@ -453,6 +463,14 @@ function ModifierEditor({ item, currency }: { item: Item; currency: string }) {
                 placeholder="+₹"
                 className="w-20"
               />
+              {trLangs.map((lang) => (
+                <Input
+                  key={lang}
+                  name={`tr_${lang}_name`}
+                  placeholder={`Name (${LANG_LABEL[lang] ?? lang})`}
+                  className="w-32"
+                />
+              ))}
               <Button type="submit" size="sm" variant="secondary">
                 Add
               </Button>
@@ -469,6 +487,14 @@ function ModifierEditor({ item, currency }: { item: Item; currency: string }) {
         <div className="flex-1">
           <Input name="name" placeholder="New group (e.g. Size, Add-ons)" required />
         </div>
+        {trLangs.map((lang) => (
+          <Input
+            key={lang}
+            name={`tr_${lang}_name`}
+            placeholder={`Name (${LANG_LABEL[lang] ?? lang})`}
+            className="w-32"
+          />
+        ))}
         <label className="flex items-center gap-1.5 text-xs text-ink/70">
           <input type="checkbox" name="required" />
           Required (variant)

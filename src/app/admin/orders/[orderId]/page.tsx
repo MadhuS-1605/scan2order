@@ -4,9 +4,11 @@ import { ArrowLeft } from "lucide-react";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { formatMoney, toNumber, modifierSummary, seatLabel } from "@/lib/utils";
+import { hasPermission } from "@/lib/auth/permissions";
 import { StatusBadge, Card, Select, Button } from "@/components/ui";
 import { changeOrderTableAction } from "@/lib/orders/actions";
 import { OrderItemsEditor } from "./order-items-editor";
+import { RefundForm } from "./refund-form";
 
 function Row({ label, value, bold = false }: { label: string; value: string; bold?: boolean }) {
   return (
@@ -23,12 +25,16 @@ export default async function OrderDetailPage({
   params: Promise<{ orderId: string }>;
 }) {
   const { orderId } = await params;
-  const { restaurant, config } = await getCurrentRestaurant("orders");
+  const { restaurant, config, session } = await getCurrentRestaurant("orders");
   const cur = config.currency;
 
   const order = await prisma.order.findFirst({
     where: { id: orderId, restaurantId: restaurant.id },
-    include: { table: true, items: true },
+    include: {
+      table: true,
+      items: true,
+      refunds: { orderBy: { createdAt: "desc" } },
+    },
   });
   if (!order) notFound();
 
@@ -55,6 +61,12 @@ export default async function OrderDetailPage({
   const discount = toNumber(order.discountAmount);
   const tip = toNumber(order.tipAmount);
   const paid = toNumber(order.amountPaid);
+  // Refunds: how much has gone back, and what's left to refund on this order.
+  const refunded = order.refunds
+    .filter((r) => r.status === "DONE")
+    .reduce((s, r) => s + toNumber(r.amount), 0);
+  const refundable = Math.max(0, Math.round((paid - refunded) * 100) / 100);
+  const canRefund = hasPermission(session.role, "refunds") && refundable > 0;
 
   const timeline: { label: string; at: Date | null }[] = [
     { label: "Placed", at: order.placedAt ?? order.createdAt },
@@ -125,7 +137,18 @@ export default async function OrderDetailPage({
               ✓ At venue (~{order.distanceM} m)
             </span>
           )}
+        {order.fulfillment !== "DINE_IN" && (
+          <span className="rounded-full bg-brand-600 px-2.5 py-1 text-xs font-medium text-white">
+            {order.fulfillment === "DELIVERY" ? "🛵 Delivery" : "🥡 Pickup"}
+          </span>
+        )}
       </div>
+
+      {order.fulfillment === "DELIVERY" && order.deliveryAddress && (
+        <div className="rounded-xl border border-brand-200 bg-brand-50 p-3 text-sm text-ink/80">
+          <span className="font-medium text-ink">Deliver to:</span> {order.deliveryAddress}
+        </div>
+      )}
 
       {editable && tables.length > 1 && (
         <form
@@ -167,6 +190,52 @@ export default async function OrderDetailPage({
             Move
           </Button>
         </form>
+      )}
+
+      {(canRefund || order.refunds.length > 0) && (
+        <Card>
+          <h2 className="mb-1 font-semibold text-ink">Refunds</h2>
+          {paid > 0 && (
+            <p className="text-sm text-ink/55">
+              Paid {formatMoney(paid, cur)}
+              {refunded > 0 && ` · refunded ${formatMoney(refunded, cur)}`}
+              {refundable > 0
+                ? ` · ${formatMoney(refundable, cur)} refundable`
+                : refunded > 0
+                  ? " · fully refunded"
+                  : ""}
+            </p>
+          )}
+          {order.refunds.length > 0 && (
+            <ul className="mt-2 space-y-1 text-sm">
+              {order.refunds.map((r) => (
+                <li key={r.id} className="flex justify-between gap-3">
+                  <span className="text-ink/70">
+                    {formatMoney(toNumber(r.amount), cur)} · {r.method}
+                    {r.status === "FAILED" && (
+                      <span className="ml-1 text-red-600">failed</span>
+                    )}
+                    {r.reason ? ` · ${r.reason}` : ""}
+                    {r.createdByName ? ` · ${r.createdByName}` : ""}
+                  </span>
+                  <span className="shrink-0 text-ink/40">
+                    {r.createdAt.toLocaleDateString("en-IN")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {canRefund && (
+            <div className="mt-3 border-t border-sand-100 pt-3">
+              <RefundForm
+                orderId={order.id}
+                refundable={refundable}
+                currency={cur}
+                online={order.paymentMethod === "ONLINE"}
+              />
+            </div>
+          )}
+        </Card>
       )}
 
       <div className="grid gap-4 md:grid-cols-2">

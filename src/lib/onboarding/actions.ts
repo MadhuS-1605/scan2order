@@ -11,6 +11,8 @@ import {
 import { createSession } from "@/lib/auth/session";
 import { slugify } from "@/lib/utils";
 import { validateSubdomain } from "@/lib/subdomain";
+import { ensureSubdomain, syncSubdomain } from "@/lib/cloudflare";
+import { tableQuotaReached, menuItemQuotaReached } from "@/lib/plan-limits";
 import { STEPS, type Step } from "@/lib/onboarding/steps";
 import {
   profileSchema,
@@ -53,8 +55,27 @@ export async function saveProfileAction(
   });
   if (subTaken) return { error: "That username is already taken." };
 
+  const selfService = data.serviceModel === "SELF_SERVICE";
+  // Self-service venues have no tables — guests order at a single QR, prepay,
+  // and pick up by number. Force the matching service behaviour; the owner can
+  // still tweak payment methods/GST in Settings.
+  const serviceDefaults = selfService
+    ? {
+        serviceModel: "SELF_SERVICE" as const,
+        requirePrepayment: true,
+        paymentTiming: "PAY_BEFORE" as const,
+        onlinePaymentEnabled: true,
+        // location checks make no sense for takeaway/pickup
+        requireDinerLocation: false,
+      }
+    : { serviceModel: "TABLE_SERVICE" as const };
+
   if (session.restaurantId) {
     // Editing an existing profile mid-onboarding.
+    const prev = await prisma.restaurant.findUnique({
+      where: { id: session.restaurantId },
+      select: { subdomain: true },
+    });
     await prisma.restaurant.update({
       where: { id: session.restaurantId },
       data: {
@@ -67,8 +88,14 @@ export async function saveProfileAction(
         city: data.city || null,
         state: data.state || null,
         postalCode: data.postalCode || null,
+        fssaiNumber: data.fssaiNumber || null,
+        logoUrl: data.logoUrl || null,
+        config: { update: serviceDefaults },
       },
     });
+    if (selfService) await ensureCounterTable(session.restaurantId);
+    // Reconcile the tenant's Cloudflare DNS record (drops the old name on rename).
+    await syncSubdomain(prev?.subdomain, sub.value);
     await advanceStep(session.restaurantId, "menu");
     redirect("/onboarding");
   }
@@ -84,6 +111,9 @@ export async function saveProfileAction(
     // Dine-in venues require diners to be on-site to order (anti-fake-order);
     // cloud kitchens take remote orders, so it's off there.
     requireDinerLocation: t !== "CLOUD_KITCHEN",
+    // Cloud kitchens are takeaway/delivery by default.
+    pickupEnabled: t === "CLOUD_KITCHEN",
+    deliveryEnabled: t === "CLOUD_KITCHEN",
   };
 
   const restaurant = await prisma.restaurant.create({
@@ -98,9 +128,19 @@ export async function saveProfileAction(
       city: data.city || null,
       state: data.state || null,
       postalCode: data.postalCode || null,
-      config: { create: { onboardingStep: 1, ...featureDefaults } },
+      fssaiNumber: data.fssaiNumber || null,
+      logoUrl: data.logoUrl || null,
+      // Start a 14-day full-feature trial on Starter; lapses to Free limits.
+      planTier: "STARTER",
+      planIsTrial: true,
+      planActiveUntil: new Date(Date.now() + 14 * 86_400_000),
+      config: { create: { onboardingStep: 1, ...featureDefaults, ...serviceDefaults } },
     },
   });
+  if (selfService) await ensureCounterTable(restaurant.id);
+
+  // Create the tenant's subdomain DNS record (no-op if Cloudflare is unconfigured).
+  await ensureSubdomain(sub.value);
 
   await prisma.adminUser.update({
     where: { id: session.sub },
@@ -111,6 +151,20 @@ export async function saveProfileAction(
   await createSession({ ...session, restaurantId: restaurant.id });
 
   redirect("/onboarding");
+}
+
+// A self-service venue needs exactly one ordering/pickup point so the existing
+// QR + diner flow works unchanged. Idempotent — one COUNTER table per venue.
+async function ensureCounterTable(restaurantId: string): Promise<void> {
+  const existing = await prisma.restaurantTable.findFirst({
+    where: { restaurantId, kind: "COUNTER" },
+    select: { id: true },
+  });
+  if (!existing) {
+    await prisma.restaurantTable.create({
+      data: { restaurantId, label: "Counter", kind: "COUNTER", seats: 0 },
+    });
+  }
 }
 
 async function advanceStep(
@@ -163,6 +217,9 @@ export async function addMenuItemAction(
   formData: FormData,
 ): Promise<ActionState> {
   const session = await requireAdminWithPermission("menu");
+  if (await menuItemQuotaReached(session.restaurantId)) {
+    return { error: "You've reached your plan's menu item limit. Upgrade your plan to add more." };
+  }
   const parsed = menuItemSchema.safeParse({
     name: formData.get("name"),
     description: formData.get("description"),
@@ -226,11 +283,19 @@ export async function saveSettingsAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const d = parsed.data;
+  // Self-service venues are pay-first by definition: keep PAY_BEFORE + prepayment
+  // on regardless of the form (the settings UI hides the pay-after option there).
+  const cfg = await prisma.onboardingConfig.findUnique({
+    where: { restaurantId: session.restaurantId },
+    select: { serviceModel: true },
+  });
+  const selfService = cfg?.serviceModel === "SELF_SERVICE";
   await prisma.onboardingConfig.update({
     where: { restaurantId: session.restaurantId },
     data: {
       orderConfirmation: d.orderConfirmation,
-      paymentTiming: d.paymentTiming,
+      paymentTiming: selfService ? "PAY_BEFORE" : d.paymentTiming,
+      requirePrepayment: selfService,
       onlinePaymentEnabled: d.onlinePaymentEnabled,
       counterPaymentEnabled: d.counterPaymentEnabled,
       gstMode: d.gstMode,
@@ -251,6 +316,9 @@ export async function addTableAction(
   const parsed = tableSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  if (await tableQuotaReached(session.restaurantId)) {
+    return { error: "You've reached your plan's table limit. Upgrade your plan to add more." };
   }
   await prisma.restaurantTable.create({
     data: {

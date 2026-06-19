@@ -37,22 +37,21 @@ export default async function PaymentPage({
   }
   const qrToken = entry.table.qrToken;
 
-  // Table-based bill: all open (unpaid) orders at this table consolidate into
-  // one bill. Falls back to the single order once it's been settled.
-  const open = entry.tableId
+  // Session-based bill: the diner's own rounds (same dining session) consolidate
+  // into one bill — scoped to the session, not the whole table, so separate
+  // parties at a shared table each pay only their own orders. Includes paid
+  // rounds so the bill stays aggregated after settlement. Sessionless (e.g.
+  // staff POS) orders fall back to the single order.
+  const orders = entry.diningSessionId
     ? await prisma.order.findMany({
         where: {
           restaurantId: entry.restaurantId,
-          tableId: entry.tableId,
+          diningSessionId: entry.diningSessionId,
           status: { not: "CANCELLED" },
-          paymentStatus: { not: "PAID" },
         },
         orderBy: { createdAt: "asc" },
         include: { items: true },
       })
-    : [];
-  const orders = open.length
-    ? open
     : [
         await prisma.order.findUniqueOrThrow({
           where: { id: entry.id },
@@ -97,6 +96,7 @@ export default async function PaymentPage({
         restaurantName={entry.restaurant.name}
         groupName={entry.restaurant.group?.name}
         seat={seatLabel(entry.table)}
+        logoUrl={entry.restaurant.logoUrl}
       />
       <div className="mx-auto max-w-lg space-y-4 px-4 py-6 pb-24 sm:py-8 sm:pb-24">
         <div className="rounded-2xl border border-sand-200 bg-surface p-5">

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Bell } from "lucide-react";
 import { getCurrentRestaurant } from "@/lib/restaurant";
+import { subscriptionState } from "@/lib/subscription";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { signoutAction } from "@/lib/auth/actions";
@@ -11,6 +12,9 @@ import { getNotificationCount } from "@/lib/notifications/feed";
 import { ClockWidget } from "@/components/admin/clock-widget";
 import { MobileNav } from "@/components/admin/mobile-nav";
 import { Toaster } from "@/components/admin/toast";
+import { AdminI18nProvider } from "@/components/admin/i18n-provider";
+import { LocaleSwitcher } from "@/components/admin/locale-switcher";
+import { ADMIN_LOCALE_COOKIE, dictFor } from "@/lib/i18n";
 import { AdminNav } from "./nav";
 import { PropertySwitcher } from "./property-switcher";
 
@@ -33,7 +37,11 @@ export default async function AdminLayout({
   }
 
   const { restaurant, config, session } = await getCurrentRestaurant();
-  const seen = Number((await cookies()).get("sto_notif_seen")?.value ?? 0) || undefined;
+  const sub = subscriptionState(restaurant);
+  const cookieStore = await cookies();
+  const locale = cookieStore.get(ADMIN_LOCALE_COOKIE)?.value ?? "en";
+  const dict = dictFor(locale);
+  const seen = Number(cookieStore.get("sto_notif_seen")?.value ?? 0) || undefined;
   const notifCount = await getNotificationCount(restaurant.id, seen);
   const features = {
     featureReservations: config.featureReservations,
@@ -66,6 +74,7 @@ export default async function AdminLayout({
   }
 
   return (
+    <AdminI18nProvider dict={dict}>
     <div className="min-h-screen bg-grain">
       <header className="sticky top-0 z-20 border-b border-sand-200 bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
@@ -81,6 +90,7 @@ export default async function AdminLayout({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <LocaleSwitcher current={locale} />
             {config.featureAttendance && (
               <ClockWidget
                 openSince={openPunch ? openPunch.clockInAt.toISOString() : null}
@@ -127,6 +137,23 @@ export default async function AdminLayout({
         </div>
       </header>
 
+      {(sub.status === "EXPIRED" || (sub.status === "TRIAL" && (sub.daysLeft ?? 0) <= 3)) && (
+        <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">
+          <Link
+            href="/admin/billing"
+            className={`block rounded-xl border px-4 py-2.5 text-sm font-medium ${
+              sub.status === "EXPIRED"
+                ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                : "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100"
+            }`}
+          >
+            {sub.status === "EXPIRED"
+              ? "Your subscription has expired — you're on Free-tier limits. Renew →"
+              : `Your free trial ends in ${sub.daysLeft} day${sub.daysLeft === 1 ? "" : "s"} — subscribe to keep your features →`}
+          </Link>
+        </div>
+      )}
+
       <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:gap-6 sm:px-6 md:flex-row">
         <aside className="hidden md:block md:w-52 md:shrink-0">
           <AdminNav role={session.role} features={features} />
@@ -139,5 +166,6 @@ export default async function AdminLayout({
       </footer>
       <Toaster />
     </div>
+    </AdminI18nProvider>
   );
 }

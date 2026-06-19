@@ -44,10 +44,18 @@ export default async function OnboardingPage() {
   const stepIndex = restaurant.config.onboardingStep;
   const step = STEPS[stepIndex] ?? "profile";
   const baseUrl = await getBaseUrl();
+  const serviceModel = restaurant.config.serviceModel;
+  // Self-service shows only the single COUNTER (venue) QR; table service shows
+  // the real tables (and never the COUNTER pseudo-table).
+  const stepTables = restaurant.tables.filter((t) =>
+    serviceModel === "SELF_SERVICE" ? t.kind === "COUNTER" : t.kind !== "COUNTER",
+  );
 
   return (
     <Shell stepIndex={stepIndex}>
-      {step === "profile" && <ProfileStep restaurant={restaurant} />}
+      {step === "profile" && (
+        <ProfileStep restaurant={{ ...restaurant, serviceModel }} />
+      )}
       {step === "menu" && (
         <MenuStep
           categories={restaurant.categories}
@@ -67,25 +75,27 @@ export default async function OnboardingPage() {
             gstMode: restaurant.config.gstMode,
             gstNumber: restaurant.config.gstNumber,
             gstPercentage: restaurant.config.gstPercentage.toString(),
+            serviceModel: restaurant.config.serviceModel,
           }}
         />
       )}
       {step === "tables" && (
         <TablesStep
+          serviceModel={serviceModel}
           tables={await Promise.all(
-            restaurant.tables.map(async (t) => ({
+            stepTables.map(async (t) => ({
               id: t.id,
               label: t.label,
               seats: t.seats,
               url: tableMenuUrl(
                 baseUrl,
-                restaurant.subdomain ?? restaurant.slug,
+                restaurant.subdomain || restaurant.slug,
                 t.label,
               ),
               qr: await qrDataUrl(
                 tableMenuUrl(
                   baseUrl,
-                  restaurant.subdomain ?? restaurant.slug,
+                  restaurant.subdomain || restaurant.slug,
                   t.label,
                 ),
               ),

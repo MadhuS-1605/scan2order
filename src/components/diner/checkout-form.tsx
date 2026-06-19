@@ -25,19 +25,27 @@ export function CheckoutForm({
   qrToken: string;
   restaurantId: string;
   happyHourPercent: number;
-  restaurant: { name: string; currency: string; groupName?: string | null };
+  restaurant: { name: string; currency: string; groupName?: string | null; logoUrl?: string | null };
   table: { label: string; kind?: string };
   config: {
     paymentTiming: string;
     onlinePaymentEnabled: boolean;
     counterPaymentEnabled: boolean;
     requireDinerLocation: boolean;
+    minOrderAmount: number;
+    pickupEnabled: boolean;
+    deliveryEnabled: boolean;
   };
   items: Item[];
 }) {
   const hhFactor = happyHourPercent > 0 ? 1 - happyHourPercent / 100 : 1;
   const cur = restaurant.currency;
-  const seat = `${table.kind === "ROOM" ? "Room" : "Table"} ${table.label}`;
+  const seat =
+    table.kind === "ROOM"
+      ? `Room ${table.label}`
+      : table.kind === "COUNTER"
+        ? "Pickup"
+        : `Table ${table.label}`;
   const payBefore = config.paymentTiming === "PAY_BEFORE";
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const router = useRouter();
@@ -56,6 +64,13 @@ export function CheckoutForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Fulfilment: only offered when the venue enables takeaway/delivery.
+  const offersFulfillment = config.pickupEnabled || config.deliveryEnabled;
+  const [fulfillment, setFulfillment] = useState<"DINE_IN" | "PICKUP" | "DELIVERY">(
+    table.kind === "COUNTER" && config.pickupEnabled ? "PICKUP" : "DINE_IN",
+  );
+  const [address, setAddress] = useState("");
+  const addressNeeded = fulfillment === "DELIVERY" && address.trim().length < 8;
   // Set the instant an order is placed so clearing the cart below doesn't trip
   // the "empty cart -> /cart" redirect and clobber the push to the status page.
   const placed = useRef(false);
@@ -88,6 +103,7 @@ export function CheckoutForm({
   }, [ready, count, router]);
 
   const subtotal = cartSubtotal(cart, byId, hhFactor);
+  const belowMin = config.minOrderAmount > 0 && subtotal < config.minOrderAmount;
 
   // Best-effort device location — resolves undefined if denied/unavailable so a
   // privacy-conscious diner is never blocked (the order is held for staff
@@ -104,6 +120,7 @@ export function CheckoutForm({
   }
 
   function placeOrder() {
+    if (belowMin || addressNeeded) return;
     setError(null);
     const lineItems = Object.values(cart).map((l) => ({
       menuItemId: l.itemId,
@@ -121,6 +138,8 @@ export function CheckoutForm({
         customerPhone: phone || undefined,
         notes: notes || undefined,
         paymentMethod: payBefore ? method : undefined,
+        fulfillment: offersFulfillment ? fulfillment : undefined,
+        deliveryAddress: fulfillment === "DELIVERY" ? address.trim() : undefined,
         sessionId: dine?.id,
         latitude: coords.lat,
         longitude: coords.lng,
@@ -146,7 +165,12 @@ export function CheckoutForm({
         /* ignore */
       }
       clear();
-      router.push(`/order/${res.orderId}`);
+      // Pay-first online → go straight to payment; otherwise to the status page.
+      router.push(
+        res.needsOnlinePayment
+          ? `/payment?order=${res.orderId}`
+          : `/order/${res.orderId}`,
+      );
     });
   }
 
@@ -157,6 +181,7 @@ export function CheckoutForm({
       <CustomerHeader
         restaurantName={restaurant.name}
         groupName={restaurant.groupName}
+        logoUrl={restaurant.logoUrl}
         seat={seat}
       />
       <div className="mx-auto max-w-lg space-y-4 px-4 py-6 sm:py-8">
@@ -206,6 +231,45 @@ export function CheckoutForm({
           </p>
         </div>
 
+        {/* Fulfilment (takeaway / delivery) */}
+        {offersFulfillment && (
+          <div className="space-y-3 rounded-2xl border border-sand-200 bg-surface p-5">
+            <p className="text-sm font-medium text-ink/80">How would you like it?</p>
+            <div className="flex flex-wrap gap-2">
+              {table.kind !== "COUNTER" && (
+                <MethodButton
+                  active={fulfillment === "DINE_IN"}
+                  onClick={() => setFulfillment("DINE_IN")}
+                  label="Dine in"
+                />
+              )}
+              {config.pickupEnabled && (
+                <MethodButton
+                  active={fulfillment === "PICKUP"}
+                  onClick={() => setFulfillment("PICKUP")}
+                  label="Pickup"
+                />
+              )}
+              {config.deliveryEnabled && (
+                <MethodButton
+                  active={fulfillment === "DELIVERY"}
+                  onClick={() => setFulfillment("DELIVERY")}
+                  label="Delivery"
+                />
+              )}
+            </div>
+            {fulfillment === "DELIVERY" && (
+              <Textarea
+                placeholder="Delivery address (flat, street, landmark, PIN)"
+                aria-label="Delivery address"
+                rows={3}
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+              />
+            )}
+          </div>
+        )}
+
         {/* Diner details */}
         <div className="space-y-3 rounded-2xl border border-sand-200 bg-surface p-5">
           {dine ? (
@@ -217,11 +281,13 @@ export function CheckoutForm({
             <>
               <Input
                 placeholder="Your name (optional)"
+                aria-label="Your name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
               <Input
                 placeholder="Mobile number (optional)"
+                aria-label="Mobile number"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 inputMode="tel"
@@ -230,6 +296,7 @@ export function CheckoutForm({
           )}
           <Textarea
             placeholder="Any notes for the kitchen? (optional)"
+            aria-label="Notes for the kitchen"
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -271,11 +338,17 @@ export function CheckoutForm({
 
       <div className="fixed inset-x-0 bottom-[52px] z-20 border-t border-sand-200 bg-surface p-3">
         <div className="mx-auto max-w-lg">
+          {belowMin && (
+            <p className="mb-2 text-center text-xs font-medium text-amber-700">
+              Minimum order is {cur} {config.minOrderAmount} — add{" "}
+              {formatMoney(config.minOrderAmount - subtotal, cur)} more to continue.
+            </p>
+          )}
           <Button
             size="lg"
             className="w-full"
             onClick={placeOrder}
-            disabled={pending || count === 0}
+            disabled={pending || count === 0 || belowMin || addressNeeded}
           >
             {pending
               ? "Placing order…"

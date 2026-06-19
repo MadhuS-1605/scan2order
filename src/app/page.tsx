@@ -169,7 +169,14 @@ export default function Home() {
       <footer className="border-t border-sand-200">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-8 text-sm text-ink/50 sm:flex-row">
           <span className="font-display text-base text-ink">Scan to Order</span>
-          <span>Built for restaurants, cafés &amp; hotels.</span>
+          <div className="flex items-center gap-4">
+            <Link href="/privacy" className="hover:text-ink">
+              Privacy
+            </Link>
+            <Link href="/terms" className="hover:text-ink">
+              Terms
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

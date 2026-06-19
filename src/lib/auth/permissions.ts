@@ -12,6 +12,7 @@ export type Permission =
   | "settings"
   | "staff"
   | "attendance"
+  | "refunds"
   | "properties";
 
 const ALL: Permission[] = [
@@ -25,6 +26,7 @@ const ALL: Permission[] = [
   "settings",
   "staff",
   "attendance",
+  "refunds",
   "properties",
 ];
 

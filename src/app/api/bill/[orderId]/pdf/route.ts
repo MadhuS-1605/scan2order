@@ -22,12 +22,14 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  // Consolidate the whole dining session (all non-cancelled rounds at the table).
+  // Consolidate the whole dining session (all non-cancelled rounds), matching the
+  // on-screen bill. Scoped to the session — not the table — so it aggregates all
+  // of this diner's rounds (even across a table move) and never other parties'.
   const orders = entry.diningSessionId
     ? await prisma.order.findMany({
         where: {
+          restaurantId: entry.restaurantId,
           diningSessionId: entry.diningSessionId,
-          tableId: entry.tableId,
           status: { not: "CANCELLED" },
         },
         orderBy: { createdAt: "asc" },
@@ -86,9 +88,13 @@ export async function GET(
       state: entry.restaurant.state,
       phone: entry.restaurant.phone,
       gstNumber: config.gstNumber,
+      fssaiNumber: entry.restaurant.fssaiNumber,
+      logoUrl: entry.restaurant.logoUrl,
     },
+    footerMessage: config.billFooterMessage,
     billNumber,
     date: primary.createdAt,
+    timezone: config.timezone,
     tableLabel: entry.table
       ? entry.table.kind === "ROOM"
         ? `Room ${entry.table.label}`

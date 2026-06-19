@@ -5,10 +5,12 @@ import { prisma } from "@/lib/db";
 import { modifierSummary, seatLabel } from "@/lib/utils";
 import { LiveStream } from "@/components/live-stream";
 import { ACTIVE_STATUSES } from "@/lib/orders/status";
+import { toggleItemPreparedAction } from "@/lib/orders/actions";
 
 // Bar counter KDS — a prep board of drink (BAR-station) items across open
-// orders. Read-only: order status stays with the kitchen/floor; the bar just
-// sees what to pour. Enabled per-venue via the Bar module.
+// orders. Bar staff tick each drink "Ready" (a per-item ack, independent of the
+// overall order status which stays with the kitchen/floor). Enabled per-venue
+// via the Bar module.
 export default async function BarScreen() {
   const { restaurant, config } = await getCurrentRestaurant("kitchen");
   if (!config.featureBar) redirect("/admin");
@@ -59,19 +61,38 @@ export default async function BarScreen() {
                 <p className="font-display text-2xl text-ink">#{order.orderNumber}</p>
                 <span className="text-xs text-ink/50">{seatLabel(order.table)}</span>
               </div>
-              <ul className="mt-3 space-y-1">
+              <ul className="mt-3 space-y-1.5">
                 {barItems.map((it) => (
-                  <li key={it.id} className="text-base text-ink/90">
-                    <span className="font-bold text-ink">{it.quantity}×</span>{" "}
-                    {it.nameSnapshot}
-                    {modifierSummary(it.modifiers) && (
-                      <span className="block pl-6 text-xs text-ink/55">
-                        {modifierSummary(it.modifiers)}
+                  <li
+                    key={it.id}
+                    className={`flex items-start justify-between gap-2 ${it.preparedAt ? "opacity-45" : ""}`}
+                  >
+                    <span className="text-base text-ink/90">
+                      <span className={it.preparedAt ? "line-through" : "font-bold text-ink"}>
+                        {it.quantity}× {it.nameSnapshot}
                       </span>
-                    )}
-                    {it.notes && (
-                      <span className="block pl-6 text-xs text-brand-700">↳ {it.notes}</span>
-                    )}
+                      {modifierSummary(it.modifiers) && (
+                        <span className="block pl-6 text-xs text-ink/55">
+                          {modifierSummary(it.modifiers)}
+                        </span>
+                      )}
+                      {it.notes && (
+                        <span className="block pl-6 text-xs text-brand-700">↳ {it.notes}</span>
+                      )}
+                    </span>
+                    <form action={toggleItemPreparedAction}>
+                      <input type="hidden" name="itemId" value={it.id} />
+                      <button
+                        type="submit"
+                        className={`shrink-0 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                          it.preparedAt
+                            ? "border-sand-300 text-ink/55 hover:bg-sand-100"
+                            : "border-olive-500/40 bg-olive-500/10 text-olive-700 hover:bg-olive-500/20"
+                        }`}
+                      >
+                        {it.preparedAt ? "Undo" : "Ready"}
+                      </button>
+                    </form>
                   </li>
                 ))}
               </ul>

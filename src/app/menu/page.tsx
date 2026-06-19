@@ -35,6 +35,7 @@ export default async function MenuPage({
       restaurantId={ctx.restaurantId}
       prefill={prefill}
       happyHourPercent={ctx.happyHourPercent}
+      ordering={ctx.ordering}
       languages={ctx.languages}
       restaurant={ctx.restaurant}
       table={ctx.table}

@@ -19,7 +19,65 @@ type TableView = {
   qr: string;
 };
 
-export function TablesStep({ tables }: { tables: TableView[] }) {
+export function TablesStep({
+  tables,
+  serviceModel = "TABLE_SERVICE",
+}: {
+  tables: TableView[];
+  serviceModel?: string;
+}) {
+  // Self-service venues have no tables — just one venue-wide ordering QR (the
+  // auto-created "Counter"). Show it for printing and let them finish.
+  if (serviceModel === "SELF_SERVICE") {
+    const qr = tables[0];
+    return (
+      <div className="space-y-6">
+        <Card>
+          <h2 className="font-display text-2xl text-ink">Your ordering QR</h2>
+          <p className="mt-1 text-sm text-ink/55">
+            Print this and place it at your counter (or on a standee). Guests
+            scan it, order, pay, and pick up by their order number — no tables.
+          </p>
+          {qr ? (
+            <div className="mt-6 max-w-xs rounded-xl border border-sand-200 p-5 text-center">
+              <Image
+                src={qr.qr}
+                alt="Venue ordering QR"
+                width={200}
+                height={200}
+                unoptimized
+                className="mx-auto h-48 w-48"
+              />
+              <p className="mt-3 text-xs break-all text-ink/45">{qr.url}</p>
+              <a
+                href={qr.qr}
+                download="ordering-qr.png"
+                className="mt-2 inline-block text-sm font-medium text-brand-600"
+              >
+                Download QR
+              </a>
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-ink/55">
+              Generating your ordering QR… go back a step and continue.
+            </p>
+          )}
+        </Card>
+
+        <div className="flex items-center justify-between">
+          <Button type="button" variant="secondary" onClick={() => gotoStepAction("settings")}>
+            Back
+          </Button>
+          <form action={completeOnboardingAction}>
+            <Button type="submit" size="lg" disabled={!qr}>
+              Finish setup
+            </Button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Card>

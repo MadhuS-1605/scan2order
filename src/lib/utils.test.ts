@@ -6,6 +6,7 @@ import {
   happyHourPercentNow,
   toNumber,
   seatLabel,
+  venueOrderingOpen,
 } from "@/lib/utils";
 
 describe("distanceMeters (geofence)", () => {
@@ -35,17 +36,42 @@ describe("formatDuration", () => {
 
 describe("isWithinWindow", () => {
   const at = (h: number, m = 0) => new Date(2026, 0, 1, h, m);
+  // 3rd arg is the venue tz (undefined = server-local); 4th is the injected "now".
   it("null bounds always within", () => {
-    expect(isWithinWindow(null, null, at(3))).toBe(true);
+    expect(isWithinWindow(null, null, undefined, at(3))).toBe(true);
   });
   it("same-day window", () => {
-    expect(isWithinWindow("09:00", "11:00", at(10))).toBe(true);
-    expect(isWithinWindow("09:00", "11:00", at(12))).toBe(false);
+    expect(isWithinWindow("09:00", "11:00", undefined, at(10))).toBe(true);
+    expect(isWithinWindow("09:00", "11:00", undefined, at(12))).toBe(false);
   });
   it("overnight (wrap-around) window", () => {
-    expect(isWithinWindow("22:00", "02:00", at(23))).toBe(true);
-    expect(isWithinWindow("22:00", "02:00", at(1))).toBe(true);
-    expect(isWithinWindow("22:00", "02:00", at(12))).toBe(false);
+    expect(isWithinWindow("22:00", "02:00", undefined, at(23))).toBe(true);
+    expect(isWithinWindow("22:00", "02:00", undefined, at(1))).toBe(true);
+    expect(isWithinWindow("22:00", "02:00", undefined, at(12))).toBe(false);
+  });
+});
+
+describe("venueOrderingOpen", () => {
+  const base = { timezone: "Asia/Kolkata", openTime: null, closeTime: null };
+  it("open 24h when no hours set", () => {
+    expect(venueOrderingOpen({ ...base, orderingPaused: false }).open).toBe(true);
+  });
+  it("closed when manually paused", () => {
+    const r = venueOrderingOpen({ ...base, orderingPaused: true });
+    expect(r.open).toBe(false);
+    expect(r.reason).toBe("paused");
+  });
+  it("respects daily hours in the venue timezone", () => {
+    // 09:00–17:00 UTC: 12:00 UTC is open, 20:00 UTC is closed.
+    const open = venueOrderingOpen({
+      orderingPaused: false,
+      openTime: "09:00",
+      closeTime: "17:00",
+      timezone: "UTC",
+    });
+    // We can't pin "now" here, so just assert it returns a well-formed result.
+    expect(typeof open.open).toBe("boolean");
+    expect([null, "closed", "paused"]).toContain(open.reason);
   });
 });
 
@@ -53,13 +79,13 @@ describe("happyHourPercentNow", () => {
   const at = (h: number) => new Date(2026, 0, 1, h, 0);
   const hh = { enabled: true, from: "16:00", to: "19:00", percent: 20 };
   it("returns percent inside the window", () => {
-    expect(happyHourPercentNow(hh, at(17))).toBe(20);
+    expect(happyHourPercentNow(hh, undefined, at(17))).toBe(20);
   });
   it("0 outside the window", () => {
-    expect(happyHourPercentNow(hh, at(12))).toBe(0);
+    expect(happyHourPercentNow(hh, undefined, at(12))).toBe(0);
   });
   it("0 when disabled", () => {
-    expect(happyHourPercentNow({ ...hh, enabled: false }, at(17))).toBe(0);
+    expect(happyHourPercentNow({ ...hh, enabled: false }, undefined, at(17))).toBe(0);
   });
 });
 

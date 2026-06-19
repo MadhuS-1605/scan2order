@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PartyPopper, Trash2, Users, CalendarDays } from "lucide-react";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
@@ -6,6 +7,7 @@ import {
   setBanquetStatusAction,
   removeBanquetItemAction,
   deleteBanquetAction,
+  convertBanquetToKitchenAction,
 } from "@/lib/banquets/actions";
 import { Card } from "@/components/ui";
 import { NewBanquetForm, AddPreorderItem } from "./banquets-manager";
@@ -170,6 +172,27 @@ export default async function BanquetsPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
+                    {b.convertedOrderId ? (
+                      <Link
+                        href={`/admin/orders/${b.convertedOrderId}`}
+                        className="rounded-lg border border-olive-500/40 bg-olive-500/10 px-3 py-1.5 text-xs font-medium text-olive-700 hover:bg-olive-500/20"
+                      >
+                        ✓ Order sent — view
+                      </Link>
+                    ) : (
+                      b.status === "CONFIRMED" &&
+                      b.items.length > 0 && (
+                        <form action={convertBanquetToKitchenAction}>
+                          <input type="hidden" name="id" value={b.id} />
+                          <button
+                            type="submit"
+                            className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700"
+                          >
+                            Send to kitchen
+                          </button>
+                        </form>
+                      )
+                    )}
                     {(NEXT[b.status] ?? []).map((n) => (
                       <form key={n.status} action={setBanquetStatusAction}>
                         <input type="hidden" name="id" value={b.id} />

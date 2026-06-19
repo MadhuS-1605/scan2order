@@ -23,6 +23,7 @@ import {
   mockMarkPaidAction,
   requestBillOtpAction,
   verifyBillOtpAction,
+  emailBillAction,
   markBillDownloadedAction,
   setTipAction,
   applyCouponAction,
@@ -139,6 +140,31 @@ export function BillClient({
     try {
       await removeCouponAction({ orderId, qrToken });
       router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const [email, setEmail] = useState("");
+  const [emailMsg, setEmailMsg] = useState<string | null>(null);
+  const [emailErr, setEmailErr] = useState<string | null>(null);
+
+  async function emailBill() {
+    setEmailErr(null);
+    setEmailMsg(null);
+    setBusy(true);
+    try {
+      const res = await emailBillAction({ orderId, qrToken, email });
+      if (res.ok) {
+        setEmailMsg(
+          res.mocked
+            ? "Bill emailed! (Email is in test mode — check the server console.)"
+            : "Bill emailed — check your inbox!",
+        );
+        setEmail("");
+      } else {
+        setEmailErr(res.error ?? "Could not send the email.");
+      }
     } finally {
       setBusy(false);
     }
@@ -333,6 +359,7 @@ export function BillClient({
                   <div className="flex gap-2">
                     <Input
                       placeholder="Enter code"
+                      aria-label="Coupon code"
                       value={coupon}
                       onChange={(e) => setCoupon(e.target.value.toUpperCase())}
                       className="uppercase"
@@ -379,6 +406,7 @@ export function BillClient({
               <div className="mt-2 flex gap-2">
                 <Input
                   placeholder="Custom amount"
+                  aria-label="Custom tip amount"
                   value={customTip}
                   onChange={(e) => setCustomTip(e.target.value)}
                   inputMode="decimal"
@@ -534,6 +562,32 @@ export function BillClient({
 
         <div className="my-4 flex items-center gap-3 text-xs text-ink/40">
           <span className="h-px flex-1 bg-sand-200" />
+          or email it
+          <span className="h-px flex-1 bg-sand-200" />
+        </div>
+
+        {emailMsg && <Alert variant="success">{emailMsg}</Alert>}
+        {emailErr && <Alert>{emailErr}</Alert>}
+        <div className="flex gap-2">
+          <Input
+            placeholder="you@email.com"
+            aria-label="Email address"
+            type="email"
+            inputMode="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <Button
+            variant="secondary"
+            onClick={emailBill}
+            disabled={busy || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)}
+          >
+            Email
+          </Button>
+        </div>
+
+        <div className="my-4 flex items-center gap-3 text-xs text-ink/40">
+          <span className="h-px flex-1 bg-sand-200" />
           or send to WhatsApp
           <span className="h-px flex-1 bg-sand-200" />
         </div>
@@ -545,6 +599,7 @@ export function BillClient({
           <div className="space-y-2">
             <Input
               placeholder="WhatsApp number e.g. +9198…"
+              aria-label="WhatsApp number"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               inputMode="tel"
@@ -573,6 +628,7 @@ export function BillClient({
             )}
             <Input
               placeholder="Enter 6-digit code"
+              aria-label="6-digit verification code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               inputMode="numeric"

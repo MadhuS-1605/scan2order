@@ -20,12 +20,18 @@ type RestaurantLike = {
   city: string | null;
   state: string | null;
   postalCode: string | null;
+  fssaiNumber?: string | null;
+  logoUrl?: string | null;
+  serviceModel?: string | null;
 } | null;
 
 export function ProfileStep({ restaurant }: { restaurant: RestaurantLike }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(
     saveProfileAction,
     {},
+  );
+  const [serviceModel, setServiceModel] = useState(
+    restaurant?.serviceModel ?? "TABLE_SERVICE",
   );
 
   return (
@@ -57,6 +63,43 @@ export function ProfileStep({ restaurant }: { restaurant: RestaurantLike }) {
             <option value="CLOUD_KITCHEN">Cloud kitchen</option>
             <option value="BAR">Bar</option>
           </Select>
+        </Field>
+        <Field label="How do guests order?" htmlFor="serviceModel">
+          <input type="hidden" name="serviceModel" value={serviceModel} />
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              {
+                value: "TABLE_SERVICE",
+                title: "Table service",
+                desc: "A QR per table. Guests scan at their table; staff serve and bill.",
+              },
+              {
+                value: "SELF_SERVICE",
+                title: "Self-service / counter",
+                desc: "One QR for the venue. Guests order, pay first, and pick up by number. No tables.",
+              },
+            ].map((opt) => (
+              <button
+                type="button"
+                key={opt.value}
+                onClick={() => setServiceModel(opt.value)}
+                className={`rounded-xl border p-3 text-left transition-colors ${
+                  serviceModel === opt.value
+                    ? "border-brand-400 bg-brand-50"
+                    : "border-sand-300 bg-surface hover:border-brand-300"
+                }`}
+              >
+                <span className="block text-sm font-medium text-ink">{opt.title}</span>
+                <span className="mt-0.5 block text-xs text-ink/55">{opt.desc}</span>
+              </button>
+            ))}
+          </div>
+          {serviceModel === "SELF_SERVICE" && (
+            <p className="mt-2 text-xs text-ink/55">
+              We&apos;ll set this venue to pay-first and create a single ordering
+              QR for you — no table setup needed.
+            </p>
+          )}
         </Field>
         <UsernameField defaultValue={restaurant?.subdomain ?? ""} />
         <div className="grid gap-4 sm:grid-cols-2">
@@ -105,6 +148,23 @@ export function ProfileStep({ restaurant }: { restaurant: RestaurantLike }) {
             />
           </Field>
         </div>
+        <Field label="FSSAI licence number" htmlFor="fssaiNumber" hint="Optional · printed on bills">
+          <Input
+            id="fssaiNumber"
+            name="fssaiNumber"
+            defaultValue={restaurant?.fssaiNumber ?? ""}
+            placeholder="e.g. 12345678901234"
+          />
+        </Field>
+        <Field label="Logo URL" htmlFor="logoUrl" hint="Optional · shown on the menu & bill">
+          <Input
+            id="logoUrl"
+            name="logoUrl"
+            type="url"
+            defaultValue={restaurant?.logoUrl ?? ""}
+            placeholder="https://…/logo.png"
+          />
+        </Field>
         <div className="flex justify-end">
           <Button type="submit" size="lg" disabled={pending}>
             {pending ? "Saving…" : "Continue"}

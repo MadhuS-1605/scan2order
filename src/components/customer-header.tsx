@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { UtensilsCrossed } from "lucide-react";
 
 // Shared top bar for the diner-facing order/bill pages: brand + seat + a quick
@@ -7,15 +8,28 @@ export function CustomerHeader({
   restaurantName,
   groupName,
   seat,
+  logoUrl,
 }: {
   restaurantName: string;
   groupName?: string | null;
   seat?: string | null;
+  logoUrl?: string | null;
 }) {
   return (
     <header className="sticky top-0 z-10 border-b border-sand-200 bg-surface/95 backdrop-blur">
-      <div className="mx-auto flex max-w-lg items-center justify-between px-4 py-3">
-        <div className="min-w-0">
+      <div className="mx-auto flex max-w-lg items-center justify-between gap-3 px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2.5">
+          {logoUrl && (
+            <Image
+              src={logoUrl}
+              alt=""
+              width={40}
+              height={40}
+              unoptimized
+              className="h-10 w-10 shrink-0 rounded-lg object-contain"
+            />
+          )}
+          <div className="min-w-0">
           {groupName && groupName !== restaurantName && (
             <p className="truncate text-[11px] font-medium uppercase tracking-[0.15em] text-brand-600">
               {groupName}
@@ -27,6 +41,7 @@ export function CustomerHeader({
           {seat && (
             <p className="text-xs uppercase tracking-wide text-ink/45">{seat}</p>
           )}
+          </div>
         </div>
         <Link
           href="/menu"
@@ -43,9 +58,20 @@ export function CustomerHeader({
 // Small attribution footer shown across the diner-facing pages.
 export function PoweredBy() {
   return (
-    <p className="py-6 text-center text-xs text-ink/35">
-      Powered by{" "}
-      <span className="font-medium text-ink/45">Scan to Order</span>
-    </p>
+    <div className="py-6 text-center text-xs text-ink/35">
+      <p>
+        Powered by{" "}
+        <span className="font-medium text-ink/45">Scan to Order</span>
+      </p>
+      <p className="mt-1">
+        <Link href="/privacy" className="hover:text-ink/60">
+          Privacy
+        </Link>{" "}
+        ·{" "}
+        <Link href="/terms" className="hover:text-ink/60">
+          Terms
+        </Link>
+      </p>
+    </div>
   );
 }

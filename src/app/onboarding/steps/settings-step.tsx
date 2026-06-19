@@ -16,6 +16,7 @@ type Config = {
   gstMode: string;
   gstNumber: string | null;
   gstPercentage: string | number;
+  serviceModel?: string;
 };
 
 export function SettingsStep({ config }: { config: Config }) {
@@ -64,22 +65,34 @@ export function SettingsStep({ config }: { config: Config }) {
           <legend className="text-sm font-medium text-ink/80">
             When do customers pay?
           </legend>
-          <div className="mt-2 space-y-2">
-            <RadioCard
-              name="paymentTiming"
-              value="PAY_AFTER"
-              defaultChecked={config.paymentTiming === "PAY_AFTER"}
-              title="Pay after (request bill at the end)"
-              desc="Diners eat first, then request the bill (cafés, dine-in)."
-            />
-            <RadioCard
-              name="paymentTiming"
-              value="PAY_BEFORE"
-              defaultChecked={config.paymentTiming === "PAY_BEFORE"}
-              title="Pay before (pay when ordering)"
-              desc="Payment is collected at order time (hotels, QSR)."
-            />
-          </div>
+          {config.serviceModel === "SELF_SERVICE" ? (
+            <div className="mt-2 rounded-lg border border-brand-200 bg-brand-50 p-3 text-sm text-ink/70">
+              <input type="hidden" name="paymentTiming" value="PAY_BEFORE" />
+              <span className="font-medium text-ink">Pay first (self-service)</span>
+              <p className="mt-0.5 text-xs text-ink/55">
+                Guests pay when they order; the order is sent to the kitchen only
+                after payment is received, then they pick up by number. Choose
+                which payment methods to accept below.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-2 space-y-2">
+              <RadioCard
+                name="paymentTiming"
+                value="PAY_AFTER"
+                defaultChecked={config.paymentTiming === "PAY_AFTER"}
+                title="Pay after (request bill at the end)"
+                desc="Diners eat first, then request the bill (cafés, dine-in)."
+              />
+              <RadioCard
+                name="paymentTiming"
+                value="PAY_BEFORE"
+                defaultChecked={config.paymentTiming === "PAY_BEFORE"}
+                title="Pay before (pay when ordering)"
+                desc="Payment is collected at order time (hotels, QSR)."
+              />
+            </div>
+          )}
         </fieldset>
 
         <fieldset>

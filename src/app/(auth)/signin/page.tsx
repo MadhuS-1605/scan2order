@@ -1,11 +1,27 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
+import { prisma } from "@/lib/db";
 import { SigninForm } from "./form";
 
 export default async function SigninPage() {
   const session = await getSession();
-  if (session) redirect(session.restaurantId ? "/admin" : "/onboarding");
+  if (session) {
+    // Validate against the DB before redirecting — a cookie can outlive its user
+    // (account deleted / DB reseeded). Trusting the raw JWT would bounce to
+    // /admin, which re-checks the DB and bounces back here -> redirect loop. If
+    // the user is gone/disabled, fall through and show the form (a fresh sign-in
+    // overwrites the stale cookie).
+    const user = await prisma.adminUser.findUnique({
+      where: { id: session.sub },
+      select: { disabled: true, restaurantId: true, isSuperAdmin: true },
+    });
+    if (user && !user.disabled) {
+      redirect(
+        user.restaurantId ? "/admin" : user.isSuperAdmin ? "/superadmin" : "/onboarding",
+      );
+    }
+  }
 
   return (
     <div className="rounded-xl border border-sand-200 bg-surface p-8">

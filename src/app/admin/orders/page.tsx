@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { getCurrentRestaurant } from "@/lib/restaurant";
+import { sweepStaleOrders } from "@/lib/orders/sweep";
 import { prisma } from "@/lib/db";
 import { formatMoney, toNumber, modifierSummary, seatLabel } from "@/lib/utils";
 import { StatusBadge } from "@/components/ui";
@@ -47,6 +48,9 @@ export default async function OrdersBoard({
   searchParams: Promise<{ status?: string }>;
 }) {
   const { restaurant, config } = await getCurrentRestaurant("orders");
+  // Lazy housekeeping: recover stuck payment intents + cancel abandoned
+  // pay-first orders so the board stays clean. Cheap + idempotent.
+  await sweepStaleOrders(restaurant.id);
   const sp = await searchParams;
   const statusFilter = ACTIVE_STATUSES.includes(sp.status as OrderStatus)
     ? (sp.status as OrderStatus)
