@@ -56,7 +56,7 @@ export function ClockWidget({ openSince }: { openSince: string | null }) {
       <button
         onClick={punch}
         disabled={pending}
-        className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-60 ${
+        className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-60 ${
           openSince
             ? "border-olive-300 bg-olive-50 text-olive-700 hover:bg-olive-100"
             : "border-sand-300 text-ink/70 hover:border-brand-300 hover:bg-sand-100"
