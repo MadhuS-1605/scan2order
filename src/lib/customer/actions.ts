@@ -15,6 +15,7 @@ import {
 import { getActiveTableToken } from "@/lib/table-session";
 import { recordAudit } from "@/lib/audit";
 import { rateLimit } from "@/lib/ratelimit";
+import { flagEnabled } from "@/lib/platform/flags";
 import { placeOrderSchema, type PlaceOrderInput } from "@/lib/validation";
 
 export type PlaceOrderResult =
@@ -96,6 +97,15 @@ export async function placeOrderAction(
   }
   const { restaurant } = table;
   const config = restaurant.config!;
+
+  // A platform-suspended venue can't take orders.
+  if (restaurant.status === "SUSPENDED") {
+    return { ok: false, error: "This venue is currently unavailable." };
+  }
+  // Global maintenance kill switch.
+  if (!(await flagEnabled("ordering_enabled"))) {
+    return { ok: false, error: "Ordering is temporarily unavailable for maintenance. Please try again shortly." };
+  }
 
   // Venue must be open: respects the manual pause switch and daily hours (tz-aware).
   const ordering = venueOrderingOpen({

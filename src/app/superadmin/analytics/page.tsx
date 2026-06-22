@@ -1,5 +1,3 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/platform/actions";
@@ -22,14 +20,7 @@ export default async function SuperAdminAnalyticsPage({
   });
 
   if (restaurants.length === 0) {
-    return (
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        <Link href="/superadmin" className="inline-flex items-center gap-1.5 text-sm text-ink/55 hover:text-ink">
-          <ArrowLeft className="h-4 w-4" /> Console
-        </Link>
-        <p className="mt-6 text-sm text-ink/45">No restaurants yet.</p>
-      </div>
-    );
+    return <p className="text-sm text-ink/45">No restaurants yet.</p>;
   }
 
   // Default to the first restaurant; redirect so the URL always carries an id.
@@ -39,32 +30,24 @@ export default async function SuperAdminAnalyticsPage({
   }
 
   return (
-    <div className="min-h-screen bg-grain">
-      <header className="border-b border-sand-200 bg-surface">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-3">
-          <Link href="/superadmin" className="inline-flex items-center gap-1.5 text-sm text-ink/55 hover:text-ink">
-            <ArrowLeft className="h-4 w-4" /> Console
-          </Link>
-          <RestaurantPicker
-            restaurants={restaurants.map((r) => ({ id: r.id, name: r.name }))}
-            currentId={selected.id}
-            range={range.key}
-          />
-        </div>
-      </header>
-
-      <div className="mx-auto max-w-6xl space-y-6 px-6 py-6">
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-medium uppercase tracking-wide text-ink/40">Analytics</p>
           <h1 className="font-display text-2xl font-medium text-ink">{selected.name}</h1>
         </div>
-        <AnalyticsView
-          restaurantId={selected.id}
-          currency={selected.config?.currency ?? "INR"}
-          rangeKey={range.key}
-          rangeHref={(key) => `/superadmin/analytics?restaurant=${selected.id}&range=${key}`}
+        <RestaurantPicker
+          restaurants={restaurants.map((r) => ({ id: r.id, name: r.name }))}
+          currentId={selected.id}
+          range={range.key}
         />
       </div>
+      <AnalyticsView
+        restaurantId={selected.id}
+        currency={selected.config?.currency ?? "INR"}
+        rangeKey={range.key}
+        rangeHref={(key) => `/superadmin/analytics?restaurant=${selected.id}&range=${key}`}
+      />
     </div>
   );
 }

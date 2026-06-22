@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import {
   saveSettingsAction,
   gotoStepAction,
+  verifyGstinAction,
 } from "@/lib/onboarding/actions";
 import { Button, Input, Select, Field, Alert, Card } from "@/components/ui";
 import type { ActionState } from "@/lib/validation";
@@ -15,6 +16,8 @@ type Config = {
   counterPaymentEnabled: boolean;
   gstMode: string;
   gstNumber: string | null;
+  gstLegalName: string | null;
+  gstVerified: boolean;
   gstPercentage: string | number;
   serviceModel?: string;
 };
@@ -25,6 +28,43 @@ export function SettingsStep({ config }: { config: Config }) {
     {},
   );
   const [gstMode, setGstMode] = useState(config.gstMode);
+  const [gstNumber, setGstNumber] = useState(config.gstNumber ?? "");
+  // The verified business name (from the GSTN) drives what we submit + show.
+  // Seeded from saved state so a previously-verified GSTIN stays confirmed.
+  const [verified, setVerified] = useState<string | null>(
+    config.gstVerified ? config.gstLegalName : null,
+  );
+  const [gstNote, setGstNote] = useState<string | null>(null);
+  const [gstError, setGstError] = useState<string | null>(null);
+  const [verifying, startVerify] = useTransition();
+
+  function onGstinChange(value: string) {
+    // Editing the number invalidates any prior verification.
+    setGstNumber(value.toUpperCase());
+    setVerified(null);
+    setGstNote(null);
+    setGstError(null);
+  }
+
+  function handleVerify() {
+    setGstError(null);
+    setGstNote(null);
+    startVerify(async () => {
+      const r = await verifyGstinAction(gstNumber);
+      if (r.ok) {
+        setVerified(r.legalName);
+        // Surface a non-blocking warning for non-active registrations.
+        if (r.status.toLowerCase() !== "active") {
+          setGstNote(`Heads up: this GSTIN's status is "${r.status}".`);
+        }
+      } else {
+        setVerified(null);
+        setGstError(r.error);
+      }
+    });
+  }
+
+  const gstOff = gstMode === "NONE";
 
   return (
     <Card>
@@ -123,7 +163,7 @@ export function SettingsStep({ config }: { config: Config }) {
           <legend className="text-sm font-medium text-ink/80">
             GST / tax
           </legend>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="GST mode" htmlFor="gstMode">
               <Select
                 id="gstMode"
@@ -145,18 +185,57 @@ export function SettingsStep({ config }: { config: Config }) {
                 min="0"
                 max="28"
                 defaultValue={String(config.gstPercentage)}
-                disabled={gstMode === "NONE"}
-              />
-            </Field>
-            <Field label="GSTIN" htmlFor="gstNumber" hint="Optional">
-              <Input
-                id="gstNumber"
-                name="gstNumber"
-                defaultValue={config.gstNumber ?? ""}
-                disabled={gstMode === "NONE"}
+                disabled={gstOff}
               />
             </Field>
           </div>
+
+          {/* GSTIN — verified against the GSTN; we fetch the registered legal
+              name rather than asking the owner to type it. */}
+          <Field
+            label="GSTIN"
+            htmlFor="gstNumber"
+            hint="We'll verify this and fetch your registered business name."
+          >
+            <div className="flex gap-2">
+              <Input
+                id="gstNumber"
+                name="gstNumber"
+                value={gstNumber}
+                onChange={(e) => onGstinChange(e.target.value)}
+                placeholder="29ABCDE1234F1Z5"
+                maxLength={15}
+                autoCapitalize="characters"
+                spellCheck={false}
+                className="font-mono uppercase"
+                disabled={gstOff}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleVerify}
+                disabled={gstOff || verifying || gstNumber.length !== 15}
+              >
+                {verifying ? "Verifying…" : "Verify"}
+              </Button>
+            </div>
+          </Field>
+
+          {/* Carries the verification outcome into the form submit. */}
+          <input type="hidden" name="gstLegalName" value={verified ?? ""} />
+          <input
+            type="hidden"
+            name="gstVerified"
+            value={verified ? "true" : "false"}
+          />
+
+          {!gstOff && verified && (
+            <Alert variant="success">
+              Verified — <span className="font-medium">{verified}</span>
+            </Alert>
+          )}
+          {!gstOff && gstNote && <Alert variant="info">{gstNote}</Alert>}
+          {!gstOff && gstError && <Alert>{gstError}</Alert>}
         </fieldset>
 
         <div className="flex items-center justify-between">

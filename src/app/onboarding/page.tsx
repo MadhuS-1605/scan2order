@@ -74,6 +74,8 @@ export default async function OnboardingPage() {
             counterPaymentEnabled: restaurant.config.counterPaymentEnabled,
             gstMode: restaurant.config.gstMode,
             gstNumber: restaurant.config.gstNumber,
+            gstLegalName: restaurant.config.gstLegalName,
+            gstVerified: restaurant.config.gstVerified,
             gstPercentage: restaurant.config.gstPercentage.toString(),
             serviceModel: restaurant.config.serviceModel,
           }}

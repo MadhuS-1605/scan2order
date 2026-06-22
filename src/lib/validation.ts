@@ -37,7 +37,13 @@ export const profileSchema = z.object({
   state: z.string().max(80).optional().or(z.literal("")),
   postalCode: z.string().max(12).optional().or(z.literal("")),
   fssaiNumber: z.string().max(30).optional().or(z.literal("")),
-  logoUrl: z.string().url().max(500).optional().or(z.literal("")),
+  logoUrl: z
+    .string()
+    .url()
+    .max(500)
+    .refine((u) => /^https?:\/\//i.test(u), "Use an http(s) URL")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const settingsSchema = z.object({
@@ -47,6 +53,10 @@ export const settingsSchema = z.object({
   counterPaymentEnabled: z.coerce.boolean(),
   gstMode: z.enum(["NONE", "INCLUSIVE", "EXCLUSIVE"]),
   gstNumber: z.string().max(20).optional().or(z.literal("")),
+  // Carried from the GSTIN verification step (hidden inputs). gstLegalName is the
+  // GSTN-registered name; gstVerified marks that it came from a real lookup.
+  gstLegalName: z.string().max(200).optional().or(z.literal("")),
+  gstVerified: z.boolean().optional(),
   gstPercentage: z.coerce.number().min(0).max(28),
 });
 
@@ -61,8 +71,17 @@ export const menuItemSchema = z.object({
   description: z.string().max(500).optional().or(z.literal("")),
   price: z.coerce.number().min(0, "Price must be positive"),
   categoryId: z.string().optional().or(z.literal("")),
-  imageUrl: z.string().url("Enter a valid image URL").optional().or(z.literal("")),
+  imageUrl: z
+    .string()
+    .url("Enter a valid image URL")
+    .refine((u) => /^https?:\/\//i.test(u), "Use an http(s) URL")
+    .optional()
+    .or(z.literal("")),
   isVeg: z.coerce.boolean(),
+  isVegan: z.coerce.boolean().optional(),
+  isJain: z.coerce.boolean().optional(),
+  isSpicy: z.coerce.boolean().optional(),
+  isGlutenFree: z.coerce.boolean().optional(),
   isAvailable: z.coerce.boolean(),
   isSpecialOfDay: z.coerce.boolean(),
   availableFrom: z
@@ -131,4 +150,4 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
 });
 
-export type ActionState = { error?: string; ok?: boolean; message?: string };
+export type ActionState = { error?: string; ok?: boolean; message?: string; otp?: boolean; otpToken?: string };

@@ -11,6 +11,9 @@ import {
   toggleSpecialAction,
   deleteCategoryAction,
   updateItemAction,
+  moveItemAction,
+  moveCategoryAction,
+  importMenuCsvAction,
 } from "@/lib/menu/actions";
 import {
   addModifierGroupAction,
@@ -28,6 +31,7 @@ import {
   Card,
   VegMark,
 } from "@/components/ui";
+import { ImageUpload } from "@/components/admin/image-upload";
 import { useT } from "@/components/admin/i18n-provider";
 import { formatMoney } from "@/lib/utils";
 import { LANG_LABEL } from "@/lib/languages";
@@ -41,6 +45,10 @@ type Item = {
   price: string;
   categoryId: string | null;
   isVeg: boolean;
+  isVegan: boolean;
+  isJain: boolean;
+  isSpicy: boolean;
+  isGlutenFree: boolean;
   isAvailable: boolean;
   isSpecialOfDay: boolean;
   isChefSpecial: boolean;
@@ -86,19 +94,33 @@ export function MenuManager({
         </div>
       </Card>
 
-      {grouped.map(({ category, items: catItems }) => (
+      <ImportExport />
+
+      {grouped.map(({ category, items: catItems }, ci) => (
         <Card key={category.id}>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-semibold text-ink">{category.name}</h3>
-            <form action={deleteCategoryAction}>
-              <input type="hidden" name="id" value={category.id} />
-              <button
-                className="text-xs text-ink/45 hover:text-red-600"
-                type="submit"
-              >
-                {tr("menu.deleteCategory")}
-              </button>
-            </form>
+            <div className="flex items-center gap-2">
+              <form action={moveCategoryAction}>
+                <input type="hidden" name="id" value={category.id} />
+                <input type="hidden" name="dir" value="up" />
+                <Button size="sm" variant="ghost" type="submit" disabled={ci === 0} aria-label={tr("menu.moveUp")}>↑</Button>
+              </form>
+              <form action={moveCategoryAction}>
+                <input type="hidden" name="id" value={category.id} />
+                <input type="hidden" name="dir" value="down" />
+                <Button size="sm" variant="ghost" type="submit" disabled={ci === grouped.length - 1} aria-label={tr("menu.moveDown")}>↓</Button>
+              </form>
+              <form action={deleteCategoryAction}>
+                <input type="hidden" name="id" value={category.id} />
+                <button
+                  className="text-xs text-ink/45 hover:text-red-600"
+                  type="submit"
+                >
+                  {tr("menu.deleteCategory")}
+                </button>
+              </form>
+            </div>
           </div>
           <ItemList
             items={catItems}
@@ -124,6 +146,49 @@ export function MenuManager({
   );
 }
 
+function ImportExport() {
+  const tr = useT();
+  const [state, action, pending] = useActionState<ActionState, FormData>(
+    importMenuCsvAction,
+    {},
+  );
+  return (
+    <Card>
+      <details className="group">
+        <summary className="cursor-pointer list-none font-medium text-ink">
+          {tr("menu.importExport")}
+        </summary>
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-ink/55">{tr("menu.importHint")}</p>
+          {state.error && <Alert>{state.error}</Alert>}
+          {state.ok && state.message && <Alert variant="success">{state.message}</Alert>}
+          <form action={action} className="space-y-2">
+            <Textarea
+              name="csv"
+              rows={5}
+              placeholder={"name,price,category,description,veg\nMargherita,250,Pizza,Classic cheese,yes"}
+              className="font-mono text-xs"
+            />
+            <div className="flex items-center gap-2">
+              <Button type="submit" size="sm" disabled={pending}>
+                {pending ? tr("menu.importing") : tr("menu.import")}
+              </Button>
+              <a
+                href="/api/export/menu"
+                target="_blank"
+                rel="noopener"
+                className="rounded-lg border border-sand-300 px-3 py-1.5 text-sm font-medium text-ink/70 hover:bg-sand-100"
+              >
+                {tr("menu.exportCsv")}
+              </a>
+            </div>
+          </form>
+        </div>
+      </details>
+    </Card>
+  );
+}
+
 function ItemList({
   items,
   categories,
@@ -140,10 +205,12 @@ function ItemList({
     return <p className="text-sm text-ink/45">{tr("menu.noItems")}</p>;
   return (
     <ul className="divide-y divide-sand-100">
-      {items.map((item) => (
+      {items.map((item, i) => (
         <ItemRow
           key={item.id}
           item={item}
+          index={i}
+          total={items.length}
           categories={categories}
           currency={currency}
           languages={languages}
@@ -155,11 +222,15 @@ function ItemList({
 
 function ItemRow({
   item,
+  index,
+  total,
   categories,
   currency,
   languages,
 }: {
   item: Item;
+  index: number;
+  total: number;
   categories: Category[];
   currency: string;
   languages: string[];
@@ -210,6 +281,18 @@ function ItemRow({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1">
+          <form action={moveItemAction}>
+            <input type="hidden" name="id" value={item.id} />
+            <input type="hidden" name="dir" value="up" />
+            <Button size="sm" variant="ghost" type="submit" disabled={index === 0} aria-label={tr("menu.moveUp")}>↑</Button>
+          </form>
+          <form action={moveItemAction}>
+            <input type="hidden" name="id" value={item.id} />
+            <input type="hidden" name="dir" value="down" />
+            <Button size="sm" variant="ghost" type="submit" disabled={index === total - 1} aria-label={tr("menu.moveDown")}>↓</Button>
+          </form>
+        </div>
         <form action={toggleAvailabilityAction}>
           <input type="hidden" name="id" value={item.id} />
           <Button size="sm" variant="secondary" type="submit">
@@ -275,13 +358,7 @@ function ItemRow({
               />
             </Field>
             <Field label={tr("menu.imageUrl")} htmlFor={`img-${item.id}`} hint={tr("common.optional")}>
-              <Input
-                id={`img-${item.id}`}
-                name="imageUrl"
-                type="url"
-                placeholder="https://…"
-                defaultValue={item.imageUrl ?? ""}
-              />
+              <ImageUpload name="imageUrl" kind="menu" defaultValue={item.imageUrl ?? ""} />
             </Field>
 
             {languages
@@ -335,6 +412,22 @@ function ItemRow({
                   defaultChecked={item.isVeg}
                 />
                 {tr("menu.veg")}
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="isVegan" value="true" defaultChecked={item.isVegan} />
+                {tr("menu.vegan")}
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="isJain" value="true" defaultChecked={item.isJain} />
+                {tr("menu.jain")}
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="isSpicy" value="true" defaultChecked={item.isSpicy} />
+                {tr("menu.spicy")}
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" name="isGlutenFree" value="true" defaultChecked={item.isGlutenFree} />
+                {tr("menu.glutenFree")}
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -601,11 +694,27 @@ function AddItemForm({ categories }: { categories: Category[] }) {
           </option>
         ))}
       </Select>
-      <Input name="imageUrl" type="url" placeholder={tr("menu.imageUrlPlaceholder")} />
+      <ImageUpload name="imageUrl" kind="menu" placeholder={tr("menu.imageUrlPlaceholder")} />
       <div className="flex flex-wrap gap-4 text-sm">
         <label className="flex items-center gap-2">
           <input type="checkbox" name="isVeg" value="true" defaultChecked />
           {tr("menu.veg")}
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" name="isVegan" value="true" />
+          {tr("menu.vegan")}
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" name="isJain" value="true" />
+          {tr("menu.jain")}
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" name="isSpicy" value="true" />
+          {tr("menu.spicy")}
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" name="isGlutenFree" value="true" />
+          {tr("menu.glutenFree")}
         </label>
         <label className="flex items-center gap-2">
           <input

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireOnboardedAdmin, requireAdminWithPermission } from "@/lib/auth/guards";
+import { hasPermission } from "@/lib/auth/permissions";
 import { emitEvent } from "@/lib/realtime/bus";
 import { notifyOrderCustomer, notifyRestaurant } from "@/lib/push";
 import { awardPointsForOrder } from "@/lib/loyalty";
@@ -78,7 +79,13 @@ function revalidateAdmin() {
 }
 
 export async function setOrderStatusAction(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireOnboardedAdmin();
+  // Progressing an order is done from the orders board (orders) AND the kitchen
+  // screen (kitchen) — allow either, reject roles with neither.
+  const session = await requireOnboardedAdmin();
+  if (!hasPermission(session.role, "orders") && !hasPermission(session.role, "kitchen")) {
+    throw new Error("You don't have permission for this action.");
+  }
+  const { restaurantId } = session;
   const orderId = String(formData.get("orderId"));
   const status = String(formData.get("status")) as OrderStatus;
 
@@ -94,7 +101,7 @@ export async function setOrderStatusAction(formData: FormData): Promise<void> {
 }
 
 export async function confirmOrderAction(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireOnboardedAdmin();
+  const { restaurantId } = await requireAdminWithPermission("orders");
   const orderId = String(formData.get("orderId"));
   const order = await ownedOrder(orderId, restaurantId);
   await prisma.order.update({
@@ -112,7 +119,7 @@ export async function confirmOrderAction(formData: FormData): Promise<void> {
 }
 
 export async function rejectOrderAction(formData: FormData): Promise<void> {
-  const session = await requireOnboardedAdmin();
+  const session = await requireAdminWithPermission("orders");
   const { restaurantId } = session;
   const orderId = String(formData.get("orderId"));
   const order = await ownedOrder(orderId, restaurantId);
@@ -163,7 +170,7 @@ export async function rejectOrderAction(formData: FormData): Promise<void> {
 // Marks a counter (offline) payment as collected. Settles the whole table bill
 // (all open rounds at the table, any device/staff), since billing is table-based.
 export async function markPaidAction(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireOnboardedAdmin();
+  const { restaurantId } = await requireAdminWithPermission("orders");
   const orderId = String(formData.get("orderId"));
   const order = await ownedOrder(orderId, restaurantId);
 

@@ -7,6 +7,7 @@ import { subscriptionState } from "@/lib/subscription";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { signoutAction } from "@/lib/auth/actions";
+import { stopImpersonationAction } from "@/lib/platform/actions";
 import { ROLE_LABELS, hasPermission } from "@/lib/auth/permissions";
 import { getNotificationCount } from "@/lib/notifications/feed";
 import { ClockWidget } from "@/components/admin/clock-widget";
@@ -37,7 +38,37 @@ export default async function AdminLayout({
   }
 
   const { restaurant, config, session } = await getCurrentRestaurant();
+
+  // A platform-suspended venue can't use its admin. An impersonating super-admin
+  // bypasses this so they can still inspect/support the account.
+  if (restaurant.status === "SUSPENDED" && !session.impersonatorId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-grain px-4">
+        <div className="max-w-md rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+          <h1 className="font-display text-2xl text-red-800">Account suspended</h1>
+          <p className="mt-2 text-sm text-red-700">
+            {restaurant.suspendedReason ||
+              "This account has been suspended. Please contact support to restore access."}
+          </p>
+          <form action={signoutAction} className="mt-5">
+            <button
+              type="submit"
+              className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   const sub = subscriptionState(restaurant);
+  const announcement = await prisma.announcement.findFirst({
+    where: { active: true },
+    orderBy: { createdAt: "desc" },
+    select: { title: true, body: true, level: true },
+  });
   const cookieStore = await cookies();
   const locale = cookieStore.get(ADMIN_LOCALE_COOKIE)?.value ?? "en";
   const dict = dictFor(locale);
@@ -76,6 +107,19 @@ export default async function AdminLayout({
   return (
     <AdminI18nProvider dict={dict}>
     <div className="min-h-screen bg-grain">
+      {session.impersonatorId && (
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-amber-500 px-4 py-1.5 text-center text-xs font-medium text-amber-950">
+          <span>
+            Viewing as <strong>{restaurant.name}</strong> — impersonating (
+            {session.impersonatorName})
+          </span>
+          <form action={stopImpersonationAction}>
+            <button type="submit" className="underline underline-offset-2 hover:opacity-80">
+              Exit impersonation
+            </button>
+          </form>
+        </div>
+      )}
       <header className="sticky top-0 z-20 border-b border-sand-200 bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
@@ -136,6 +180,19 @@ export default async function AdminLayout({
           </div>
         </div>
       </header>
+
+      {announcement && (
+        <div
+          className={`border-b px-4 py-2 text-center text-sm sm:px-6 ${
+            announcement.level === "WARNING"
+              ? "border-amber-200 bg-amber-50 text-amber-800"
+              : "border-brand-200 bg-brand-50 text-brand-700"
+          }`}
+        >
+          <span className="font-medium">{announcement.title}</span>
+          {announcement.body && <span className="ml-2 text-ink/60">{announcement.body}</span>}
+        </div>
+      )}
 
       {(sub.status === "EXPIRED" || (sub.status === "TRIAL" && (sub.daysLeft ?? 0) <= 3)) && (
         <div className="mx-auto max-w-7xl px-4 pt-4 sm:px-6">

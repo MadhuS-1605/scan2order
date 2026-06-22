@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { emitEvent } from "@/lib/realtime/bus";
 import { notifyRestaurant } from "@/lib/push";
 import { sendWhatsApp } from "@/lib/messaging/provider";
+import { recordUsage } from "@/lib/usage";
 import type { ReservationStatus } from "@prisma/client";
 
 export async function createReservationAction(args: {
@@ -76,6 +77,7 @@ export async function createReservationAction(args: {
     } at ${restaurant.name}${when} for ${partySize}. We'll confirm shortly.`,
     restaurant.config?.whatsappFrom,
   );
+  if (res.ok) await recordUsage(restaurant.id, "whatsapp");
 
   return { ok: true, mocked: res.mocked };
 }
@@ -114,10 +116,11 @@ export async function setReservationStatusAction(
     const when = reservation.reservedFor
       ? ` for ${reservation.reservedFor.toLocaleString("en-IN")}`
       : "";
-    await sendWhatsApp(
+    const res = await sendWhatsApp(
       reservation.customerPhone,
       `Good news ${reservation.customerName}! Your table at ${reservation.restaurant.name}${when} is confirmed. See you soon.`,
       reservation.restaurant.config?.whatsappFrom,
     );
+    if (res.ok) await recordUsage(reservation.restaurantId, "whatsapp");
   }
 }

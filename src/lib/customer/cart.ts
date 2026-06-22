@@ -26,6 +26,10 @@ export type Item = {
   price: number;
   categoryId: string | null;
   isVeg: boolean;
+  isVegan: boolean;
+  isJain: boolean;
+  isSpicy: boolean;
+  isGlutenFree: boolean;
   isSpecialOfDay: boolean;
   isChefSpecial: boolean;
   availableFrom: string | null;

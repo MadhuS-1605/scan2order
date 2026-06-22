@@ -7,12 +7,23 @@ import { requireAdminWithPermission } from "@/lib/auth/guards";
 import {
   createRazorpayOrder,
   verifyRazorpaySignature,
+  fetchRazorpayPayment,
+  fetchRazorpaySubscription,
   createRazorpaySubscription,
   cancelRazorpaySubscription,
   verifyRazorpaySubscriptionSignature,
 } from "@/lib/payments/razorpay";
 import { planByTier, type PlanTier } from "@/lib/plans";
+import { resolvePlanPrice } from "@/lib/plan-settings";
 import { recordAudit } from "@/lib/audit";
+import {
+  getOutstandingOverage,
+  buildPendingOverageCharges,
+  attachOverageToOrder,
+  reconcileOverageByRazorpayOrder,
+  settleOverageAsPaid,
+} from "@/lib/billing/overage";
+import { notifyOverageSettled } from "@/lib/billing/overage-notify";
 
 const PERIOD_DAYS = 30;
 const DAY = 86_400_000;
@@ -55,7 +66,35 @@ async function activate(restaurantId: string, tier: PlanTier, periodDays = PERIO
   });
 }
 
-export async function startPlanCheckoutAction(tierInput: string): Promise<PlanIntent> {
+// Validate a promo code against a base price; returns the discounted price and
+// the canonical code (null if the code is absent/invalid/expired/exhausted).
+async function applyPlanCoupon(
+  price: number,
+  codeInput?: string,
+): Promise<{ discounted: number; coupon: string | null }> {
+  const code = (codeInput ?? "").trim().toUpperCase();
+  if (!code) return { discounted: price, coupon: null };
+  const c = await prisma.planCoupon.findUnique({ where: { code } });
+  if (!c || !c.active) return { discounted: price, coupon: null };
+  if (c.expiresAt && c.expiresAt.getTime() < Date.now()) return { discounted: price, coupon: null };
+  if (c.maxRedemptions != null && c.redeemedCount >= c.maxRedemptions) return { discounted: price, coupon: null };
+  const val = Number(c.value);
+  const off = c.type === "PERCENT" ? price * (val / 100) : val;
+  const discounted = Math.max(1, Math.round((price - off) * 100) / 100);
+  return { discounted, coupon: c.code };
+}
+
+// Redeem a promo code atomically — re-check the cap inside a transaction so
+// concurrent settlements can't push redeemedCount past maxRedemptions.
+async function redeemPlanCoupon(code: string): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const c = await tx.planCoupon.findUnique({ where: { code }, select: { redeemedCount: true, maxRedemptions: true } });
+    if (!c || (c.maxRedemptions != null && c.redeemedCount >= c.maxRedemptions)) return;
+    await tx.planCoupon.update({ where: { code }, data: { redeemedCount: { increment: 1 } } });
+  });
+}
+
+export async function startPlanCheckoutAction(tierInput: string, codeInput?: string): Promise<PlanIntent> {
   const session = await requireAdminWithPermission("settings");
   const tier = tierInput as PlanTier;
   const plan = planByTier(tier);
@@ -65,22 +104,34 @@ export async function startPlanCheckoutAction(tierInput: string): Promise<PlanIn
   const creds = platformCreds();
   if (!creds) return { ok: true, mock: true }; // dev: no gateway -> client calls mock activate
 
+  // Apply a promo code (if valid) to the (operator-set) plan price.
+  const basePrice = await resolvePlanPrice(tier);
+  const { discounted, coupon } = await applyPlanCoupon(basePrice, codeInput);
+
+  // Bundle any outstanding usage overage into this plan-extend order, so the
+  // owner settles plan + overage in one payment.
+  const { total: overage } = await buildPendingOverageCharges(session.restaurantId);
+
   const order = await createRazorpayOrder(
     creds,
-    plan.price,
+    discounted + overage,
     "INR",
     `plan-${session.restaurantId.slice(-6)}-${tier}`,
   );
-  await prisma.planPayment.create({
+  const pp = await prisma.planPayment.create({
     data: {
       restaurantId: session.restaurantId,
       tier,
-      amount: plan.price,
+      amount: discounted,
       periodDays: PERIOD_DAYS,
       status: "PENDING",
       razorpayOrderId: order.id,
+      couponCode: coupon,
     },
   });
+  if (overage > 0) {
+    await attachOverageToOrder(session.restaurantId, order.id, pp.id);
+  }
   return {
     ok: true,
     mock: false,
@@ -113,14 +164,27 @@ export async function verifyPlanPaymentAction(args: {
     where: { razorpayOrderId: args.razorpayOrderId, restaurantId: session.restaurantId },
   });
   if (!pp) return { ok: false, error: "Unknown payment reference." };
-  if (pp.status !== "PAID") {
-    await prisma.planPayment.updateMany({
-      where: { id: pp.id },
-      data: { status: "PAID", razorpayPaymentId: args.razorpayPaymentId },
-    });
-    await activate(session.restaurantId, pp.tier, pp.periodDays);
-    await recordAudit(session.restaurantId, session, "plan.subscribed", `${pp.tier} · ${pp.periodDays}d`);
+  if (pp.status === "PAID") return { ok: true };
+  // Confirm the payment was actually captured for THIS order (amount is enforced
+  // by the server-created Razorpay order).
+  const captured = await fetchRazorpayPayment(creds, args.razorpayPaymentId);
+  if (!captured || captured.status !== "captured" || captured.orderId !== args.razorpayOrderId) {
+    return { ok: false, error: "Payment could not be confirmed." };
   }
+  await prisma.planPayment.updateMany({
+    where: { id: pp.id },
+    data: { status: "PAID", razorpayPaymentId: args.razorpayPaymentId },
+  });
+  await activate(session.restaurantId, pp.tier, pp.periodDays);
+  // Settle any overage that rode along on this order, then notify the owner.
+  const ovg = await reconcileOverageByRazorpayOrder(
+    args.razorpayOrderId,
+    args.razorpayPaymentId,
+    session.restaurantId,
+  );
+  if (ovg.amount > 0) await notifyOverageSettled(session.restaurantId, ovg.amount);
+  if (pp.couponCode) await redeemPlanCoupon(pp.couponCode);
+  await recordAudit(session.restaurantId, session, "plan.subscribed", `${pp.tier} · ${pp.periodDays}d`);
   revalidatePath("/admin/billing");
   return { ok: true };
 }
@@ -128,6 +192,7 @@ export async function verifyPlanPaymentAction(args: {
 // Dev / Razorpay-not-configured: activate without a real charge.
 export async function mockActivatePlanAction(tierInput: string): Promise<{ ok: boolean; error?: string }> {
   const session = await requireAdminWithPermission("settings");
+  if (process.env.NODE_ENV === "production") return { ok: false, error: "Not available." };
   if (platformCreds()) return { ok: false, error: "Use the live payment flow." };
   const tier = tierInput as PlanTier;
   const plan = planByTier(tier);
@@ -136,6 +201,9 @@ export async function mockActivatePlanAction(tierInput: string): Promise<{ ok: b
     data: { restaurantId: session.restaurantId, tier, amount: plan.price, periodDays: PERIOD_DAYS, status: "PAID" },
   });
   await activate(session.restaurantId, tier);
+  // Mirror the live bundle: clear any outstanding overage too.
+  const { total: ovgTotal } = await settleOverageAsPaid(session.restaurantId);
+  if (ovgTotal > 0) await notifyOverageSettled(session.restaurantId, ovgTotal);
   await recordAudit(session.restaurantId, session, "plan.subscribed_mock", tier);
   revalidatePath("/admin/billing");
   return { ok: true };
@@ -154,6 +222,12 @@ export async function reconcilePlanPaymentByRazorpayOrder(
     data: { status: "PAID", ...(razorpayPaymentId ? { razorpayPaymentId } : {}) },
   });
   await activate(pp.restaurantId, pp.tier, pp.periodDays);
+  // Settle any overage bundled onto the same order, then notify the owner.
+  const ovg = await reconcileOverageByRazorpayOrder(razorpayOrderId, razorpayPaymentId, pp.restaurantId);
+  if (ovg.amount > 0) await notifyOverageSettled(pp.restaurantId, ovg.amount);
+  if (pp.couponCode) {
+    await prisma.planCoupon.updateMany({ where: { code: pp.couponCode }, data: { redeemedCount: { increment: 1 } } });
+  }
   return { ok: true };
 }
 
@@ -205,7 +279,13 @@ export async function verifyAutoRenewAction(args: {
     select: { id: true, planActiveUntil: true },
   });
   if (!restaurant) return { ok: false, error: "Unknown subscription." };
-  const tier = args.tier as PlanTier;
+  // Derive the tier from the subscription's actual Razorpay plan id — never trust
+  // the client-supplied tier (would let a Starter subscriber claim Pro).
+  const sub = await fetchRazorpaySubscription(creds, args.razorpaySubscriptionId);
+  const tier = (Object.entries(env.razorpay.planIds).find(
+    ([, planId]) => planId && planId === sub?.planId,
+  )?.[0] as PlanTier | undefined);
+  if (!tier) return { ok: false, error: "Could not determine the plan for this subscription." };
   const base =
     restaurant.planActiveUntil && restaurant.planActiveUntil.getTime() > Date.now()
       ? restaurant.planActiveUntil.getTime()
@@ -276,6 +356,80 @@ export async function reconcileSubscriptionEvent(
       data: { planAutoRenew: false },
     });
   }
+  return { ok: true };
+}
+
+// --- Overage settlement (standalone "Settle now") ---
+
+// Start a standalone Razorpay checkout for outstanding usage overage. Uses the
+// same platform creds + PlanIntent shape as plan checkout.
+export async function startOverageCheckoutAction(): Promise<PlanIntent> {
+  const session = await requireAdminWithPermission("settings");
+  const creds = platformCreds();
+  if (!creds) {
+    // dev: no gateway -> client calls the mock settle path
+    const { total } = await getOutstandingOverage(session.restaurantId);
+    if (total <= 0) return { ok: false, error: "No overage to settle." };
+    return { ok: true, mock: true };
+  }
+  const { total } = await buildPendingOverageCharges(session.restaurantId);
+  if (total <= 0) return { ok: false, error: "No overage to settle." };
+  const order = await createRazorpayOrder(
+    creds,
+    total,
+    "INR",
+    `ovg-${session.restaurantId.slice(-6)}`,
+  );
+  await attachOverageToOrder(session.restaurantId, order.id);
+  return {
+    ok: true,
+    mock: false,
+    razorpayOrderId: order.id,
+    amount: order.amount,
+    keyId: creds.keyId,
+    currency: "INR",
+    name: "Scan to Order",
+  };
+}
+
+export async function verifyOveragePaymentAction(args: {
+  razorpayOrderId: string;
+  razorpayPaymentId: string;
+  signature: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireAdminWithPermission("settings");
+  const creds = platformCreds();
+  if (!creds) return { ok: false, error: "Payment not configured." };
+  if (
+    !verifyRazorpaySignature(creds.keySecret, args.razorpayOrderId, args.razorpayPaymentId, args.signature)
+  ) {
+    return { ok: false, error: "Payment verification failed. Please try again." };
+  }
+  const captured = await fetchRazorpayPayment(creds, args.razorpayPaymentId);
+  if (!captured || captured.status !== "captured" || captured.orderId !== args.razorpayOrderId) {
+    return { ok: false, error: "Payment could not be confirmed." };
+  }
+  const ovg = await reconcileOverageByRazorpayOrder(
+    args.razorpayOrderId,
+    args.razorpayPaymentId,
+    session.restaurantId,
+  );
+  if (ovg.amount > 0) await notifyOverageSettled(session.restaurantId, ovg.amount);
+  await recordAudit(session.restaurantId, session, "overage.settled", args.razorpayOrderId);
+  revalidatePath("/admin/billing");
+  return { ok: true };
+}
+
+// Dev / Razorpay-not-configured: settle overage without a real charge.
+export async function mockSettleOverageAction(): Promise<{ ok: boolean; error?: string }> {
+  const session = await requireAdminWithPermission("settings");
+  if (process.env.NODE_ENV === "production") return { ok: false, error: "Not available." };
+  if (platformCreds()) return { ok: false, error: "Use the live payment flow." };
+  const { total } = await settleOverageAsPaid(session.restaurantId);
+  if (total <= 0) return { ok: false, error: "No overage to settle." };
+  await notifyOverageSettled(session.restaurantId, total);
+  await recordAudit(session.restaurantId, session, "overage.settled_mock", String(total));
+  revalidatePath("/admin/billing");
   return { ok: true };
 }
 

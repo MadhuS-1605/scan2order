@@ -1,8 +1,12 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+
+// Unguessable QR token (the sole secret gating diner bill/order access).
+const newQrToken = () => randomBytes(24).toString("base64url");
 import {
   requireAdmin,
   requireOnboardedAdmin,
@@ -12,8 +16,11 @@ import { createSession } from "@/lib/auth/session";
 import { slugify } from "@/lib/utils";
 import { validateSubdomain } from "@/lib/subdomain";
 import { ensureSubdomain, syncSubdomain } from "@/lib/cloudflare";
+import { notifyOps } from "@/lib/platform/alerts";
+import { trialDaysFor } from "@/lib/plan-settings";
 import { tableQuotaReached, menuItemQuotaReached } from "@/lib/plan-limits";
 import { STEPS, type Step } from "@/lib/onboarding/steps";
+import { verifyGstin, type GstVerifyResult } from "@/lib/gst";
 import {
   profileSchema,
   settingsSchema,
@@ -130,14 +137,20 @@ export async function saveProfileAction(
       postalCode: data.postalCode || null,
       fssaiNumber: data.fssaiNumber || null,
       logoUrl: data.logoUrl || null,
-      // Start a 14-day full-feature trial on Starter; lapses to Free limits.
+      // Start a full-feature trial on Starter (operator-configurable length).
       planTier: "STARTER",
       planIsTrial: true,
-      planActiveUntil: new Date(Date.now() + 14 * 86_400_000),
+      planActiveUntil: new Date(Date.now() + (await trialDaysFor("STARTER")) * 86_400_000),
       config: { create: { onboardingStep: 1, ...featureDefaults, ...serviceDefaults } },
     },
   });
   if (selfService) await ensureCounterTable(restaurant.id);
+
+  // Alert the operator team about the new venue (fail-soft, no-op if unset).
+  await notifyOps(
+    "New venue signed up",
+    `${data.name} (${data.type})\nUsername: ${sub.value}\nCity: ${data.city || "—"}`,
+  );
 
   // Create the tenant's subdomain DNS record (no-op if Cloudflare is unconfigured).
   await ensureSubdomain(sub.value);
@@ -162,7 +175,7 @@ async function ensureCounterTable(restaurantId: string): Promise<void> {
   });
   if (!existing) {
     await prisma.restaurantTable.create({
-      data: { restaurantId, label: "Counter", kind: "COUNTER", seats: 0 },
+      data: { restaurantId, label: "Counter", kind: "COUNTER", seats: 0, qrToken: newQrToken() },
     });
   }
 }
@@ -230,6 +243,10 @@ export async function addMenuItemAction(
     availableTo: formData.get("availableTo"),
     // Unchecked checkboxes are absent from FormData -> coerce explicitly.
     isVeg: formData.get("isVeg") === "true",
+    isVegan: formData.get("isVegan") === "true",
+    isJain: formData.get("isJain") === "true",
+    isSpicy: formData.get("isSpicy") === "true",
+    isGlutenFree: formData.get("isGlutenFree") === "true",
     isAvailable: formData.get("isAvailable") === "true",
     isSpecialOfDay: formData.get("isSpecialOfDay") === "true",
   });
@@ -237,19 +254,32 @@ export async function addMenuItemAction(
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
   const d = parsed.data;
+  // Only accept a category that belongs to this tenant.
+  const categoryId = d.categoryId
+    ? (await prisma.menuCategory.findFirst({ where: { id: d.categoryId, restaurantId: session.restaurantId }, select: { id: true } }))?.id ?? null
+    : null;
+  // Append new items after existing ones in the same category (drives reorder).
+  const sortOrder = await prisma.menuItem.count({
+    where: { restaurantId: session.restaurantId, categoryId },
+  });
   await prisma.menuItem.create({
     data: {
       restaurantId: session.restaurantId,
-      categoryId: d.categoryId || null,
+      categoryId,
       name: d.name,
       description: d.description || null,
       price: d.price,
       imageUrl: d.imageUrl || null,
       isVeg: d.isVeg,
+      isVegan: d.isVegan ?? false,
+      isJain: d.isJain ?? false,
+      isSpicy: d.isSpicy ?? false,
+      isGlutenFree: d.isGlutenFree ?? false,
       isAvailable: d.isAvailable,
       isSpecialOfDay: d.isSpecialOfDay,
       availableFrom: d.availableFrom || null,
       availableTo: d.availableTo || null,
+      sortOrder,
     },
   });
   revalidatePath("/onboarding");
@@ -267,6 +297,16 @@ export async function deleteMenuItemAction(formData: FormData) {
   revalidatePath("/admin/menu");
 }
 
+// Look up a GSTIN against the GSTN and return the registered business name, so
+// the Settings step can auto-fill it instead of trusting typed input. Returns a
+// structured result (called imperatively from the client, not via a form).
+export async function verifyGstinAction(
+  gstin: string,
+): Promise<GstVerifyResult> {
+  await requireAdminWithPermission("settings");
+  return verifyGstin(gstin);
+}
+
 // Step 2 — settings (order confirmation, payment, GST).
 export async function saveSettingsAction(
   _prev: ActionState,
@@ -278,6 +318,9 @@ export async function saveSettingsAction(
     ...raw,
     onlinePaymentEnabled: formData.get("onlinePaymentEnabled") === "on",
     counterPaymentEnabled: formData.get("counterPaymentEnabled") === "on",
+    // Explicit boolean: coercing the "true"/"false" string would treat both as
+    // truthy (any non-empty string is true under z.coerce.boolean()).
+    gstVerified: formData.get("gstVerified") === "true",
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
@@ -299,7 +342,13 @@ export async function saveSettingsAction(
       onlinePaymentEnabled: d.onlinePaymentEnabled,
       counterPaymentEnabled: d.counterPaymentEnabled,
       gstMode: d.gstMode,
-      gstNumber: d.gstNumber || null,
+      gstNumber: d.gstMode === "NONE" ? null : d.gstNumber || null,
+      // The legal name + verified flag are only meaningful for a real GSTIN;
+      // clear them when GST is off or no number is set.
+      gstLegalName:
+        d.gstMode === "NONE" || !d.gstNumber ? null : d.gstLegalName || null,
+      gstVerified:
+        d.gstMode !== "NONE" && Boolean(d.gstNumber) && Boolean(d.gstVerified),
       gstPercentage: d.gstPercentage,
       onboardingStep: STEPS.indexOf("tables"),
     },
@@ -326,6 +375,7 @@ export async function addTableAction(
       label: parsed.data.label,
       seats: parsed.data.seats,
       kind: parsed.data.kind,
+      qrToken: newQrToken(),
     },
   });
   revalidatePath("/onboarding");

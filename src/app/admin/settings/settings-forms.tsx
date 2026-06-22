@@ -14,6 +14,7 @@ import {
   Alert,
   Card,
 } from "@/components/ui";
+import { ImageUpload } from "@/components/admin/image-upload";
 import type { ActionState } from "@/lib/validation";
 import { LANGUAGES } from "@/lib/languages";
 import { updateTenantAction } from "@/lib/tenant/actions";
@@ -40,6 +41,7 @@ type Config = {
   gstMode: string;
   gstNumber: string | null;
   gstPercentage: string;
+  serviceChargePercent: string;
   reviewUrl: string | null;
   happyHourEnabled: boolean;
   happyHourFrom: string | null;
@@ -60,6 +62,7 @@ type Config = {
   billFooterMessage: string | null;
   defaultPrepMinutes: number;
   minOrderAmount: number;
+  dailyReportEmail: boolean;
   pickupEnabled: boolean;
   deliveryEnabled: boolean;
   requireDinerLocation: boolean;
@@ -214,13 +217,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
           />
         </Field>
         <Field label={tr("settings.logoUrl")} htmlFor="s-logo" hint={tr("settings.logoUrlHint")}>
-          <Input
-            id="s-logo"
-            name="logoUrl"
-            type="url"
-            defaultValue={profile.logoUrl ?? ""}
-            placeholder="https://…/logo.png"
-          />
+          <ImageUpload name="logoUrl" kind="logo" defaultValue={profile.logoUrl ?? ""} />
         </Field>
         <div className="flex justify-end">
           <Button type="submit" disabled={pending}>
@@ -385,6 +382,11 @@ function OperationsForm({ config }: { config: Config }) {
           />
         </Field>
 
+        <label className="flex items-center gap-2 text-sm text-ink/70">
+          <input type="checkbox" name="dailyReportEmail" defaultChecked={config.dailyReportEmail} />
+          {tr("settings.dailyReportEmail")}
+        </label>
+
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label={tr("settings.gstMode")} htmlFor="o-gst">
             <Select
@@ -406,6 +408,17 @@ function OperationsForm({ config }: { config: Config }) {
               step="0.01"
               defaultValue={config.gstPercentage}
               disabled={gstMode === "NONE"}
+            />
+          </Field>
+          <Field label={tr("settings.serviceCharge")} htmlFor="o-sc" hint={tr("settings.serviceChargeHint")}>
+            <Input
+              id="o-sc"
+              name="serviceChargePercent"
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              defaultValue={config.serviceChargePercent}
             />
           </Field>
           <Field label={tr("settings.gstin")} htmlFor="o-num">

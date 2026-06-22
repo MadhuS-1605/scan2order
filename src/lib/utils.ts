@@ -5,6 +5,15 @@ export function cn(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }
 
+// Escape user-controlled text before interpolating into an HTML string (emails).
+// React escapes JSX automatically; this is for hand-built HTML template strings.
+const HTML_ESCAPES: Record<string, string> = {
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+};
+export function escapeHtml(value: string): string {
+  return String(value).replace(/[&<>"']/g, (c) => HTML_ESCAPES[c]);
+}
+
 // Format money. Prisma Decimal serializes via toString(); accept number too.
 export function formatMoney(
   amount: number | string | Prisma.Decimal,

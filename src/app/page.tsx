@@ -7,11 +7,12 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { VegMark } from "@/components/ui";
-import { PLANS } from "@/lib/plans";
+import { resolvePlans } from "@/lib/plan-settings";
 import { formatMoney } from "@/lib/utils";
 import { Check } from "lucide-react";
 
-export default function Home() {
+export default async function Home() {
+  const plans = await resolvePlans();
   return (
     <div className="min-h-screen bg-grain">
       <Header />
@@ -103,7 +104,7 @@ export default function Home() {
             Start free. Upgrade when you&apos;re ready.
           </p>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {PLANS.map((p) => (
+            {plans.map((p) => (
               <div
                 key={p.tier}
                 className={`flex flex-col rounded-2xl border bg-surface p-6 ${

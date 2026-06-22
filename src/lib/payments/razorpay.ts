@@ -1,6 +1,17 @@
 import "server-only";
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import { env } from "@/lib/env";
+import { decryptSecret } from "@/lib/crypto";
+
+// Constant-time comparison of two hex strings (avoids signature timing oracles).
+export function timingEqualHex(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string" || a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+  } catch {
+    return false;
+  }
+}
 
 export type RazorpayCreds = { keyId: string; keySecret: string };
 
@@ -10,7 +21,8 @@ export function resolveRazorpayCreds(config: {
   razorpayKeySecret: string | null;
 }): RazorpayCreds | null {
   if (config.razorpayKeyId && config.razorpayKeySecret) {
-    return { keyId: config.razorpayKeyId, keySecret: config.razorpayKeySecret };
+    // Stored encrypted at rest (decryptSecret passes through legacy plaintext).
+    return { keyId: config.razorpayKeyId, keySecret: decryptSecret(config.razorpayKeySecret) };
   }
   if (env.razorpay.keyId && env.razorpay.keySecret) {
     return { keyId: env.razorpay.keyId, keySecret: env.razorpay.keySecret };
@@ -33,6 +45,26 @@ export async function createRazorpayOrder(
     receipt,
   });
   return { id: order.id, amount: Number(order.amount) };
+}
+
+// Fetch a payment from Razorpay to confirm what was actually captured. Returns
+// the gateway's status, the order it belongs to, and the amount in PAISE.
+export async function fetchRazorpayPayment(
+  creds: RazorpayCreds,
+  paymentId: string,
+): Promise<{ status: string; orderId: string | null; amountPaise: number } | null> {
+  try {
+    const { default: Razorpay } = await import("razorpay");
+    const rzp = new Razorpay({ key_id: creds.keyId, key_secret: creds.keySecret });
+    const p = await rzp.payments.fetch(paymentId);
+    return {
+      status: String(p.status),
+      orderId: p.order_id ? String(p.order_id) : null,
+      amountPaise: Number(p.amount),
+    };
+  } catch {
+    return null;
+  }
 }
 
 // Refunds a captured payment (full or partial). amountRupees -> paise. Returns
@@ -68,6 +100,22 @@ export async function createRazorpaySubscription(
   return { id: sub.id };
 }
 
+// Fetch a subscription to learn which plan it's actually on (for server-side
+// tier derivation, instead of trusting a client-supplied tier).
+export async function fetchRazorpaySubscription(
+  creds: RazorpayCreds,
+  subscriptionId: string,
+): Promise<{ planId: string | null } | null> {
+  try {
+    const { default: Razorpay } = await import("razorpay");
+    const rzp = new Razorpay({ key_id: creds.keyId, key_secret: creds.keySecret });
+    const s = await rzp.subscriptions.fetch(subscriptionId);
+    return { planId: s.plan_id ? String(s.plan_id) : null };
+  } catch {
+    return null;
+  }
+}
+
 export async function cancelRazorpaySubscription(
   creds: RazorpayCreds,
   subscriptionId: string,
@@ -87,7 +135,7 @@ export function verifyRazorpaySubscriptionSignature(
   const expected = createHmac("sha256", keySecret)
     .update(`${razorpayPaymentId}|${razorpaySubscriptionId}`)
     .digest("hex");
-  return expected === signature;
+  return timingEqualHex(expected, signature);
 }
 
 // Verifies a Razorpay webhook: HMAC-SHA256 of the RAW request body using the
@@ -98,7 +146,7 @@ export function verifyRazorpayWebhook(
   signature: string,
 ): boolean {
   const expected = createHmac("sha256", webhookSecret).update(rawBody).digest("hex");
-  return expected === signature;
+  return timingEqualHex(expected, signature);
 }
 
 // Verifies the checkout signature (HMAC-SHA256 of "orderId|paymentId").
@@ -111,5 +159,5 @@ export function verifyRazorpaySignature(
   const expected = createHmac("sha256", keySecret)
     .update(`${razorpayOrderId}|${razorpayPaymentId}`)
     .digest("hex");
-  return expected === signature;
+  return timingEqualHex(expected, signature);
 }

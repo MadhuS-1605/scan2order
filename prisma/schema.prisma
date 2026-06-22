@@ -115,6 +115,7 @@ enum PaymentProvider {
 enum OtpPurpose {
   WHATSAPP_BILL
   LOGIN
+  ADMIN_LOGIN // super-admin 2FA (keyed by email)
 }
 
 enum BillDeliveryMethod {
@@ -206,6 +207,99 @@ enum PlanTier {
   FREE
   STARTER
   PRO
+  ENTERPRISE
+}
+
+enum RestaurantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum PlanCouponType {
+  PERCENT // value = % off (0-100)
+  AMOUNT // value = ₹ off
+}
+
+// Operator-editable plan pricing (overrides the code defaults in src/lib/plans.ts).
+// Keyed by PlanTier value. Absent row => use the code default. Capabilities and
+// limits stay code-defined; only price / allowances / trial are tunable live.
+model PlanSetting {
+  tier              String   @id // "FREE" | "STARTER" | "PRO" | "ENTERPRISE"
+  price             Int
+  whatsappAllowance Int
+  emailAllowance    Int
+  trialDays         Int      @default(14)
+  updatedAt         DateTime @updatedAt
+
+  @@map("plan_settings")
+}
+
+// Platform-issued promo code applied at subscription checkout (distinct from a
+// tenant's own diner-facing Coupon). Managed by super-admins.
+model PlanCoupon {
+  id             String         @id @default(cuid())
+  code           String         @unique
+  type           PlanCouponType @default(PERCENT)
+  value          Decimal        @db.Decimal(10, 2)
+  active         Boolean        @default(true)
+  maxRedemptions Int? // null = unlimited
+  redeemedCount  Int            @default(0)
+  expiresAt      DateTime?
+  createdAt      DateTime       @default(now())
+
+  @@map("plan_coupons")
+}
+
+enum AnnouncementLevel {
+  INFO
+  WARNING
+}
+
+// Sub-role for super-admins (platform operators). FULL = everything; BILLING =
+// revenue + plan grants; SUPPORT = tenant management + impersonation, no billing.
+enum PlatformRole {
+  FULL
+  BILLING
+  SUPPORT
+}
+
+// Global platform kill switches, keyed by a known string (see src/lib/platform/
+// flags.ts). Absent row = the code default (usually enabled).
+model FeatureFlag {
+  key       String   @id
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  @@map("feature_flags")
+}
+
+// Internal super-admin note on a tenant (support context). Not visible to the
+// tenant. See the per-tenant drill-down.
+model TenantNote {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  authorId     String?
+  authorName   String?
+  body         String
+  createdAt    DateTime   @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@map("tenant_notes")
+}
+
+// Platform-wide notice shown as a banner in every tenant admin. Managed by
+// super-admins (src/app/superadmin/announcements).
+model Announcement {
+  id            String            @id @default(cuid())
+  title         String
+  body          String?
+  level         AnnouncementLevel @default(INFO)
+  active        Boolean           @default(true)
+  createdByName String?
+  createdAt     DateTime          @default(now())
+
+  @@index([active, createdAt])
+  @@map("announcements")
 }
 
 model Restaurant {
@@ -223,6 +317,14 @@ model Restaurant {
   // webhooks extend planActiveUntil each cycle.
   planAutoRenew         Boolean @default(false)
   razorpaySubscriptionId String?
+  // Platform lifecycle: a super-admin can SUSPEND a venue (blocks its admin until
+  // reactivated). Default ACTIVE; diner-facing behaviour is unaffected for now.
+  status          RestaurantStatus @default(ACTIVE)
+  suspendedAt     DateTime?
+  suspendedReason String?
+  // Last time a dunning (trial-ending / lapsed) reminder was sent — cooldown so
+  // the dunning cron doesn't re-notify daily. See src/lib/billing/dunning.ts.
+  lastDunningAt   DateTime?
   type        RestaurantType @default(RESTAURANT)
   email       String?
   phone       String?
@@ -259,9 +361,84 @@ model Restaurant {
   integrations      Integration[]
   auditLogs         AuditLog[]
   attendance        StaffAttendance[]
+  usageMeters       UsageMeter[]
+  overageCharges    OverageCharge[]
+  tenantNotes       TenantNote[]
+  campaigns         Campaign[]
 
   @@index([groupId])
   @@map("restaurants")
+}
+
+// A marketing message blast a venue sends to its past guests (WhatsApp only —
+// guest email isn't stored). Counts against the venue's WhatsApp allowance.
+model Campaign {
+  id             String   @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  segment        String // "all" | "repeat" | "recent"
+  message        String
+  recipientCount Int      @default(0)
+  sentCount      Int      @default(0)
+  createdByName  String?
+  createdAt      DateTime @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@map("campaigns")
+}
+
+// Metered usage for billable channels (WhatsApp / email). One row per
+// (restaurant, month, channel); `count` is incremented on each successful send.
+// Plans include a monthly allowance (see plan allowances in src/lib/plans.ts);
+// usage beyond it accrues overage. Bucketed by calendar month ("YYYY-MM", UTC).
+enum UsageChannel {
+  WHATSAPP
+  EMAIL
+}
+
+model UsageMeter {
+  id           String       @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  period       String // calendar month bucket, "YYYY-MM"
+  channel      UsageChannel
+  count        Int          @default(0)
+  // Highest allowance threshold (e.g. 80, 100) the owner has been notified at
+  // this period — prevents repeat alerts. Resets with each month's new row.
+  notifiedThreshold Int     @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([restaurantId, period, channel])
+  @@index([restaurantId, period])
+  @@map("usage_meters")
+}
+
+// A settlement of one closed month's metered overage (WhatsApp + email beyond
+// the plan allowance). Snapshots the billed units + ₹ amount at settle time. A
+// PAID row marks that month as settled so it's never billed twice; non-PAID
+// rows are transient (rebuilt on each settle attempt). Collected either
+// standalone ("Settle overage") or bundled into a plan-extend order — see
+// src/lib/billing/overage.ts.
+model OverageCharge {
+  id                String        @id @default(cuid())
+  restaurantId      String
+  restaurant        Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  period            String // calendar month settled, "YYYY-MM"
+  whatsappUnits     Int           @default(0)
+  emailUnits        Int           @default(0)
+  amount            Decimal       @db.Decimal(10, 2) // pre-GST ₹, snapshotted at settle
+  status            PaymentStatus @default(PENDING)
+  razorpayOrderId   String? // shared by all charges settled in one payment
+  razorpayPaymentId String?   @unique // captured-payment id is single-use across the platform
+  planPaymentId     String? // set when bundled into a plan-extend order
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([restaurantId, period])
+  @@index([restaurantId])
+  @@index([razorpayOrderId])
+  @@map("overage_charges")
 }
 
 model AdminUser {
@@ -275,6 +452,17 @@ model AdminUser {
   name         String
   role         AdminRole   @default(OWNER)
   isSuperAdmin Boolean     @default(false)
+  // Sub-role when isSuperAdmin — gates which platform actions are allowed.
+  platformRole PlatformRole @default(FULL)
+  // Authenticator-app (TOTP) 2FA. Base32 secret; enabled only after the user
+  // confirms a code during enrolment. Email OTP works as an alternative factor.
+  totpSecret   String? // AES-GCM encrypted when ENCRYPTION_KEY is set (else plaintext)
+  totpEnabled  Boolean      @default(false)
+  // Highest TOTP time-step already consumed — prevents replay within the window.
+  lastTotpStep Int?
+  // One-time set-password invite (operator-created owners). Token cleared on use.
+  inviteToken       String?   @unique
+  inviteTokenExpiry DateTime?
   // Disabled accounts keep their history/audit attribution but cannot sign in.
   disabled     Boolean     @default(false)
   restaurantId String?
@@ -319,6 +507,8 @@ model OnboardingConfig {
   billFooterMessage String?
   // Default kitchen prep estimate (minutes) shown to the diner as "ready in ~N".
   defaultPrepMinutes Int @default(15)
+  // Email the owner an end-of-day sales summary (sent by the daily-summary cron).
+  dailyReportEmail Boolean @default(false)
   // Minimum order subtotal (venue currency, whole units). 0 = no minimum.
   minOrderAmount Int @default(0)
   // Takeaway / delivery ordering (e.g. cloud kitchens). When on, the diner picks
@@ -332,7 +522,14 @@ model OnboardingConfig {
 
   gstMode       GstMode @default(NONE)
   gstNumber     String?
+  // Registered legal name fetched from the GSTN (via the verification provider)
+  // when the GSTIN is verified — used on tax invoices. Distinct from the
+  // restaurant's display name. Null until a successful verification.
+  gstLegalName  String?
+  gstVerified   Boolean @default(false)
   gstPercentage Decimal @default(5) @db.Decimal(5, 2)
+  // Optional service charge added to the bill (percent of subtotal). 0 = none.
+  serviceChargePercent Decimal @default(0) @db.Decimal(5, 2)
   currency      String  @default("INR")
 
   // Optional per-restaurant Razorpay account (falls back to platform env if null)
@@ -428,6 +625,11 @@ model MenuItem {
   price       Decimal @db.Decimal(10, 2)
   imageUrl    String?
   isVeg       Boolean @default(true)
+  // Dietary attributes for diner filters / badges.
+  isVegan       Boolean @default(false)
+  isJain        Boolean @default(false)
+  isSpicy       Boolean @default(false)
+  isGlutenFree  Boolean @default(false)
   isAvailable Boolean @default(true) // in-stock toggle
 
   // Optional daily availability window ("HH:mm", 24h). Null => always available.
@@ -658,7 +860,9 @@ model PlanPayment {
   periodDays        Int           @default(30)
   status            PaymentStatus @default(PENDING)
   razorpayOrderId   String?
-  razorpayPaymentId String?
+  razorpayPaymentId String?   @unique // captured-payment id is single-use across the platform
+  // Promo code applied at checkout (PlanCoupon.code), if any.
+  couponCode        String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
@@ -703,7 +907,7 @@ model Payment {
   status   PaymentStatus   @default(PENDING)
 
   razorpayOrderId   String?
-  razorpayPaymentId String?
+  razorpayPaymentId String?   @unique // captured-payment id is single-use across the platform
   razorpaySignature String?
 
   createdAt DateTime @default(now())
@@ -761,6 +965,23 @@ model AuditLog {
 
   @@index([restaurantId, createdAt])
   @@map("audit_logs")
+}
+
+// Platform-operator (super-admin) action trail. Distinct from AuditLog, which is
+// tenant-scoped: the actor here is a super-admin and the action may target a
+// specific tenant (targetRestaurantId) or be platform-wide.
+model PlatformAuditLog {
+  id                String   @id @default(cuid())
+  actorId           String?
+  actorName         String?
+  action            String // e.g. "tenant.suspended", "tenant.impersonated", "plan.granted"
+  targetRestaurantId String?
+  detail            String?
+  createdAt         DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetRestaurantId])
+  @@map("platform_audit_logs")
 }
 
 // Staff clock-in / clock-out records. Self punches are geofenced (coords stored

@@ -7,6 +7,7 @@ import {
   toNumber,
   seatLabel,
   venueOrderingOpen,
+  escapeHtml,
 } from "@/lib/utils";
 
 describe("distanceMeters (geofence)", () => {
@@ -86,6 +87,22 @@ describe("happyHourPercentNow", () => {
   });
   it("0 when disabled", () => {
     expect(happyHourPercentNow({ ...hh, enabled: false }, undefined, at(17))).toBe(0);
+  });
+});
+
+describe("escapeHtml (email-template XSS guard)", () => {
+  it("escapes the five HTML-significant characters", () => {
+    expect(escapeHtml(`<b>&"'`)).toBe("&lt;b&gt;&amp;&quot;&#39;");
+  });
+  it("neutralizes an injected tag in a tenant-controlled name", () => {
+    const out = escapeHtml(`<img src=x onerror=alert(1)>`);
+    expect(out).not.toContain("<");
+    expect(out).not.toContain(">");
+    expect(out).toContain("&lt;img");
+  });
+  it("leaves plain text untouched", () => {
+    expect(escapeHtml("Madhu's Cafe 42")).toBe("Madhu&#39;s Cafe 42");
+    expect(escapeHtml("Dosa Corner")).toBe("Dosa Corner");
   });
 });
 

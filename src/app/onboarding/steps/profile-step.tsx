@@ -5,6 +5,7 @@ import { saveProfileAction } from "@/lib/onboarding/actions";
 import { checkSubdomainAction } from "@/lib/tenant/actions";
 import { normalizeSubdomain } from "@/lib/subdomain";
 import { Button, Input, Select, Field, Alert, Card } from "@/components/ui";
+import { ImageUpload } from "@/components/admin/image-upload";
 import type { ActionState } from "@/lib/validation";
 
 const PLATFORM_DOMAIN =
@@ -156,14 +157,8 @@ export function ProfileStep({ restaurant }: { restaurant: RestaurantLike }) {
             placeholder="e.g. 12345678901234"
           />
         </Field>
-        <Field label="Logo URL" htmlFor="logoUrl" hint="Optional · shown on the menu & bill">
-          <Input
-            id="logoUrl"
-            name="logoUrl"
-            type="url"
-            defaultValue={restaurant?.logoUrl ?? ""}
-            placeholder="https://…/logo.png"
-          />
+        <Field label="Logo" htmlFor="logoUrl" hint="Optional · shown on the menu & bill">
+          <ImageUpload name="logoUrl" kind="logo" defaultValue={restaurant?.logoUrl ?? ""} />
         </Field>
         <div className="flex justify-end">
           <Button type="submit" size="lg" disabled={pending}>

@@ -33,6 +33,41 @@ const nextConfig: NextConfig = {
     "web-push",
     "ioredis",
   ],
+  async headers() {
+    // Enforcing CSP. Razorpay Checkout pulls its SDK/iframe/XHR/fonts from
+    // several *.razorpay.com subdomains (checkout, api, lumberjack, sentry,
+    // cdn), so allow the whole suffix rather than enumerating each. Next's
+    // hydration/runtime uses inline <script>/<style>, hence 'unsafe-inline'.
+    // If Checkout ever errors on load, the first thing to try is adding
+    // 'unsafe-eval' to script-src; to fully roll back, change the header key
+    // below to "Content-Security-Policy-Report-Only".
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://*.razorpay.com",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data: https://*.razorpay.com",
+      "connect-src 'self' https://*.razorpay.com",
+      "frame-src 'self' https://*.razorpay.com",
+      "frame-ancestors 'self'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "object-src 'none'",
+    ].join("; ");
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "geolocation=(self), camera=(), microphone=(), payment=(self)" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+          { key: "Content-Security-Policy", value: csp },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

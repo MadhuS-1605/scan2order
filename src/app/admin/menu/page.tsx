@@ -21,7 +21,7 @@ export default async function MenuPage() {
     }),
     prisma.menuItem.findMany({
       where: { restaurantId: restaurant.id },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       include: {
         modifierGroups: {
           orderBy: { sortOrder: "asc" },
@@ -73,6 +73,10 @@ export default async function MenuPage() {
           price: i.price.toString(),
           categoryId: i.categoryId,
           isVeg: i.isVeg,
+          isVegan: i.isVegan,
+          isJain: i.isJain,
+          isSpicy: i.isSpicy,
+          isGlutenFree: i.isGlutenFree,
           isAvailable: i.isAvailable,
           isSpecialOfDay: i.isSpecialOfDay,
           isChefSpecial: i.isChefSpecial,

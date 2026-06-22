@@ -38,7 +38,7 @@ export function CustomerMenu({
   restaurantId: string;
   prefill?: { itemId: string; qty: number }[];
   happyHourPercent: number;
-  ordering?: { open: boolean; reason: "paused" | "closed" | null };
+  ordering?: { open: boolean; reason: "paused" | "closed" | "suspended" | "maintenance" | null };
   languages: string[];
   restaurant: { name: string; currency: string; groupName?: string | null; logoUrl?: string | null };
   table: { label: string; kind?: string };
@@ -49,6 +49,9 @@ export function CustomerMenu({
   const orderingOpen = ordering.open;
   const [lang, setLang] = useState("en");
   const [vegOnly, setVegOnly] = useState(false);
+  const [veganOnly, setVeganOnly] = useState(false);
+  const [jainOnly, setJainOnly] = useState(false);
+  const [gfOnly, setGfOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [customizing, setCustomizing] = useState<Item | null>(null);
   const { cart, count, addLine } = useCart(restaurantId, { prefill });
@@ -98,7 +101,13 @@ export function CustomerMenu({
   const cur = restaurant.currency;
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
-  const visible = vegOnly ? items.filter((i) => i.isVeg) : items;
+  const visible = items.filter(
+    (i) =>
+      (!vegOnly || i.isVeg) &&
+      (!veganOnly || i.isVegan) &&
+      (!jainOnly || i.isJain) &&
+      (!gfOnly || i.isGlutenFree),
+  );
   const specials = visible.filter((i) => i.isSpecialOfDay);
   const subtotal = cartSubtotal(cart, byId, hhFactor);
 
@@ -220,6 +229,9 @@ export function CustomerMenu({
             </span>
             Veg only
           </FilterChip>
+          <FilterChip active={veganOnly} onClick={() => setVeganOnly((v) => !v)}>🌱 Vegan</FilterChip>
+          <FilterChip active={jainOnly} onClick={() => setJainOnly((v) => !v)}>Jain</FilterChip>
+          <FilterChip active={gfOnly} onClick={() => setGfOnly((v) => !v)}>Gluten-free</FilterChip>
           {specials.length > 0 && (
             <FilterChip active={false} onClick={() => scrollToSection("sec-specials")}>
               ⭐ Specials
@@ -240,7 +252,11 @@ export function CustomerMenu({
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-center text-sm text-amber-800">
             {ordering.reason === "paused"
               ? "🛎️ Ordering is paused right now — please check back in a little while. You can still browse the menu."
-              : "🌙 We're closed right now, so ordering is unavailable. Browse the menu and come back during opening hours."}
+              : ordering.reason === "suspended"
+                ? "⚠️ This venue is temporarily unavailable and isn't taking orders right now."
+                : ordering.reason === "maintenance"
+                  ? "🛠️ Ordering is temporarily down for maintenance — please try again shortly. You can still browse the menu."
+                  : "🌙 We're closed right now, so ordering is unavailable. Browse the menu and come back during opening hours."}
           </div>
         </div>
       )}
@@ -614,12 +630,29 @@ function ItemRow({
           <VegMark isVeg={item.isVeg} />
           <p className="text-sm font-medium text-ink">{name}</p>
         </div>
-        {(item.isChefSpecial || (item.availableFrom && item.availableTo)) && (
+        {(item.isChefSpecial ||
+          item.isVegan ||
+          item.isJain ||
+          item.isSpicy ||
+          item.isGlutenFree ||
+          (item.availableFrom && item.availableTo)) && (
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {item.isChefSpecial && (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
                 👨‍🍳 Chef&apos;s Special
               </span>
+            )}
+            {item.isVegan && (
+              <span className="rounded-full bg-olive-100 px-1.5 py-0.5 text-[10px] font-medium text-olive-700">🌱 Vegan</span>
+            )}
+            {item.isJain && (
+              <span className="rounded-full bg-olive-100 px-1.5 py-0.5 text-[10px] font-medium text-olive-700">Jain</span>
+            )}
+            {item.isSpicy && (
+              <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">🌶️ Spicy</span>
+            )}
+            {item.isGlutenFree && (
+              <span className="rounded-full bg-sand-100 px-1.5 py-0.5 text-[10px] font-medium text-ink/60">GF</span>
             )}
             {item.availableFrom && item.availableTo && (
               <span className="inline-flex items-center gap-1 rounded-full bg-sand-100 px-1.5 py-0.5 text-[10px] font-medium text-ink/55">

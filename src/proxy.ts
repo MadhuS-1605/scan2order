@@ -52,6 +52,7 @@ export function proxy(request: NextRequest) {
     res.cookies.set(TABLE_COOKIE, token, {
       httpOnly: true,
       sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: TABLE_COOKIE_MAX_AGE,
     });

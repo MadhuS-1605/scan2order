@@ -40,12 +40,13 @@ export function PlanCheckout({
   const tr = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
   async function subscribe() {
     setError(null);
     setBusy(true);
     try {
-      const intent = await startPlanCheckoutAction(tier);
+      const intent = await startPlanCheckoutAction(tier, code.trim() || undefined);
       if (!intent.ok) {
         setError(intent.error);
         return;
@@ -90,6 +91,12 @@ export function PlanCheckout({
 
   return (
     <div>
+      <input
+        value={code}
+        onChange={(e) => setCode(e.target.value.toUpperCase())}
+        placeholder={tr("billing.promoCode")}
+        className="mb-2 w-full rounded-lg border border-sand-300 bg-surface px-2.5 py-1.5 text-xs uppercase placeholder:normal-case"
+      />
       <button
         type="button"
         onClick={subscribe}

@@ -21,6 +21,8 @@ import {
   BarChart3,
   Star,
   Download,
+  Receipt,
+  Contact,
   Users,
   Clock,
   Building2,
@@ -79,6 +81,8 @@ const GROUPS: { heading: string; links: NavLink[] }[] = [
     heading: "Insights",
     links: [
       { href: "/admin/analytics", label: "Analytics", perm: "analytics", icon: BarChart3 },
+      { href: "/admin/reports", label: "Reports", perm: "analytics", icon: Receipt },
+      { href: "/admin/customers", label: "Guests", perm: "analytics", icon: Contact },
       { href: "/admin/feedback", label: "Feedback", perm: "analytics", icon: Star },
       { href: "/admin/export", label: "Export", perm: "analytics", icon: Download },
     ],

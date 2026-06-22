@@ -3,15 +3,19 @@
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { emitEvent } from "@/lib/realtime/bus";
-import { toNumber, formatMoney } from "@/lib/utils";
+import { toNumber, formatMoney, escapeHtml } from "@/lib/utils";
 import { round2 } from "@/lib/pricing";
 import {
   resolveRazorpayCreds,
   createRazorpayOrder,
   verifyRazorpaySignature,
+  fetchRazorpayPayment,
 } from "@/lib/payments/razorpay";
 import { createOtp, verifyOtp } from "@/lib/messaging/otp";
 import { sendWhatsApp, sendEmail, sendWhatsAppTemplate } from "@/lib/messaging/provider";
+import { recordUsage } from "@/lib/usage";
+import { flagEnabled } from "@/lib/platform/flags";
+import { rateLimit } from "@/lib/ratelimit";
 import { awardPointsForOrder } from "@/lib/loyalty";
 
 // Loads an order scoped to the scanned table's QR token (customer-safe access).
@@ -75,12 +79,23 @@ async function getCustomerSession(orderId: string, qrToken: string) {
 function sessionTotal(orders: Order[]): number {
   return r2(orders.reduce((s, o) => s + toNumber(o.totalAmount), 0));
 }
-function sessionPayable(orders: Order[], primary: Order): number {
-  const net = Math.max(0, sessionTotal(orders) - toNumber(primary.discountAmount));
-  return r2(net + toNumber(primary.tipAmount));
+function sessionSubtotal(orders: Order[]): number {
+  return r2(orders.reduce((s, o) => s + toNumber(o.subtotal), 0));
 }
-function sessionRemaining(orders: Order[], primary: Order): number {
-  return Math.max(0, r2(sessionPayable(orders, primary) - toNumber(primary.amountPaid)));
+// Optional service charge added on top of the bill (percent of food subtotal).
+function serviceChargeOf(orders: Order[], scPct: number): number {
+  return scPct > 0 ? r2((sessionSubtotal(orders) * scPct) / 100) : 0;
+}
+function sessionPayable(orders: Order[], primary: Order, scPct: number): number {
+  const net = Math.max(0, sessionTotal(orders) - toNumber(primary.discountAmount));
+  return r2(net + serviceChargeOf(orders, scPct) + toNumber(primary.tipAmount));
+}
+function sessionRemaining(orders: Order[], primary: Order, scPct: number): number {
+  return Math.max(0, r2(sessionPayable(orders, primary, scPct) - toNumber(primary.amountPaid)));
+}
+// Service-charge % for a session, read from the primary order's venue config.
+function scPctOf(primary: { restaurant?: { config?: { serviceChargePercent?: unknown } | null } }): number {
+  return toNumber((primary.restaurant?.config?.serviceChargePercent as number | undefined) ?? 0);
 }
 
 // Settle the whole session: mark every order paid and award loyalty once each.
@@ -89,9 +104,10 @@ async function settleSession(orders: Order[], primary: Order, method: "ONLINE" |
   // release it to the kitchen (CONFIRMED) now that payment has landed.
   const cfg = await prisma.onboardingConfig.findUnique({
     where: { restaurantId: primary.restaurantId },
-    select: { requirePrepayment: true },
+    select: { requirePrepayment: true, serviceChargePercent: true },
   });
   const confirmOnPay = cfg?.requirePrepayment ?? false;
+  const scPct = toNumber(cfg?.serviceChargePercent ?? 0);
   const now = new Date();
   await prisma.$transaction(
     orders.map((o) =>
@@ -103,7 +119,7 @@ async function settleSession(orders: Order[], primary: Order, method: "ONLINE" |
           // The whole consolidated bill's payment is recorded on the primary
           // order; others settle at 0 so SUM(amountPaid) across the bill is
           // accurate (no double-counting).
-          amountPaid: o.id === primary.id ? sessionPayable(orders, primary) : 0,
+          amountPaid: o.id === primary.id ? sessionPayable(orders, primary, scPct) : 0,
           ...(confirmOnPay && o.status === "PLACED"
             ? { status: "CONFIRMED" as const, confirmedAt: now }
             : {}),
@@ -325,6 +341,10 @@ export async function createPaymentIntentAction(args: {
 }): Promise<PaymentIntent> {
   const session = await getCustomerSession(args.orderId, args.qrToken);
   if (!session) return { ok: false, error: "Order not found." };
+  // Throttle gateway-order creation per order (avoids spamming Razorpay/DB rows).
+  if (!(await rateLimit(`payintent:${args.orderId}`, { windowMs: 60_000, max: 10 }))) {
+    return { ok: false, error: "Too many attempts. Please wait a moment." };
+  }
   const { orders, primary } = session;
   if (primary.paymentStatus === "PAID")
     return { ok: false, error: "This order is already paid." };
@@ -332,8 +352,11 @@ export async function createPaymentIntentAction(args: {
   const config = primary.restaurant.config!;
   if (!config.onlinePaymentEnabled)
     return { ok: false, error: "Online payment is not enabled." };
+  // Platform kill switch (overrides every venue's own setting).
+  if (!(await flagEnabled("online_payments_enabled")))
+    return { ok: false, error: "Online payment is temporarily unavailable. Please pay at the counter." };
 
-  const remaining = sessionRemaining(orders, primary);
+  const remaining = sessionRemaining(orders, primary, scPctOf(primary));
   if (remaining <= 0) return { ok: false, error: "Nothing left to pay." };
   const amount = r2(Math.min(Math.max(args.amount ?? remaining, 1), remaining));
 
@@ -411,9 +434,21 @@ export async function verifyPaymentAction(args: {
   });
   if (!payment) return { ok: false, error: "Unknown payment reference." };
   if (payment.status === "PAID") return { ok: true }; // idempotent re-verify
+
+  // Confirm with Razorpay what was actually captured — the signature alone proves
+  // the ids were issued, not that the money was captured for the right amount.
+  const captured = await fetchRazorpayPayment(creds, args.razorpayPaymentId);
+  if (
+    !captured ||
+    captured.status !== "captured" ||
+    captured.orderId !== args.razorpayOrderId ||
+    captured.amountPaise !== Math.round(toNumber(payment.amount) * 100)
+  ) {
+    return { ok: false, error: "Payment could not be confirmed. Please try again." };
+  }
   const paidNow = toNumber(payment.amount);
   const newPaid = r2(toNumber(primary.amountPaid) + paidNow);
-  const settled = newPaid >= sessionPayable(orders, primary) - 0.01;
+  const settled = newPaid >= sessionPayable(orders, primary, scPctOf(primary)) - 0.01;
 
   await prisma.payment.updateMany({
     where: { orderId: primary.id, razorpayOrderId: args.razorpayOrderId },
@@ -487,7 +522,7 @@ export async function reconcilePaidByRazorpayOrder(
   });
 
   const newPaid = r2(toNumber(primary.amountPaid) + toNumber(payment.amount));
-  if (newPaid >= sessionPayable(orders, primary) - 0.01) {
+  if (newPaid >= sessionPayable(orders, primary, scPctOf(primary)) - 0.01) {
     await settleSession(orders, primary, "ONLINE");
   } else {
     await prisma.order.update({
@@ -511,10 +546,10 @@ export async function mockMarkPaidAction(args: {
   const session = await getCustomerSession(args.orderId, args.qrToken);
   if (!session) return { ok: false, error: "Order not found." };
   const { orders, primary } = session;
-  const remaining = sessionRemaining(orders, primary);
+  const remaining = sessionRemaining(orders, primary, scPctOf(primary));
   const paidNow = r2(Math.min(args.amount ?? remaining, remaining));
   const newPaid = r2(toNumber(primary.amountPaid) + paidNow);
-  const settled = newPaid >= sessionPayable(orders, primary) - 0.01;
+  const settled = newPaid >= sessionPayable(orders, primary, scPctOf(primary)) - 0.01;
   if (settled) {
     await settleSession(orders, primary, "ONLINE");
   } else {
@@ -559,6 +594,7 @@ export async function requestBillOtpAction(args: {
           order.restaurant.config!.whatsappFrom,
         );
   if (!res.ok) return { ok: false, error: res.error ?? "Could not send code." };
+  await recordUsage(order.restaurantId, "whatsapp");
   return { ok: true, mocked: res.mocked };
 }
 
@@ -611,6 +647,7 @@ export async function verifyBillOtpAction(args: {
           order.restaurant.config!.whatsappFrom,
         );
   if (!send.ok) return { ok: false, error: send.error ?? "Could not send bill." };
+  await recordUsage(order.restaurantId, "whatsapp");
   return { ok: true, mocked: send.mocked };
 }
 
@@ -629,16 +666,18 @@ export async function emailBillAction(args: {
   await ensureBill(order, "EMAIL");
   const link = `${env.appUrl.replace(/\/$/, "")}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
   const name = order.restaurant.name;
+  const safeName = escapeHtml(name);
   const cur = order.restaurant.config!.currency;
   const total = toNumber(order.totalAmount).toFixed(2);
   const html = `<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;color:#1c1917">
-    <h2 style="margin:0 0 8px">Thanks for dining at ${name}!</h2>
+    <h2 style="margin:0 0 8px">Thanks for dining at ${safeName}!</h2>
     <p style="margin:0 0 16px">Here's your bill (#${order.orderNumber}) — total <strong>${cur} ${total}</strong>.</p>
     <p style="margin:0 0 20px"><a href="${link}" style="background:#d93d0b;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Download your bill (PDF)</a></p>
     <p style="color:#999;font-size:12px;margin:0">Powered by Scan to Order</p>
   </div>`;
   const send = await sendEmail(email, `Your bill from ${name} (#${order.orderNumber})`, html);
   if (!send.ok) return { ok: false, error: send.error ?? "Could not send the email." };
+  await recordUsage(order.restaurantId, "email");
   return { ok: true, mocked: send.mocked };
 }
 

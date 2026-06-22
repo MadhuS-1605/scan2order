@@ -2,6 +2,7 @@ import { env } from "@/lib/env";
 import { prisma } from "@/lib/db";
 import { sweepStaleOrders } from "@/lib/orders/sweep";
 import { reportError } from "@/lib/observability";
+import { cronAuthorized } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
 
@@ -12,12 +13,7 @@ async function handle(request: Request): Promise<Response> {
   const secret = env.cronSecret;
   if (!secret) return new Response("Cron not configured", { status: 503 });
 
-  const auth = request.headers.get("authorization") ?? "";
-  const provided =
-    auth.replace(/^Bearer\s+/i, "") ||
-    new URL(request.url).searchParams.get("key") ||
-    "";
-  if (provided !== secret) return new Response("Unauthorized", { status: 401 });
+  if (!cronAuthorized(request, secret)) return new Response("Unauthorized", { status: 401 });
 
   const restaurants = await prisma.restaurant.findMany({ select: { id: true } });
   let ok = 0;

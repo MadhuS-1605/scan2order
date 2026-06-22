@@ -8,6 +8,7 @@ import {
   gotoStepAction,
 } from "@/lib/onboarding/actions";
 import { Button, Input, Textarea, Select, Field, Alert, Card } from "@/components/ui";
+import { ImageUpload } from "@/components/admin/image-upload";
 import { formatMoney } from "@/lib/utils";
 import type { ActionState } from "@/lib/validation";
 
@@ -202,8 +203,8 @@ function AddItemForm({ categories }: { categories: Category[] }) {
           placeholder="Char-grilled cottage cheese with spices"
         />
       </Field>
-      <Field label="Image URL" htmlFor="item-img" hint="Optional">
-        <Input id="item-img" name="imageUrl" type="url" placeholder="https://…" />
+      <Field label="Image" htmlFor="item-img" hint="Optional">
+        <ImageUpload name="imageUrl" kind="menu" />
       </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label="Available from" htmlFor="item-from" hint="Optional">

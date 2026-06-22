@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireAdminWithPermission } from "@/lib/auth/guards";
 import { recordAudit } from "@/lib/audit";
 import { plan } from "@/lib/plan-limits";
+import { encryptSecret } from "@/lib/crypto";
 import {
   profileSchema,
   settingsSchema,
@@ -97,6 +98,7 @@ export async function updateOperationsAction(
       gstMode: d.gstMode,
       gstNumber: d.gstNumber || null,
       gstPercentage: d.gstPercentage,
+      serviceChargePercent: Math.max(0, Math.min(100, Number(formData.get("serviceChargePercent") ?? 0) || 0)),
       reviewUrl: reviewUrl || null,
       happyHourEnabled: formData.get("happyHourEnabled") === "on",
       happyHourFrom: hhFrom || null,
@@ -116,6 +118,7 @@ export async function updateOperationsAction(
         Math.min(180, Number(formData.get("defaultPrepMinutes") ?? 15) || 15),
       ),
       minOrderAmount: Math.max(0, Math.floor(Number(formData.get("minOrderAmount") ?? 0) || 0)),
+      dailyReportEmail: formData.get("dailyReportEmail") === "on",
       pickupEnabled: formData.get("pickupEnabled") === "on",
       deliveryEnabled: formData.get("deliveryEnabled") === "on",
       languages: [...langs].join(","),
@@ -158,7 +161,8 @@ export async function updatePaymentCredsAction(
     data: {
       razorpayKeyId: razorpayKeyId || null,
       // Keep existing secret if the field is left blank (masked on the form).
-      ...(razorpayKeySecret ? { razorpayKeySecret } : {}),
+      // Encrypted at rest; decrypted in resolveRazorpayCreds.
+      ...(razorpayKeySecret ? { razorpayKeySecret: encryptSecret(razorpayKeySecret) } : {}),
       whatsappFrom: whatsappFrom || null,
       upiId: upiId || null,
       upiName: upiName || null,

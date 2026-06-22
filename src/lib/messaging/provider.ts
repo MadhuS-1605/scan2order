@@ -1,5 +1,6 @@
 import "server-only";
 import { env } from "@/lib/env";
+import { flagEnabled } from "@/lib/platform/flags";
 
 // Messaging abstraction. Uses Twilio when configured, otherwise logs to the
 // server console so the flow is fully testable without credentials.
@@ -23,6 +24,7 @@ export async function sendEmail(
   subject: string,
   html: string,
 ): Promise<SendResult> {
+  if (!(await flagEnabled("email_enabled"))) return { ok: false, error: "Email sending is disabled." };
   if (!env.email.configured()) {
     console.log(`\n[Email → ${to}] ${subject}\n${html}\n`);
     return { ok: true, mocked: true };
@@ -48,6 +50,7 @@ export async function sendWhatsApp(
   body: string,
   fromOverride?: string | null,
 ): Promise<SendResult> {
+  if (!(await flagEnabled("whatsapp_enabled"))) return { ok: false, error: "WhatsApp sending is disabled." };
   const from = fromOverride || env.messaging.twilioWhatsappFrom;
   if (!isTwilio() || !from) {
     console.log(`\n[WhatsApp → ${to}]\n${body}\n`);
@@ -80,6 +83,7 @@ export async function sendWhatsAppTemplate(
   params: string[],
   lang: string = env.messaging.meta.lang,
 ): Promise<SendResult> {
+  if (!(await flagEnabled("whatsapp_enabled"))) return { ok: false, error: "WhatsApp sending is disabled." };
   const m = env.messaging.meta;
   if (!isMeta() || !template) {
     console.log(`\n[WhatsApp template "${template}" → ${to}]\n${params.join(" | ")}\n`);

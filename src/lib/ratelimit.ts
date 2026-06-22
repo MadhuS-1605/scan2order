@@ -34,11 +34,14 @@ redis.call('PEXPIRE', KEYS[1], window)
 return 1
 `;
 
-type Opts = { windowMs: number; max: number; minGapMs?: number };
+// `failClosed`: on a Redis error, DENY instead of allow — use for auth-sensitive
+// limiters (login, 2FA, set-password) so an outage can't disable brute-force
+// protection. Defaults to fail-open for non-auth paths (e.g. ordering).
+type Opts = { windowMs: number; max: number; minGapMs?: number; failClosed?: boolean };
 
 export async function rateLimit(
   key: string,
-  { windowMs, max, minGapMs }: Opts,
+  { windowMs, max, minGapMs, failClosed }: Opts,
   now: number = Date.now(),
 ): Promise<boolean> {
   const redis = redisEnabled() ? getRedis() : null;
@@ -55,9 +58,8 @@ export async function rateLimit(
       );
       return res === 1;
     } catch (e) {
-      // Fail open — a Redis hiccup shouldn't block legitimate orders.
-      console.error("[ratelimit] redis error, allowing", e);
-      return true;
+      console.error("[ratelimit] redis error", e);
+      return !failClosed; // auth limiters fail closed; others fail open
     }
   }
 

@@ -5,6 +5,7 @@ import {
   reconcilePlanPaymentByRazorpayOrder,
   reconcileSubscriptionEvent,
 } from "@/lib/billing/subscription-actions";
+import { reconcileOverageByRazorpayOrder } from "@/lib/billing/overage";
 
 export const runtime = "nodejs";
 
@@ -44,11 +45,15 @@ export async function POST(request: Request) {
     const entity = event.payload?.payment?.entity;
     const razorpayOrderId = entity?.order_id;
     if (razorpayOrderId) {
-      // Idempotent. Same order id space is split between diner order payments
-      // and tenant plan payments — try the diner path, then the plan path.
+      // Idempotent. The same order-id space is shared by diner order payments,
+      // tenant plan payments (which also settle any bundled overage), and
+      // standalone overage orders — try each in turn.
       const settled = await reconcilePaidByRazorpayOrder(razorpayOrderId, entity?.id);
       if (!settled.ok) {
-        await reconcilePlanPaymentByRazorpayOrder(razorpayOrderId, entity?.id);
+        const plan = await reconcilePlanPaymentByRazorpayOrder(razorpayOrderId, entity?.id);
+        if (!plan.ok) {
+          await reconcileOverageByRazorpayOrder(razorpayOrderId, entity?.id);
+        }
       }
     }
   } else if (type.startsWith("subscription.")) {

@@ -69,7 +69,9 @@ export default async function PaymentPage({
   const total = r2(orders.reduce((s, o) => s + toNumber(o.totalAmount), 0));
   const tip = toNumber(primary.tipAmount);
   const discount = toNumber(primary.discountAmount);
-  const payable = r2(Math.max(0, total - discount) + tip);
+  const scPct = toNumber(config.serviceChargePercent);
+  const serviceCharge = scPct > 0 ? r2((subtotal * scPct) / 100) : 0;
+  const payable = r2(Math.max(0, total - discount) + serviceCharge + tip);
   const amountPaid = toNumber(primary.amountPaid);
   const remaining = Math.max(0, r2(payable - amountPaid));
   const paid = primary.paymentStatus === "PAID";
@@ -153,6 +155,9 @@ export default async function PaymentPage({
                 label={`Discount${primary.couponCode ? ` (${primary.couponCode})` : ""}`}
                 value={`− ${formatMoney(discount, cur)}`}
               />
+            )}
+            {serviceCharge > 0 && (
+              <Row label={`Service charge (${scPct}%)`} value={formatMoney(serviceCharge, cur)} />
             )}
             {tip > 0 && <Row label="Tip" value={formatMoney(tip, cur)} />}
             <Row label="Amount payable" value={formatMoney(payable, cur)} bold />

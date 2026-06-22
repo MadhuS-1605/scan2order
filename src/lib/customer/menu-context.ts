@@ -9,6 +9,7 @@ import { subscriptionState } from "@/lib/subscription";
 import { planLimits } from "@/lib/plans";
 import { parseLanguages } from "@/lib/languages";
 import { getActiveTableToken } from "@/lib/table-session";
+import { flagEnabled } from "@/lib/platform/flags";
 import type { Item } from "@/lib/customer/cart";
 
 export type MenuContext = {
@@ -29,8 +30,8 @@ export type MenuContext = {
   };
   happyHourPercent: number;
   // Whether the venue is currently accepting orders (business hours + manual
-  // pause). When closed, the diner can browse but not order.
-  ordering: { open: boolean; reason: "paused" | "closed" | null };
+  // pause + platform suspension). When closed, the diner can browse but not order.
+  ordering: { open: boolean; reason: "paused" | "closed" | "suspended" | "maintenance" | null };
   languages: string[];
   categories: { id: string; name: string; icon: string | null }[];
   items: Item[];
@@ -110,6 +111,10 @@ export async function getMenuContext(): Promise<MenuContext | null> {
     price: toNumber(i.price),
     categoryId: i.categoryId,
     isVeg: i.isVeg,
+    isVegan: i.isVegan,
+    isJain: i.isJain,
+    isSpicy: i.isSpicy,
+    isGlutenFree: i.isGlutenFree,
     isSpecialOfDay: i.isSpecialOfDay,
     isChefSpecial: i.isChefSpecial,
     availableFrom: i.availableFrom,
@@ -163,12 +168,20 @@ export async function getMenuContext(): Promise<MenuContext | null> {
       deliveryEnabled: config.deliveryEnabled,
     },
     happyHourPercent,
-    ordering: venueOrderingOpen({
-      orderingPaused: config.orderingPaused,
-      openTime: config.openTime,
-      closeTime: config.closeTime,
-      timezone: config.timezone,
-    }),
+    // Ordering availability: a platform suspension or the global maintenance
+    // kill switch both block ordering (diners may still browse); otherwise the
+    // venue's own pause + business hours apply.
+    ordering:
+      restaurant.status === "SUSPENDED"
+        ? { open: false, reason: "suspended" as const }
+        : !(await flagEnabled("ordering_enabled"))
+          ? { open: false, reason: "maintenance" as const }
+          : venueOrderingOpen({
+              orderingPaused: config.orderingPaused,
+              openTime: config.openTime,
+              closeTime: config.closeTime,
+              timezone: config.timezone,
+            }),
     languages: parseLanguages(config.languages),
     categories: restaurant.categories.map((c) => ({
       id: c.id,

@@ -58,6 +58,23 @@ async function findRecordId(name: string): Promise<string | null> {
   return first.id ?? null;
 }
 
+export type DnsRecord = { id: string; name: string; content: string; proxied: boolean };
+
+// List the zone's CNAME records (for the platform DNS management view).
+export async function listDnsRecords(): Promise<DnsRecord[]> {
+  if (!cloudflareConfigured()) return [];
+  const { ok, result } = await cf(
+    `/zones/${env.cloudflare.zoneId}/dns_records?type=CNAME&per_page=200`,
+  );
+  if (!ok || !Array.isArray(result)) return [];
+  return (result as Array<{ id?: string; name?: string; content?: string; proxied?: boolean }>).map((r) => ({
+    id: r.id ?? "",
+    name: r.name ?? "",
+    content: r.content ?? "",
+    proxied: Boolean(r.proxied),
+  }));
+}
+
 // Create (or update) the CNAME for a tenant subdomain. Idempotent.
 export async function ensureSubdomain(subdomain: string): Promise<DnsResult> {
   if (!cloudflareConfigured()) return { ok: true, skipped: true };

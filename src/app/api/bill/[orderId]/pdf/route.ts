@@ -63,7 +63,9 @@ export async function GET(
   const total = r2(orders.reduce((s, o) => s + toNumber(o.totalAmount), 0));
   const discount = toNumber(primary.discountAmount);
   const tip = toNumber(primary.tipAmount);
-  const payable = r2(Math.max(0, total - discount) + tip);
+  const scPct = toNumber(config.serviceChargePercent);
+  const serviceCharge = scPct > 0 ? r2((subtotal * scPct) / 100) : 0;
+  const payable = r2(Math.max(0, total - discount) + serviceCharge + tip);
 
   const paid = primary.paymentStatus === "PAID";
   // QR: a UPI "scan to pay" link when configured & unpaid, else the bill page.
@@ -88,6 +90,8 @@ export async function GET(
       state: entry.restaurant.state,
       phone: entry.restaurant.phone,
       gstNumber: config.gstNumber,
+      // Only print the legal name when it was actually verified against the GSTN.
+      gstLegalName: config.gstVerified ? config.gstLegalName : null,
       fssaiNumber: entry.restaurant.fssaiNumber,
       logoUrl: entry.restaurant.logoUrl,
     },
@@ -104,6 +108,7 @@ export async function GET(
     token: orders.map((o) => o.orderNumber).join(", "),
     items,
     subtotal,
+    serviceCharge,
     taxAmount,
     total,
     discount,

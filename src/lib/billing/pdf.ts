@@ -1,6 +1,7 @@
 import "server-only";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
+import { isSafeWebhookUrl } from "@/lib/integrations/webhooks";
 
 export type BillPdfData = {
   restaurant: {
@@ -10,6 +11,7 @@ export type BillPdfData = {
     state: string | null;
     phone: string | null;
     gstNumber: string | null;
+    gstLegalName: string | null; // GSTN-registered legal name (shown with GSTIN on the tax invoice)
     fssaiNumber: string | null;
     logoUrl: string | null;
   };
@@ -25,6 +27,7 @@ export type BillPdfData = {
   taxAmount: number;
   total: number;
   discount: number;
+  serviceCharge: number;
   couponCode: string | null;
   tip: number;
   payable: number;
@@ -67,9 +70,11 @@ export async function generateBillPdf(data: BillPdfData): Promise<Buffer> {
 
   // Best-effort fetch of the restaurant logo (pdfkit supports PNG/JPEG only).
   let logo: Buffer | null = null;
-  if (data.restaurant.logoUrl) {
+  // Only fetch a tenant-supplied logo URL if it passes the SSRF allow-list
+  // (blocks loopback / private / link-local / cloud-metadata hosts).
+  if (data.restaurant.logoUrl && isSafeWebhookUrl(data.restaurant.logoUrl)) {
     try {
-      const res = await fetch(data.restaurant.logoUrl);
+      const res = await fetch(data.restaurant.logoUrl, { redirect: "error" });
       const ct = res.headers.get("content-type") ?? "";
       if (res.ok && /(png|jpe?g)/i.test(ct)) {
         logo = Buffer.from(await res.arrayBuffer());
@@ -157,6 +162,13 @@ export async function generateBillPdf(data: BillPdfData): Promise<Buffer> {
       data.restaurant.phone ? `Ph: ${data.restaurant.phone}` : null,
     ].filter(Boolean) as string[];
     for (const a of addr) center(a, 6.5, "Helvetica", 0);
+    // GST law expects the registered legal name printed with the GSTIN. Skip it
+    // when it's identical to the display name above to avoid a redundant line.
+    if (
+      data.restaurant.gstLegalName &&
+      data.restaurant.gstLegalName !== data.restaurant.name
+    )
+      center(data.restaurant.gstLegalName, 6.5, "Helvetica", 0);
     if (data.restaurant.gstNumber) center(`GST: ${data.restaurant.gstNumber}`, 6.5, "Helvetica", 0);
     if (data.restaurant.fssaiNumber) center(`FSSAI Lic: ${data.restaurant.fssaiNumber}`, 6.5, "Helvetica", 0);
     y += 2;
@@ -219,6 +231,7 @@ export async function generateBillPdf(data: BillPdfData): Promise<Buffer> {
     }
     if (data.discount > 0)
       lr(data.couponCode ? `Discount (${data.couponCode})` : "Discount", "- " + money(data.discount));
+    if (data.serviceCharge > 0) lr("Service charge", money(data.serviceCharge));
     if (data.tip > 0) lr("Tip", money(data.tip));
     rule();
     lr("GRAND TOTAL", "Rs. " + money(data.payable), 11, "Helvetica-Bold");

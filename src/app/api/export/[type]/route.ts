@@ -67,14 +67,15 @@ export async function GET(
     const items = await prisma.menuItem.findMany({
       where: { restaurantId: rid },
       include: { category: true },
-      orderBy: { name: "asc" },
+      orderBy: [{ categoryId: "asc" }, { sortOrder: "asc" }],
     });
     csv = toCsv(
-      ["Name", "Category", "Price", "Veg", "Available", "Special", "Track stock", "Stock"],
+      ["Name", "Category", "Price", "Description", "Veg", "Available", "Special", "Track stock", "Stock"],
       items.map((i) => [
         i.name,
         i.category?.name,
         toNumber(i.price),
+        i.description,
         i.isVeg ? "Yes" : "No",
         i.isAvailable ? "Yes" : "No",
         i.isSpecialOfDay ? "Yes" : "No",
