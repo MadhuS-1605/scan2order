@@ -42,6 +42,9 @@ export default function Error({
         >
           Try again
         </button>
+        {/* Intentional full-page navigation: a hard load fully discards the
+            errored React tree rather than soft-navigating within it. */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a
           href="/menu"
           className="rounded-lg border border-sand-300 px-5 py-2.5 text-sm font-medium text-ink/70 transition-colors hover:bg-sand-100"
