@@ -450,6 +450,8 @@ model AdminUser {
   email        String?     @unique
   username     String?
   passwordHash String
+  // Google OAuth subject id, set when an owner links/signs in with Google.
+  googleId     String?     @unique
   name         String
   role         AdminRole   @default(OWNER)
   isSuperAdmin Boolean     @default(false)

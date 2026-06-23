@@ -2,9 +2,28 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
+import { env } from "@/lib/env";
+import { Alert } from "@/components/ui";
 import { SigninForm } from "./form";
 
-export default async function SigninPage() {
+// Map OAuth callback error codes (?error=…) to friendly messages.
+const OAUTH_ERRORS: Record<string, string> = {
+  google_unavailable: "Google sign-in isn't available right now. Use email & password.",
+  google_state: "That sign-in attempt expired. Please try again.",
+  google_failed: "Couldn't complete Google sign-in. Please try again.",
+  google_unverified: "Your Google account email isn't verified.",
+  google_superadmin: "Admin accounts must sign in with email & password.",
+  disabled: "This account has been disabled.",
+  signups_disabled: "New sign-ups are temporarily disabled.",
+};
+
+export default async function SigninPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+  const errorMessage = error ? (OAUTH_ERRORS[error] ?? null) : null;
   const session = await getSession();
   if (session) {
     // Validate against the DB before redirecting — a cookie can outlive its user
@@ -29,8 +48,13 @@ export default async function SigninPage() {
       <p className="mt-1.5 text-sm text-ink/55">
         Sign in to your restaurant dashboard.
       </p>
+      {errorMessage && (
+        <div className="mt-4">
+          <Alert>{errorMessage}</Alert>
+        </div>
+      )}
       <div className="mt-6">
-        <SigninForm />
+        <SigninForm googleEnabled={env.google.configured()} />
       </div>
       <p className="mt-6 text-center text-sm text-ink/55">
         New here?{" "}

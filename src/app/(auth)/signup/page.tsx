@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { redirect } from "next/navigation";
+import { env } from "@/lib/env";
 import { SignupForm } from "./form";
 
 export default async function SignupPage() {
@@ -16,7 +17,7 @@ export default async function SignupPage() {
         Create an owner account to get started.
       </p>
       <div className="mt-6">
-        <SignupForm />
+        <SignupForm googleEnabled={env.google.configured()} />
       </div>
       <p className="mt-6 text-center text-sm text-ink/55">
         Already have an account?{" "}

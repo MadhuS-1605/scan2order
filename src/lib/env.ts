@@ -19,6 +19,16 @@ export const env = {
   // Mirrors the value the subdomain proxy + QR builder read.
   platformDomain: process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan.to",
 
+  // Google OAuth (owner "Continue with Google"). Optional — when unset, the
+  // button is hidden and the routes return early. The redirect URI registered in
+  // the Google console must be `${NEXT_PUBLIC_APP_URL}/api/auth/google/callback`.
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID ?? "",
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+    configured: () =>
+      Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+  },
+
   // Cloudflare DNS automation. When configured, each tenant gets an explicit
   // (proxied) CNAME created in the zone instead of relying on a wildcard record.
   // See src/lib/cloudflare.ts.

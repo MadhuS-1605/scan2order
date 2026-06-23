@@ -4,9 +4,10 @@ import { useActionState, useState } from "react";
 import { signinAction, verifyAdminOtpAction, sendAdminEmailOtpAction } from "@/lib/auth/actions";
 import { Button, Input, Field, Alert } from "@/components/ui";
 import { PasswordInput } from "@/components/password-input";
+import { GoogleButton, AuthDivider } from "@/components/google-button";
 import type { ActionState } from "@/lib/validation";
 
-export function SigninForm() {
+export function SigninForm({ googleEnabled = false }: { googleEnabled?: boolean }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(signinAction, {});
   const [otpState, otpAction, otpPending] = useActionState<ActionState, FormData>(
     verifyAdminOtpAction,
@@ -56,9 +57,16 @@ export function SigninForm() {
   }
 
   return (
-    <form action={action} className="space-y-4">
-      {state.error && <Alert>{state.error}</Alert>}
-      <Field label="Email" htmlFor="email">
+    <div>
+      {googleEnabled && (
+        <>
+          <GoogleButton />
+          <AuthDivider />
+        </>
+      )}
+      <form action={action} className="space-y-4">
+        {state.error && <Alert>{state.error}</Alert>}
+        <Field label="Email" htmlFor="email">
         <Input
           id="email"
           name="email"
@@ -75,6 +83,7 @@ export function SigninForm() {
       <Button type="submit" size="lg" className="w-full" disabled={pending}>
         {pending ? "Signing in…" : "Sign in"}
       </Button>
-    </form>
+      </form>
+    </div>
   );
 }
