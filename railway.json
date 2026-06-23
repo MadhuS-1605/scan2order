@@ -7,7 +7,7 @@
   "deploy": {
     "preDeployCommand": "node scripts/safe-db-sync.mjs && node scripts/ensure-superadmin.mjs",
     "startCommand": "npm run start",
-    "healthcheckPath": "/",
+    "healthcheckPath": "/api/health",
     "healthcheckTimeout": 120,
     "numReplicas": 1,
     "restartPolicyType": "ALWAYS"

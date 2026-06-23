@@ -20,9 +20,11 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  // Boots the app for the test run; reuses an already-running dev server locally.
+  // Boots the app for the test run. Locally: reuse the running dev server. In CI:
+  // serve the production build (matches what ships, and avoids dev on-demand
+  // compile flakiness). The CI workflow runs `npm run build` before the suite.
   webServer: {
-    command: "npm run dev",
+    command: process.env.CI ? "npm run start" : "npm run dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

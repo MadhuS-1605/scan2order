@@ -23,3 +23,56 @@ jobs:
         run: npx eslint .
       - name: Unit tests
         run: npm test
+      # Catch deploy-breaking build errors (e.g. build-time DB queries, bad
+      # framework usage) BEFORE they reach Railway. db.ts only checks DATABASE_URL
+      # is present at import, so a dummy value is enough — the build never connects.
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://user:pass@localhost:5432/build?schema=public
+          AUTH_SECRET: ci-build-secret-not-used-at-runtime-0123456789
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scan_to_order
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/scan_to_order?schema=public
+      AUTH_SECRET: ci-e2e-secret-at-least-32-characters-long-xyz
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      MESSAGING_PROVIDER: console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      # The production build the e2e suite serves (playwright.config boots
+      # `npm run start` in CI; global-setup pushes the schema + seeds the DB).
+      - name: Build
+        run: npm run build
+      - name: E2E (critical paths — auth, diner, payment, refund, isolation)
+        run: npm run test:e2e
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
