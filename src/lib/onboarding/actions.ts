@@ -62,7 +62,8 @@ export async function saveProfileAction(
   });
   if (subTaken) return { error: "That username is already taken." };
 
-  const selfService = data.serviceModel === "SELF_SERVICE";
+  // Fast food (QSR) is self-serve by definition, regardless of the toggle.
+  const selfService = data.serviceModel === "SELF_SERVICE" || data.type === "QSR";
   // Self-service venues have no tables — guests order at a single QR, prepay,
   // and pick up by number. Force the matching service behaviour; the owner can
   // still tweak payment methods/GST in Settings.
@@ -111,7 +112,7 @@ export async function saveProfileAction(
   // on the onboarding "Features" step and in Settings.
   const t = data.type;
   const featureDefaults = {
-    featureReservations: t !== "CLOUD_KITCHEN",
+    featureReservations: t !== "CLOUD_KITCHEN" && t !== "QSR",
     featureRooms: t === "HOTEL",
     featureBanquets: t === "HOTEL",
     featureBar: t === "BAR",

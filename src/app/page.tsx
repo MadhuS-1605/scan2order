@@ -11,6 +11,8 @@ import { resolvePlans } from "@/lib/plan-settings";
 import { formatMoney } from "@/lib/utils";
 import { Check } from "lucide-react";
 
+const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan2order.co.in";
+
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
@@ -107,10 +109,13 @@ export default async function Home() {
           </p>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {plans.map((p) => (
-              <div
+              <Link
                 key={p.tier}
-                className={`flex flex-col rounded-2xl border bg-surface p-6 ${
-                  p.highlight ? "border-brand-400 ring-1 ring-brand-200" : "border-sand-200"
+                href="/signup"
+                className={`group flex cursor-pointer flex-col rounded-2xl border bg-surface p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
+                  p.highlight
+                    ? "border-brand-400 ring-1 ring-brand-200 hover:ring-brand-300"
+                    : "border-sand-200 hover:border-brand-300"
                 }`}
               >
                 <div className="flex items-center justify-between">
@@ -134,37 +139,35 @@ export default async function Home() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/signup"
+                <span
                   className={`mt-5 rounded-lg py-2 text-center text-sm font-medium transition-colors ${
                     p.highlight
-                      ? "bg-brand-600 text-white hover:bg-brand-700"
-                      : "border border-sand-300 text-ink hover:bg-sand-100"
+                      ? "bg-brand-600 text-white group-hover:bg-brand-700"
+                      : "border border-sand-300 text-ink group-hover:border-brand-300 group-hover:bg-brand-50"
                   }`}
                 >
                   Get started
-                </Link>
-              </div>
+                </span>
+              </Link>
             ))}
           </div>
 
-          {/* Demo */}
+          {/* Demo — by request (we don't publish credentials) */}
           <div className="mt-8 flex flex-col items-center justify-between gap-3 rounded-2xl border border-dashed border-sand-300 bg-surface px-6 py-5 text-center sm:flex-row sm:text-left">
             <div>
-              <p className="font-medium text-ink">Want a look first? Try the live demo.</p>
+              <p className="font-medium text-ink">Want a look first?</p>
               <p className="text-sm text-ink/55">
-                Sign in with{" "}
-                <span className="font-medium text-ink">demo@scan.to</span> /{" "}
-                <span className="font-medium text-ink">password123</span>
+                Book a guided walkthrough — we&apos;ll show you the live product on a
+                quick call, or start your 14-day free trial right away.
               </p>
             </div>
-            <Link
-              href="/signin"
-              className="inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-surface px-5 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
+            <a
+              href={`mailto:sales@${PLATFORM_DOMAIN}?subject=${encodeURIComponent("Scan to Order — demo request")}`}
+              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-brand-300 bg-surface px-5 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
             >
-              Open the demo
+              Request a demo
               <ArrowRight className="h-4 w-4" />
-            </Link>
+            </a>
           </div>
         </div>
       </section>

@@ -57,10 +57,15 @@ export function ProfileStep({ restaurant }: { restaurant: RestaurantLike }) {
             id="type"
             name="type"
             defaultValue={restaurant?.type ?? "RESTAURANT"}
+            onChange={(e) => {
+              // Fast food is self-serve by nature — preselect the matching model.
+              if (e.target.value === "QSR") setServiceModel("SELF_SERVICE");
+            }}
           >
             <option value="RESTAURANT">Restaurant</option>
             <option value="CAFE">Café</option>
-            <option value="HOTEL">Hotel</option>
+            <option value="HOTEL">Hotel (Rooms &amp; Dine)</option>
+            <option value="QSR">Fast Food (Self-Serve Restaurant)</option>
             <option value="CLOUD_KITCHEN">Cloud kitchen</option>
             <option value="BAR">Bar</option>
           </Select>
