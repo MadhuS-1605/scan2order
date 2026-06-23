@@ -9,6 +9,15 @@ import Redis from "ioredis";
 
 const url = process.env.REDIS_URL;
 
+// Per-instance fallback is fine for a single replica, but on a multi-instance /
+// serverless prod deploy it silently weakens rate limiting and breaks cross-node
+// realtime. Warn loudly (once, at module load) so it's caught before scaling.
+if (!url && process.env.NODE_ENV === "production") {
+  console.warn(
+    "[redis] REDIS_URL is not set — rate limiting and realtime use per-instance memory. Set REDIS_URL before running more than one replica.",
+  );
+}
+
 const g = globalThis as unknown as {
   __sto_redis?: Redis | null;
   __sto_redis_sub?: Redis | null;

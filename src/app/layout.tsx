@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/sw-register";
+import { Analytics } from "@/components/analytics";
 
 const fraunces = Fraunces({
   subsets: ["latin"],
@@ -82,6 +83,7 @@ export default function RootLayout({
       <body>
         {children}
         <ServiceWorkerRegister />
+        <Analytics />
       </body>
     </html>
   );
