@@ -11,6 +11,8 @@ import { resolvePlans } from "@/lib/plan-settings";
 import { formatMoney } from "@/lib/utils";
 import { Check } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const plans = await resolvePlans();
   return (
