@@ -5,7 +5,7 @@
     "buildCommand": "npm run build"
   },
   "deploy": {
-    "preDeployCommand": "npx prisma db push && node scripts/ensure-superadmin.mjs",
+    "preDeployCommand": "node scripts/safe-db-sync.mjs && node scripts/ensure-superadmin.mjs",
     "startCommand": "npm run start",
     "healthcheckPath": "/",
     "healthcheckTimeout": 120,
