@@ -130,7 +130,7 @@ export function NavLinks({
             {links.map((l) => {
               const active = l.exact
                 ? pathname === l.href
-                : pathname.startsWith(l.href);
+                : pathname === l.href || pathname.startsWith(`${l.href}/`);
               return (
                 <Link
                   key={l.href}

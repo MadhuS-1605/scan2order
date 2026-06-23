@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/platform/actions";
 import { signoutAction } from "@/lib/auth/actions";
 import { platformCan, type PlatformCapability } from "@/lib/platform/roles";
+import { SuperAdminNav } from "./nav";
 
 const NAV: { href: string; label: string; cap?: PlatformCapability }[] = [
   { href: "/superadmin", label: "Console" },
@@ -27,27 +28,20 @@ export default async function SuperAdminLayout({
   children: React.ReactNode;
 }) {
   const session = await requireSuperAdmin();
+  const navItems = NAV.filter(
+    (n) => !n.cap || platformCan(session.platformRole, n.cap),
+  ).map(({ href, label }) => ({ href, label }));
   return (
     <div className="min-h-screen bg-grain">
-      <header className="border-b border-sand-200 bg-surface">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-3">
-          <div className="flex items-center gap-4">
-            <p className="font-display text-lg text-ink">
+      <header className="sticky top-0 z-30 border-b border-sand-200 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3">
+          <div className="flex items-center gap-3">
+            <p className="hidden shrink-0 font-display text-lg text-ink sm:block">
               Scan to Order <span className="text-ink/40">· Platform</span>
             </p>
-            <nav className="flex flex-wrap items-center gap-1">
-              {NAV.filter((n) => !n.cap || platformCan(session.platformRole, n.cap)).map((n) => (
-                <Link
-                  key={n.href}
-                  href={n.href}
-                  className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-ink/65 hover:bg-sand-100 hover:text-ink"
-                >
-                  {n.label}
-                </Link>
-              ))}
-            </nav>
+            <SuperAdminNav items={navItems} />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <span className="hidden rounded bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-600 sm:inline">
               Super admin
             </span>
