@@ -11,10 +11,18 @@ let cache: { at: number; map: Map<string, { price: number; trialDays: number }> 
 
 async function load(): Promise<Map<string, { price: number; trialDays: number }>> {
   if (cache && Date.now() - cache.at < TTL_MS) return cache.map;
-  const rows = await prisma.planSetting.findMany();
-  const map = new Map(rows.map((r) => [r.tier, { price: r.price, trialDays: r.trialDays }]));
-  cache = { at: Date.now(), map };
-  return map;
+  try {
+    const rows = await prisma.planSetting.findMany();
+    const map = new Map(rows.map((r) => [r.tier, { price: r.price, trialDays: r.trialDays }]));
+    cache = { at: Date.now(), map };
+    return map;
+  } catch {
+    // The DB is unreachable or the table isn't migrated yet (e.g. a deploy where
+    // pre-deploy `db push` hasn't run). Fall back to the code-defined plan
+    // defaults so the public landing page / healthcheck never hard-fails —
+    // every caller already falls back per-tier to plans.ts for missing tiers.
+    return new Map();
+  }
 }
 
 export const DEFAULT_TRIAL_DAYS = 14;

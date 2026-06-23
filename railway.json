@@ -5,6 +5,7 @@
     "buildCommand": "npm run build"
   },
   "deploy": {
+    "preDeployCommand": "npx prisma db push --skip-generate --accept-data-loss",
     "startCommand": "npm run start",
     "healthcheckPath": "/",
     "healthcheckTimeout": 120,
