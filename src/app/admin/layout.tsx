@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, LogOut } from "lucide-react";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { subscriptionState } from "@/lib/subscription";
 import { getSession } from "@/lib/auth/session";
@@ -133,7 +133,7 @@ export default async function AdminLayout({
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <LocaleSwitcher current={locale} />
             {config.featureAttendance && (
               <ClockWidget
@@ -172,9 +172,11 @@ export default async function AdminLayout({
             <form action={signoutAction}>
               <button
                 type="submit"
-                className="rounded-lg border border-sand-300 px-3 py-1.5 text-sm text-ink/70 transition-colors hover:border-brand-300 hover:bg-sand-100"
+                aria-label="Sign out"
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-sand-300 p-2 text-sm text-ink/70 transition-colors hover:border-brand-300 hover:bg-sand-100 sm:px-3 sm:py-1.5"
               >
-                Sign out
+                <LogOut className="h-4 w-4 sm:hidden" />
+                <span className="hidden sm:inline">Sign out</span>
               </button>
             </form>
           </div>
