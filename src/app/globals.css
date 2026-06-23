@@ -48,6 +48,31 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Eye-comfort defaults for staff who stare at admin/KDS screens for long shifts:
+   keep the OS in light mode, tint form controls to the warm brand, and give a
+   clear (but soft) keyboard-focus ring. The warm palette already avoids harsh
+   pure-white glare. */
+:root {
+  color-scheme: light;
+  accent-color: var(--color-brand-600);
+}
+:focus-visible {
+  outline: 2px solid var(--color-brand-400);
+  outline-offset: 2px;
+}
+/* Respect users who get fatigued/distracted by motion — neutralise transitions
+   and animations rather than flashing tickets across a busy kitchen screen. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Display serif helper with tighter tracking for headlines */
 .font-display {
   font-family: var(--font-serif);

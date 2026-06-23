@@ -55,7 +55,18 @@ export default async function Home() {
             </div>
           </div>
 
-          <MenuPreview />
+          <div className="relative">
+            {/* Soft food-photo accent behind the phone mock (decorative). */}
+            <div
+              className="absolute -right-4 -top-10 -z-10 hidden h-64 w-64 rounded-3xl bg-cover bg-center opacity-80 shadow-xl lg:block"
+              style={{
+                backgroundImage:
+                  "url(https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=700&q=80&auto=format&fit=crop)",
+              }}
+              aria-hidden="true"
+            />
+            <MenuPreview />
+          </div>
         </div>
       </section>
 
@@ -84,15 +95,30 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* For whom */}
+      {/* For whom — visual cards for each hospitality segment */}
       <section className="mx-auto max-w-6xl px-6 py-14">
-        <div className="grid gap-10 md:grid-cols-3">
+        <h2 className="font-display text-3xl text-ink">Built for every venue</h2>
+        <p className="mt-2 max-w-md text-sm text-ink/55">
+          One platform that adapts to how your guests dine — fine dining, a busy
+          café counter, or in-room hotel service.
+        </p>
+        <div className="mt-8 grid gap-5 md:grid-cols-3">
           {AUDIENCES.map((a) => (
-            <div key={a.title} className="border-t-2 border-ink pt-4">
-              <h3 className="font-display text-xl text-ink">{a.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-ink/65">
-                {a.body}
-              </p>
+            <div
+              key={a.title}
+              className="group relative aspect-[4/5] overflow-hidden rounded-2xl bg-brand-800"
+            >
+              <div
+                className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                style={{ backgroundImage: `url(${a.img})` }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/40 to-ink/5" />
+              <div className="absolute inset-x-0 bottom-0 p-5">
+                <h3 className="font-display text-2xl text-white">{a.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-white/85">
+                  {a.body}
+                </p>
+              </div>
             </div>
           ))}
         </div>
@@ -273,16 +299,19 @@ const STEPS = [
 
 const AUDIENCES = [
   {
-    title: "Restaurants",
-    body: "Onboard in minutes — menu, tables, QR codes, GST and payment rules, all in one place.",
+    title: "Restaurants & bars",
+    body: "Per-table QR ordering, a live floor, KOT printing and one consolidated bill.",
+    img: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=900&q=80&auto=format&fit=crop",
   },
   {
-    title: "Diners",
-    body: "No app to install. Scan, order, track the kitchen, and pay however suits them.",
+    title: "Cafés & QSR",
+    body: "One counter QR, pay-first, pick up by number — fast self-service for busy footfall.",
+    img: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=900&q=80&auto=format&fit=crop",
   },
   {
-    title: "The kitchen",
-    body: "A clean, live ticket board with one-tap status — and a customer-facing pickup screen.",
+    title: "Hotels",
+    body: "In-room dining charged to the room folio, plus banquets and multi-property management.",
+    img: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=900&q=80&auto=format&fit=crop",
   },
 ];
 
