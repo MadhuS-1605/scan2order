@@ -17,6 +17,7 @@ import { currentUsage } from "@/lib/usage";
 import { getOutstandingOverage } from "@/lib/billing/overage";
 import { downgradeToFreeAction } from "@/lib/billing/subscription-actions";
 import { formatMoney, toNumber } from "@/lib/utils";
+import { PlanDetailsDisclosure } from "@/components/plan-details";
 import { PlanCheckout } from "./plan-checkout";
 import { AutoRenew } from "./auto-renew";
 import { OverageSettle } from "./overage-settle";
@@ -187,7 +188,7 @@ export default async function BillingPage() {
                 {isFree ? t(d, "billing.free") : formatMoney(p.price)}
                 {!isFree && <span className="text-sm text-ink/45"> {t(d, "billing.perMo")}</span>}
               </p>
-              <ul className="mt-4 flex-1 space-y-1.5">
+              <ul className="mt-4 space-y-1.5">
                 {p.features.map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm text-ink/70">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-olive-600" />
@@ -195,7 +196,8 @@ export default async function BillingPage() {
                   </li>
                 ))}
               </ul>
-              <div className="mt-5">
+              <PlanDetailsDisclosure details={p.details} />
+              <div className="mt-auto pt-5">
                 {isCurrent ? (
                   isFree ? (
                     <div className="rounded-lg bg-sand-100 py-2 text-center text-sm font-medium text-ink/60">

@@ -41,9 +41,13 @@ const nextConfig: NextConfig = {
     // If Checkout ever errors on load, the first thing to try is adding
     // 'unsafe-eval' to script-src; to fully roll back, change the header key
     // below to "Content-Security-Policy-Report-Only".
+    // Dev only: React + Turbopack use eval() in development for fast refresh and
+    // callstack reconstruction, so 'unsafe-eval' is required locally. Production
+    // React never uses eval(), so the prod policy stays strict (no eval).
+    const devEval = process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://*.razorpay.com https://www.googletagmanager.com",
+      `script-src 'self' 'unsafe-inline'${devEval} https://*.razorpay.com https://www.googletagmanager.com`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data: https://*.razorpay.com",

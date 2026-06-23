@@ -5,11 +5,12 @@ import {
   ChefHat,
   ReceiptText,
   ArrowRight,
+  Check,
 } from "lucide-react";
 import { VegMark } from "@/components/ui";
+import { PlanDetailsDisclosure } from "@/components/plan-details";
 import { resolvePlans } from "@/lib/plan-settings";
 import { formatMoney } from "@/lib/utils";
-import { Check } from "lucide-react";
 
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan2order.co.in";
 
@@ -133,50 +134,84 @@ export default async function Home() {
           <p className="mt-2 text-center text-sm text-ink/55">
             Start free. Upgrade when you&apos;re ready.
           </p>
-          <div className="mt-8 grid gap-4 md:grid-cols-3">
-            {plans.map((p) => (
-              <Link
-                key={p.tier}
-                href="/signup"
-                className={`group flex cursor-pointer flex-col rounded-2xl border bg-surface p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
-                  p.highlight
-                    ? "border-brand-400 ring-1 ring-brand-200 hover:ring-brand-300"
-                    : "border-sand-200 hover:border-brand-300"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-xl text-ink">{p.name}</h3>
-                  {p.highlight && (
-                    <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-600">
-                      Popular
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-sm text-ink/55">{p.tagline}</p>
-                <p className="mt-3 font-display text-3xl text-ink">
-                  {p.price === 0 ? "Free" : formatMoney(p.price)}
-                  {p.price > 0 && <span className="text-sm text-ink/45"> /mo</span>}
-                </p>
-                <ul className="mt-4 flex-1 space-y-1.5">
-                  {p.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-ink/70">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-olive-600" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <span
-                  className={`mt-5 rounded-lg py-2 text-center text-sm font-medium transition-colors ${
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {plans.map((p) => {
+              const isContact = Boolean(p.contactOnly);
+              return (
+                <div
+                  key={p.tier}
+                  className={`flex flex-col rounded-2xl border bg-surface p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
                     p.highlight
-                      ? "bg-brand-600 text-white group-hover:bg-brand-700"
-                      : "border border-sand-300 text-ink group-hover:border-brand-300 group-hover:bg-brand-50"
+                      ? "border-brand-400 ring-1 ring-brand-200"
+                      : "border-sand-200 hover:border-brand-300"
                   }`}
                 >
-                  Get started
-                </span>
-              </Link>
-            ))}
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-display text-xl text-ink">{p.name}</h3>
+                    {p.highlight && (
+                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-600">
+                        Popular
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm text-ink/55">{p.tagline}</p>
+                  <p className="mt-3 font-display text-3xl text-ink">
+                    {isContact ? "Custom" : p.price === 0 ? "Free" : formatMoney(p.price)}
+                    {!isContact && p.price > 0 && (
+                      <span className="text-sm text-ink/45"> /mo</span>
+                    )}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink/40">
+                    {isContact
+                      ? "Tailored to your group"
+                      : p.price > 0
+                        ? "+ 18% GST · 14-day free trial"
+                        : "Free forever · no card needed"}
+                  </p>
+                  <ul className="mt-4 space-y-1.5">
+                    {p.features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-sm text-ink/70">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-olive-600" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <PlanDetailsDisclosure details={p.details} />
+                  <div className="mt-auto pt-5">
+                    {isContact ? (
+                      <a
+                        href={`mailto:sales@${PLATFORM_DOMAIN}?subject=${encodeURIComponent("Scan to Order — Enterprise enquiry")}`}
+                        className="block rounded-lg border border-sand-300 py-2 text-center text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50"
+                      >
+                        Contact sales
+                      </a>
+                    ) : (
+                      <Link
+                        href="/signup"
+                        className={`block rounded-lg py-2 text-center text-sm font-medium transition-colors ${
+                          p.highlight
+                            ? "bg-brand-600 text-white hover:bg-brand-700"
+                            : "border border-sand-300 text-ink hover:border-brand-300 hover:bg-brand-50"
+                        }`}
+                      >
+                        Get started
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+
+          <p className="mt-5 text-center text-xs leading-relaxed text-ink/45">
+            Prices exclude 18% GST. Online payments run through your own Razorpay
+            account (Razorpay&apos;s ~2% gateway fee applies). Extra WhatsApp &amp;
+            email beyond your plan are billed per message — bills sent inside a
+            guest&apos;s 24-hour WhatsApp window are free.{" "}
+            <span className="text-ink/55">
+              &ldquo;Powered by Scan to Order&rdquo; stays on every plan.
+            </span>
+          </p>
 
           {/* Demo — by request (we don't publish credentials) */}
           <div className="mt-8 flex flex-col items-center justify-between gap-3 rounded-2xl border border-dashed border-sand-300 bg-surface px-6 py-5 text-center sm:flex-row sm:text-left">

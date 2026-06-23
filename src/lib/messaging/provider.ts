@@ -122,6 +122,75 @@ export async function sendWhatsAppTemplate(
   }
 }
 
+// Send a free-form WhatsApp text (NOT a template). Meta only delivers this
+// inside an open 24-hour customer service window (the recipient messaged the
+// business in the last 24h); outside it Meta rejects with error 131047/470 and
+// the caller must fall back to a paid template. A session message is FREE, so
+// bills sent this way carry no per-message charge. For Twilio/console this is
+// just the normal free-form send.
+export async function sendWhatsAppFreeform(
+  to: string,
+  body: string,
+  fromOverride?: string | null,
+): Promise<SendResult> {
+  if (!(await flagEnabled("whatsapp_enabled"))) return { ok: false, error: "WhatsApp sending is disabled." };
+  if (!isMeta()) return sendWhatsApp(to, body, fromOverride);
+  const m = env.messaging.meta;
+  try {
+    const res = await fetch(
+      `https://graph.facebook.com/${m.apiVersion}/${m.phoneNumberId}/messages`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${m.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          messaging_product: "whatsapp",
+          to: to.replace(/[^\d]/g, ""),
+          type: "text",
+          text: { body, preview_url: true },
+        }),
+      },
+    );
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      return { ok: false, error: `WhatsApp session send failed (${res.status})${txt ? `: ${txt.slice(0, 160)}` : ""}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Send failed" };
+  }
+}
+
+// Low-cost SMS fallback for OTP delivery, used only when the primary WhatsApp
+// send fails (e.g. the recipient isn't on WhatsApp). Sends our own `code` via
+// 2Factor.in's transactional SMS route (cheapest for India). Logs to the
+// console (mocked) when no fallback provider is configured.
+export async function sendOtpSms(to: string, code: string): Promise<SendResult> {
+  const fb = env.messaging.smsFallback;
+  const phone = to.replace(/[^\d]/g, "");
+  if (fb.provider === "twofactor" && fb.twoFactorApiKey) {
+    try {
+      // 2Factor "SMS" endpoint injects our code into an approved template:
+      // /API/V1/{key}/SMS/{phone}/{otp}[/{template}]
+      const tmpl = fb.twoFactorTemplate ? `/${encodeURIComponent(fb.twoFactorTemplate)}` : "";
+      const res = await fetch(
+        `https://2factor.in/API/V1/${fb.twoFactorApiKey}/SMS/${phone}/${encodeURIComponent(code)}${tmpl}`,
+      );
+      const j = (await res.json().catch(() => null)) as { Status?: string; Details?: string } | null;
+      if (!res.ok || j?.Status !== "Success") {
+        return { ok: false, error: `SMS failed${j?.Details ? `: ${j.Details}` : ` (${res.status})`}` };
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : "SMS send failed" };
+    }
+  }
+  console.log(`\n[SMS fallback → ${to}] code ${code}\n`);
+  return { ok: true, mocked: true };
+}
+
 export async function sendSms(to: string, body: string): Promise<SendResult> {
   if (!isTwilio() || !env.messaging.twilioSmsFrom) {
     console.log(`\n[SMS → ${to}]\n${body}\n`);

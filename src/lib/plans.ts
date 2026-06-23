@@ -101,17 +101,41 @@ export const OVERAGE_RATE: Record<UsageChannel, number> = {
   email: 0.1,
 };
 
+// Expanded plan copy shown behind a "Show more" toggle on the pricing cards.
+// Keeps the at-a-glance `features` list short while giving tenants the full
+// picture before they commit.
+export type PlanDetails = {
+  blurb: string; // 1–2 sentences: who it's for / what you get
+  included: string[]; // plain-English explanation of what's included
+  usageCosts: string[]; // additional usage-based costs that can apply
+};
+
 export type Plan = {
   tier: PlanTier;
   name: string;
   price: number; // ₹ / month (0 on Free; ignored when contactOnly)
   tagline: string;
   features: string[];
+  details: PlanDetails;
   limits: PlanLimits;
   allowance: UsageAllowance; // monthly included WhatsApp/email sends
   highlight?: boolean;
   contactOnly?: boolean; // Enterprise — custom pricing, contact sales (no self-serve checkout)
 };
+
+// Per-message overage prices as display strings (built from OVERAGE_RATE so the
+// pricing copy and the billing engine never drift). GST is added on top.
+const WA_RATE = `₹${OVERAGE_RATE.whatsapp.toFixed(2)}`;
+const EMAIL_RATE = `₹${OVERAGE_RATE.email.toFixed(2)}`;
+
+// Usage-cost lines shared by the paid metered tiers.
+const METERED_USAGE_COSTS = [
+  `Extra WhatsApp messages beyond your monthly allowance: ${WA_RATE} each.`,
+  `Extra emails beyond your monthly allowance: ${EMAIL_RATE} each.`,
+  "Bills sent while a guest's 24-hour WhatsApp window is open are free and don't use your allowance.",
+  "Razorpay's own gateway fee (~2% + GST) on guest payments is billed by Razorpay to your account — not by us.",
+  "All usage charges are added to your next invoice, plus 18% GST.",
+];
 
 // India SaaS GST. Displayed and charged on top of the listed price.
 export const GST_RATE = 0.18;
@@ -134,6 +158,19 @@ export const PLANS: Plan[] = [
     ],
     limits: { maxTables: 10, maxMenuItems: 50, onlinePayments: false },
     allowance: { whatsapp: 0, email: 50 },
+    details: {
+      blurb:
+        "Everything you need to take QR orders and run the kitchen — at no cost. Ideal for trying Scan to Order or running a small outlet.",
+      included: [
+        "QR menu & ordering for up to 10 tables with a live kitchen screen.",
+        "Guests pay at the counter (online card/UPI payments need Starter).",
+        "Up to 50 bill emails a month; WhatsApp bills & OTP aren't included.",
+        '"Powered by Scan to Order" appears on your guest menu and bills.',
+      ],
+      usageCosts: [
+        `Extra bill emails beyond 50/month: ${EMAIL_RATE} each + 18% GST.`,
+      ],
+    },
   },
   {
     tier: "STARTER",
@@ -154,6 +191,18 @@ export const PLANS: Plan[] = [
     ],
     limits: { maxTables: null, maxMenuItems: null, onlinePayments: true },
     allowance: { whatsapp: 1000, email: 2000 },
+    details: {
+      blurb:
+        "For a busy single restaurant or café that takes online payments and reaches guests on WhatsApp.",
+      included: [
+        "Unlimited tables and menu items.",
+        "Online payments through your own Razorpay account (card/UPI).",
+        "WhatsApp login OTP and bills, coupons, happy-hour, loyalty, reservations, analytics, CSV export and refunds.",
+        "1,000 WhatsApp messages and 2,000 emails included every month.",
+        '"Powered by Scan to Order" stays on guest-facing pages.',
+      ],
+      usageCosts: METERED_USAGE_COSTS,
+    },
   },
   {
     tier: "PRO",
@@ -172,6 +221,18 @@ export const PLANS: Plan[] = [
     ],
     limits: { maxTables: null, maxMenuItems: null, onlinePayments: true },
     allowance: { whatsapp: 5000, email: 10000 },
+    details: {
+      blurb:
+        "Full-service venues, bars and hotels that need rooms, KOT printing, inventory and staff tools.",
+      included: [
+        "Everything in Starter.",
+        "Hotel rooms & banquets, bar KDS, and KOT thermal printing.",
+        "Inventory & stock, staff attendance, and an audit log.",
+        "5,000 WhatsApp messages and 10,000 emails included every month.",
+        "Priority email support.",
+      ],
+      usageCosts: METERED_USAGE_COSTS,
+    },
   },
   {
     tier: "ENTERPRISE",
@@ -190,6 +251,19 @@ export const PLANS: Plan[] = [
     ],
     limits: { maxTables: null, maxMenuItems: null, onlinePayments: true },
     allowance: { whatsapp: null, email: null },
+    details: {
+      blurb:
+        "Chains and groups that need multi-property management, integrations, SSO and custom limits.",
+      included: [
+        "Everything in Pro.",
+        "Multi-property console, integrations & webhooks, and SSO.",
+        "Unlimited WhatsApp messages and emails.",
+        "Custom limits, an SLA, and dedicated support.",
+      ],
+      usageCosts: [
+        "Custom pricing — usage is bundled to your volume. Talk to us.",
+      ],
+    },
   },
 ];
 

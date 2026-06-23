@@ -176,6 +176,23 @@ export const env = {
       // Dunning (trial-ending / lapsed). Body params: {{1}} venue, {{2}} message,
       // {{3}} billing URL.
       dunningTemplate: process.env.META_WHATSAPP_DUNNING_TEMPLATE ?? "",
+      // Inbound webhook (src/app/api/webhook/whatsapp). The verify token is the
+      // string you set in the Meta webhook config; the app secret is used to
+      // validate the X-Hub-Signature-256 of inbound payloads. Inbound messages
+      // open a 24h customer service window, during which bills can be sent as
+      // free-form session messages for free (no utility-template charge).
+      webhookVerifyToken: process.env.META_WHATSAPP_VERIFY_TOKEN ?? "",
+      appSecret: process.env.META_APP_SECRET ?? "",
+    },
+    // Low-cost SMS fallback for OTP delivery when the primary WhatsApp send
+    // fails (e.g. the number isn't on WhatsApp). 2Factor.in is the cheapest
+    // route for India (~₹0.15/OTP) and sends our own code via an approved
+    // template. provider="none" disables the fallback (default).
+    smsFallback: {
+      provider: (process.env.SMS_FALLBACK_PROVIDER ?? "none") as "none" | "twofactor",
+      twoFactorApiKey: process.env.TWOFACTOR_API_KEY ?? "",
+      // Optional approved DLT template name registered in the 2Factor dashboard.
+      twoFactorTemplate: process.env.TWOFACTOR_TEMPLATE ?? "",
     },
   },
 } as const;

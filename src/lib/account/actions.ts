@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { createOtp, verifyOtp } from "@/lib/messaging/otp";
-import { sendWhatsApp, sendWhatsAppTemplate } from "@/lib/messaging/provider";
+import { sendWhatsApp, sendWhatsAppTemplate, sendOtpSms } from "@/lib/messaging/provider";
 import { env } from "@/lib/env";
 import {
   createCustomerSession,
@@ -31,7 +31,13 @@ export async function requestLoginOtpAction(args: {
           phone,
           `Your Scan to Order login code is ${code}. It expires in 5 minutes.`,
         );
-  if (!res.ok) return { ok: false, error: res.error ?? "Could not send code." };
+  if (!res.ok) {
+    // WhatsApp didn't go through (often the number isn't on WhatsApp) — try the
+    // low-cost SMS fallback before giving up.
+    const sms = await sendOtpSms(phone, code);
+    if (sms.ok) return { ok: true, mocked: sms.mocked };
+    return { ok: false, error: res.error ?? "Could not send code." };
+  }
   return { ok: true, mocked: res.mocked };
 }
 

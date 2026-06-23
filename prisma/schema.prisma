@@ -731,6 +731,11 @@ model Customer {
   phone         String   @unique
   name          String?
   loyaltyPoints Int      @default(0)
+  // When the diner's 24h WhatsApp customer-service window closes (set from the
+  // inbound webhook whenever they message the business). While open, bills can
+  // be delivered as free-form session messages for free — see
+  // src/lib/billing/actions.ts (verifyBillOtpAction).
+  whatsappWindowUntil DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

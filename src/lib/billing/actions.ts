@@ -12,7 +12,13 @@ import {
   fetchRazorpayPayment,
 } from "@/lib/payments/razorpay";
 import { createOtp, verifyOtp } from "@/lib/messaging/otp";
-import { sendWhatsApp, sendEmail, sendWhatsAppTemplate } from "@/lib/messaging/provider";
+import {
+  sendWhatsApp,
+  sendEmail,
+  sendWhatsAppTemplate,
+  sendWhatsAppFreeform,
+  sendOtpSms,
+} from "@/lib/messaging/provider";
 import { recordUsage } from "@/lib/usage";
 import { flagEnabled } from "@/lib/platform/flags";
 import { rateLimit } from "@/lib/ratelimit";
@@ -593,7 +599,13 @@ export async function requestBillOtpAction(args: {
           `Your verification code for the ${order.restaurant.name} bill is ${code}. It expires in 5 minutes.`,
           order.restaurant.config!.whatsappFrom,
         );
-  if (!res.ok) return { ok: false, error: res.error ?? "Could not send code." };
+  if (!res.ok) {
+    // Fall back to low-cost SMS when WhatsApp can't deliver the code.
+    const sms = await sendOtpSms(phone, code);
+    if (!sms.ok) return { ok: false, error: res.error ?? "Could not send code." };
+    await recordUsage(order.restaurantId, "whatsapp");
+    return { ok: true, mocked: sms.mocked };
+  }
   await recordUsage(order.restaurantId, "whatsapp");
   return { ok: true, mocked: res.mocked };
 }
@@ -632,22 +644,41 @@ export async function verifyBillOtpAction(args: {
   const link = `${env.appUrl.replace(/\/$/, "")}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
   const cur = order.restaurant.config!.currency;
   const total = toNumber(order.totalAmount).toFixed(2);
-  // Meta template body vars: {{1}} restaurant, {{2}} total, {{3}} bill link.
-  const send =
-    env.messaging.provider === "meta"
-      ? await sendWhatsAppTemplate(phone, env.messaging.meta.billTemplate, [
-          order.restaurant.name,
-          `${cur} ${total}`,
-          link,
-        ])
-      : await sendWhatsApp(
-          phone,
-          `Here's your bill from ${order.restaurant.name} (#${order.orderNumber}). ` +
-            `Total: ${cur} ${total}.\nDownload: ${link}`,
-          order.restaurant.config!.whatsappFrom,
-        );
+  const freeText =
+    `Here's your bill from ${order.restaurant.name} (#${order.orderNumber}). ` +
+    `Total: ${cur} ${total}.\nDownload: ${link}`;
+
+  // Prefer a free-form session message when the diner has an open 24h WhatsApp
+  // window (Meta only): that's free, so we send it that way and don't meter it.
+  // Otherwise (window closed, or Twilio) use the paid utility template / SMS.
+  const windowOpen =
+    !!customer.whatsappWindowUntil && customer.whatsappWindowUntil > new Date();
+  let send: { ok: boolean; error?: string; mocked?: boolean };
+  let billable = true;
+  if (env.messaging.provider === "meta" && windowOpen) {
+    send = await sendWhatsAppFreeform(phone, freeText);
+    if (send.ok) {
+      billable = false; // free inside the service window
+    } else {
+      // Window unexpectedly unusable — fall back to the paid template.
+      // Template body vars: {{1}} restaurant, {{2}} total, {{3}} bill link.
+      send = await sendWhatsAppTemplate(phone, env.messaging.meta.billTemplate, [
+        order.restaurant.name,
+        `${cur} ${total}`,
+        link,
+      ]);
+    }
+  } else if (env.messaging.provider === "meta") {
+    send = await sendWhatsAppTemplate(phone, env.messaging.meta.billTemplate, [
+      order.restaurant.name,
+      `${cur} ${total}`,
+      link,
+    ]);
+  } else {
+    send = await sendWhatsApp(phone, freeText, order.restaurant.config!.whatsappFrom);
+  }
   if (!send.ok) return { ok: false, error: send.error ?? "Could not send bill." };
-  await recordUsage(order.restaurantId, "whatsapp");
+  if (billable) await recordUsage(order.restaurantId, "whatsapp");
   return { ok: true, mocked: send.mocked };
 }
 
