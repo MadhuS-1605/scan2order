@@ -771,10 +771,11 @@ Payment & messaging**, overriding the platform env.
   (`src/lib/ratelimit.ts`) then use Redis pub/sub + counters so they stay correct
   across instances; unset, they use per-instance in-memory state (fine for a
   single instance). Both fall back gracefully on a Redis error.
-- **Scheduled jobs:** point your scheduler (Vercel Cron, GitHub Actions, etc.) at
+- **Scheduled jobs:** point your scheduler (Railway Cron, GitHub Actions, etc.) at
   the `/api/cron/*` endpoints (`sweep`, `dunning`, `daily-summary`, `ops-digest`,
-  `backfill-subdomains`) with an `Authorization: Bearer $CRON_SECRET` header. The
-  secret is **never** accepted via query string.
+  `backfill-subdomains`, and `reset-demo` — nightly rebuild of the public demo
+  tenant) with an `Authorization: Bearer $CRON_SECRET` header. The secret is
+  **never** accepted via query string.
 - **Server-only packages** (`pdfkit`, `pg`, `@prisma/adapter-pg`, `razorpay`,
   `twilio`, `web-push`, `ioredis`) are declared in `serverExternalPackages`; keep
   that in sync if you add native/server deps.
