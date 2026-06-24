@@ -29,7 +29,6 @@ const nextConfig: NextConfig = {
     "@prisma/adapter-pg",
     "pg",
     "razorpay",
-    "twilio",
     "web-push",
     "ioredis",
   ],

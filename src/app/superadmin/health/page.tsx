@@ -33,9 +33,7 @@ export default async function PlatformHealthPage() {
   const whatsappReady =
     provider === "meta"
       ? Boolean(env.messaging.meta.token && env.messaging.meta.phoneNumberId)
-      : provider === "twilio"
-        ? Boolean(env.messaging.twilioAccountSid && env.messaging.twilioAuthToken)
-        : false;
+      : false;
   const services: { label: string; ok: boolean; note?: string }[] = [
     { label: "Razorpay (platform)", ok: env.razorpay.configured() },
     { label: "Razorpay webhook", ok: Boolean(env.razorpay.webhookSecret) },

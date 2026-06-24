@@ -34,7 +34,7 @@ last migration. Before a tracked deploy:
 - `.env` is git-ignored (good). For production set a **high-entropy random**
   `AUTH_SECRET` (the dev value is a readable phrase — fine for local, not prod).
 - `DATABASE_URL` and `AUTH_SECRET` are required (the app throws at startup if
-  missing — good). Razorpay (`RAZORPAY_KEY_*`) and messaging (`TWILIO_*`/WhatsApp)
+  missing — good). Razorpay (`RAZORPAY_KEY_*`) and messaging (`META_WHATSAPP_*`)
   are **optional and fail silently at use-time** if only partially configured —
   set both halves or leave both unset. Regenerate VAPID keys per environment.
 
@@ -64,7 +64,7 @@ last migration. Before a tracked deploy:
 3. **Variables:** `DATABASE_URL=${{Postgres.DATABASE_URL}}`, a strong
    `AUTH_SECRET` (`openssl rand -base64 32`, then leave it fixed),
    `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_PLATFORM_DOMAIN`, plus optional
-   Razorpay/Twilio/VAPID. **`NEXT_PUBLIC_*` are inlined at build time** — set them
+   Razorpay/WhatsApp/VAPID. **`NEXT_PUBLIC_*` are inlined at build time** — set them
    before building, then redeploy once the domain exists.
 4. **Push the schema** (no migration history — uses `db push`):
    `railway run npm run db:deploy` (runs `prisma db push` with the service's

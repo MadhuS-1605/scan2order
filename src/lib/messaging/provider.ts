@@ -2,20 +2,11 @@ import "server-only";
 import { env } from "@/lib/env";
 import { flagEnabled } from "@/lib/platform/flags";
 
-// Messaging abstraction. Uses Twilio when configured, otherwise logs to the
-// server console so the flow is fully testable without credentials.
+// Messaging abstraction. WhatsApp goes through Meta's Cloud API (templates +
+// in-window free-form); SMS OTP fallback uses 2Factor. Anything unconfigured
+// logs to the server console so the flow is fully testable without credentials.
 
 type SendResult = { ok: boolean; error?: string; mocked?: boolean };
-
-async function twilioClient() {
-  const { default: twilio } = await import("twilio");
-  return twilio(env.messaging.twilioAccountSid, env.messaging.twilioAuthToken);
-}
-
-const isTwilio = () =>
-  env.messaging.provider === "twilio" &&
-  env.messaging.twilioAccountSid &&
-  env.messaging.twilioAuthToken;
 
 // Transactional email via Resend's REST API (no SDK dependency). Logs to the
 // console when no key is set, so the flow works in dev without credentials.
@@ -45,28 +36,17 @@ export async function sendEmail(
   }
 }
 
+// Free-form WhatsApp text. Meta business-initiated sends require a template
+// (sendWhatsAppTemplate); in-window free-form is handled by sendWhatsAppFreeform.
+// With no non-Meta provider, this logs to the console (dev / unconfigured).
 export async function sendWhatsApp(
   to: string,
   body: string,
-  fromOverride?: string | null,
+  _fromOverride?: string | null,
 ): Promise<SendResult> {
   if (!(await flagEnabled("whatsapp_enabled"))) return { ok: false, error: "WhatsApp sending is disabled." };
-  const from = fromOverride || env.messaging.twilioWhatsappFrom;
-  if (!isTwilio() || !from) {
-    console.log(`\n[WhatsApp → ${to}]\n${body}\n`);
-    return { ok: true, mocked: true };
-  }
-  try {
-    const client = await twilioClient();
-    await client.messages.create({
-      from: from.startsWith("whatsapp:") ? from : `whatsapp:${from}`,
-      to: to.startsWith("whatsapp:") ? to : `whatsapp:${to}`,
-      body,
-    });
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Send failed" };
-  }
+  console.log(`\n[WhatsApp → ${to}]\n${body}\n`);
+  return { ok: true, mocked: true };
 }
 
 const isMeta = () =>
@@ -126,8 +106,8 @@ export async function sendWhatsAppTemplate(
 // inside an open 24-hour customer service window (the recipient messaged the
 // business in the last 24h); outside it Meta rejects with error 131047/470 and
 // the caller must fall back to a paid template. A session message is FREE, so
-// bills sent this way carry no per-message charge. For Twilio/console this is
-// just the normal free-form send.
+// bills sent this way carry no per-message charge. Without Meta this is a no-op
+// console log.
 export async function sendWhatsAppFreeform(
   to: string,
   body: string,
@@ -191,20 +171,9 @@ export async function sendOtpSms(to: string, code: string): Promise<SendResult> 
   return { ok: true, mocked: true };
 }
 
+// Generic SMS. The only wired SMS path is the OTP fallback via 2Factor
+// (sendOtpSms); this generic sender logs to the console (dev / unconfigured).
 export async function sendSms(to: string, body: string): Promise<SendResult> {
-  if (!isTwilio() || !env.messaging.twilioSmsFrom) {
-    console.log(`\n[SMS → ${to}]\n${body}\n`);
-    return { ok: true, mocked: true };
-  }
-  try {
-    const client = await twilioClient();
-    await client.messages.create({
-      from: env.messaging.twilioSmsFrom,
-      to,
-      body,
-    });
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Send failed" };
-  }
+  console.log(`\n[SMS → ${to}]\n${body}\n`);
+  return { ok: true, mocked: true };
 }

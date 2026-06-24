@@ -17,7 +17,7 @@ attributed and audited.
 
 Built with **Next.js 16** (App Router, Turbopack), **PostgreSQL + Prisma 7**
 (driver adapter), **Tailwind v4**, **Razorpay** (online payments + subscriptions),
-**Meta WhatsApp Cloud API / Twilio** (WhatsApp & SMS OTP), **Resend** (email),
+**Meta WhatsApp Cloud API** (WhatsApp) + **2Factor** (SMS OTP fallback), **Resend** (email),
 **Cloudflare R2** (image/CDN storage) + **Cloudflare DNS** (per-venue subdomain
 automation), **Web Push (VAPID)**, optional **Redis** (scale-out realtime + rate
 limiting), and a **Vitest** suite. The platform is multi-tenant end-to-end: a
@@ -285,7 +285,7 @@ flowchart TD
 ### Bills
 - 80mm thermal-style **PDF** via `pdfkit` (`/api/bill/[orderId]/pdf`) with GST
   break-up, discount, tip, and the UPI QR.
-- **WhatsApp bill delivery** gated by phone + OTP (Twilio, or console-logged in
+- **WhatsApp bill delivery** gated by phone + OTP (Meta WhatsApp Cloud API, or console-logged in
   dev).
 
 ### Multi-language menu
@@ -472,7 +472,7 @@ The app ships a hardened baseline (full audit + remediation in
 | Auth | `jose` JWT session cookie + `bcryptjs`; 2FA via email OTP + dependency-free TOTP (RFC 6238) |
 | Crypto | `node:crypto` — AES-256-GCM secret encryption, constant-time HMAC, CSPRNG tokens |
 | Payments | Razorpay (orders, webhooks, subscriptions/eMandate); UPI deep links |
-| Messaging | **Meta WhatsApp Cloud API** / Twilio (WhatsApp + SMS OTP); console fallback |
+| Messaging | **Meta WhatsApp Cloud API** (WhatsApp) + **2Factor** (SMS OTP fallback); console fallback |
 | Email | **Resend** |
 | Storage / CDN | **Cloudflare R2** (S3-compatible via `aws4fetch`) for images |
 | DNS | **Cloudflare DNS** — per-venue subdomain automation |
@@ -504,7 +504,7 @@ Prisma 7 connects through a **driver adapter** rather than a datasource URL:
   calls `process.loadEnvFile()` (Prisma 7 config files do **not** auto-load
   `.env`).
 - `serverExternalPackages` in `next.config.ts` keeps `@prisma/adapter-pg`, `pg`,
-  `pdfkit`, `razorpay`, `twilio`, `web-push` and `ioredis` out of the Turbopack
+  `pdfkit`, `razorpay`, `web-push` and `ioredis` out of the Turbopack
   bundle.
 
 ---
@@ -521,7 +521,7 @@ Prisma 7 connects through a **driver adapter** rather than a datasource URL:
 ```bash
 cp .env.example .env
 ```
-Set at least `DATABASE_URL` and `AUTH_SECRET`. Without Razorpay/Twilio/VAPID, the
+Set at least `DATABASE_URL` and `AUTH_SECRET`. Without Razorpay/WhatsApp/VAPID, the
 app runs in a fully testable **dev/console mode**: online payments are mocked,
 OTP/WhatsApp messages are printed to the server console, and push is a no-op.
 
@@ -648,7 +648,7 @@ src/
     attendance/              clock-in/out + manager mark (geofenced)
     redis.ts  ratelimit.ts   optional Redis client + sliding-window rate limiter
     upi.ts                   UPI deep-link builder
-    messaging/               OTP + WhatsApp/SMS provider (Twilio | console)
+    messaging/               OTP + WhatsApp/SMS provider (Meta | 2Factor | console)
     print/                   KOT ESC/POS + print action
     realtime/                SSE event bus (in-memory, or Redis pub/sub when REDIS_URL set)
     integrations/            catalog, actions, outbound webhooks
@@ -725,11 +725,11 @@ yet (they need a throwaway test database).
 | `RAZORPAY_KEY_ID` | Payments | Platform-level Razorpay key id (fallback when a restaurant has no own keys) | No |
 | `RAZORPAY_KEY_SECRET` | Payments | Platform-level Razorpay key secret | No |
 | `NEXT_PUBLIC_RAZORPAY_KEY_ID` | Payments | Razorpay key id exposed to the browser checkout (same as `RAZORPAY_KEY_ID`) | No |
-| `MESSAGING_PROVIDER` | Messaging | `twilio` for real delivery, `console` to log codes/messages in dev. Defaults to `console` | No |
-| `TWILIO_ACCOUNT_SID` | Messaging | Twilio account SID | Only if `twilio` |
-| `TWILIO_AUTH_TOKEN` | Messaging | Twilio auth token | Only if `twilio` |
-| `TWILIO_WHATSAPP_FROM` | Messaging | Twilio WhatsApp sender, e.g. `whatsapp:+14155238886` | For WhatsApp |
-| `TWILIO_SMS_FROM` | Messaging | Twilio SMS sender for OTP | For SMS OTP |
+| `MESSAGING_PROVIDER` | Messaging | `meta` (WhatsApp Cloud API) for real delivery, `console` to log codes/messages in dev. Defaults to `console` | No |
+| `META_WHATSAPP_TOKEN` / `META_WHATSAPP_PHONE_ID` | Messaging | Meta WhatsApp Cloud API token + sender phone-number id | Only if `meta` |
+| `META_WHATSAPP_*_TEMPLATE` | Messaging | Names of pre-approved templates (OTP, bill, overage, dunning) | For business-initiated WA |
+| `META_WHATSAPP_VERIFY_TOKEN` / `META_APP_SECRET` | Messaging | Inbound WhatsApp webhook verify token + app secret (24h free-window) | For the WA webhook |
+| `SMS_FALLBACK_PROVIDER` / `TWOFACTOR_API_KEY` | Messaging | SMS OTP fallback via 2Factor (`twofactor` to enable) | Optional |
 | `VAPID_PUBLIC_KEY` | Web Push | VAPID public key (server) | Only for push |
 | `VAPID_PRIVATE_KEY` | Web Push | VAPID private key (server) | Only for push |
 | `VAPID_SUBJECT` | Web Push | VAPID subject, e.g. `mailto:you@example.com` | Only for push |
@@ -777,11 +777,11 @@ Payment & messaging**, overriding the platform env.
   tenant) with an `Authorization: Bearer $CRON_SECRET` header. The secret is
   **never** accepted via query string.
 - **Server-only packages** (`pdfkit`, `pg`, `@prisma/adapter-pg`, `razorpay`,
-  `twilio`, `web-push`, `ioredis`) are declared in `serverExternalPackages`; keep
+  `web-push`, `ioredis`) are declared in `serverExternalPackages`; keep
   that in sync if you add native/server deps.
 - **Secrets:** `.env` is git-ignored; set a high-entropy random `AUTH_SECRET` in
   production (the dev value is a readable phrase). `DATABASE_URL`/`AUTH_SECRET` are
-  required and throw at startup if missing; Razorpay/Twilio are optional and fail
+  required and throw at startup if missing; Razorpay/WhatsApp are optional and fail
   at use-time if only half-configured.
 - **Secure context:** PWA install, push, and the diner geofence prompt require
   HTTPS in production (localhost is exempt in dev).

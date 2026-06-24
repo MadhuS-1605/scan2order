@@ -5,7 +5,7 @@ browser surfaces — the **diner** ordering app, the **admin** dashboard, and th
 **kitchen/monitor** screens — plus a cross-tenant **super-admin** console. It is
 backed by a single PostgreSQL database accessed through Prisma 7's `pg` driver
 adapter. Live updates are pushed with Server-Sent Events from an in-process event
-bus; external calls go to Razorpay (online payments), Twilio (WhatsApp/SMS OTP),
+bus; external calls go to Razorpay (online payments), Meta WhatsApp / 2Factor SMS (OTP),
 Web Push endpoints, and any configured outbound webhook.
 
 ---
@@ -36,7 +36,7 @@ flowchart TB
     subgraph External["External services"]
         RZP["Razorpay"]
         UPI["UPI apps<br/>(upi://pay QR)"]
-        Twilio["Twilio<br/>WhatsApp / SMS OTP"]
+        WA["Meta WhatsApp / 2Factor SMS"]
         Push["Web Push (VAPID)"]
         Hook["Tenant webhook endpoint"]
     end
@@ -56,7 +56,7 @@ flowchart TB
 
     Actions --> RZP
     BillPDF --> UPI
-    Actions --> Twilio
+    Actions --> WA
     Actions --> Push
     Bus -- order.created/updated --> Hook
     Diner --> BillPDF
@@ -78,7 +78,7 @@ flowchart TB
    configured **outbound webhook** (best-effort, SSRF-guarded).
 5. Payments call Razorpay (order create + signature verify); the 80mm **PDF bill**
    (`/api/bill/[orderId]/pdf`) embeds a `upi://pay` QR. WhatsApp bills and OTP go
-   through Twilio (or the console in dev). Push notifications go to subscribed
+   through Meta WhatsApp (or the console in dev). Push notifications go to subscribed
    devices via VAPID.
 
 ---

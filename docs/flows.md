@@ -122,7 +122,7 @@ flowchart TB
     Admin --> App
     App --> DB[(PostgreSQL)]
     App --> RZP[Razorpay]
-    App --> WA[WhatsApp · Twilio/Meta]
+    App --> WA[WhatsApp · Meta Cloud API]
     App --> Mail[Email · Resend]
     App --> R2[(Cloudflare R2<br/>images/CDN)]
     App --> CF[Cloudflare DNS<br/>per-venue subdomain]

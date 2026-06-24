@@ -152,14 +152,9 @@ export const env = {
   messaging: {
     provider: (process.env.MESSAGING_PROVIDER ?? "console") as
       | "console"
-      | "twilio"
       | "meta",
-    twilioAccountSid: process.env.TWILIO_ACCOUNT_SID ?? "",
-    twilioAuthToken: process.env.TWILIO_AUTH_TOKEN ?? "",
-    twilioWhatsappFrom: process.env.TWILIO_WHATSAPP_FROM ?? "",
-    twilioSmsFrom: process.env.TWILIO_SMS_FROM ?? "",
-    // Meta WhatsApp Cloud API (free Twilio alternative). Business-initiated
-    // messages (OTP, bills) require pre-approved templates — set their names.
+    // Meta WhatsApp Cloud API. Business-initiated messages (OTP, bills) require
+    // pre-approved templates — set their names.
     meta: {
       token: process.env.META_WHATSAPP_TOKEN ?? "",
       phoneNumberId: process.env.META_WHATSAPP_PHONE_ID ?? "",
@@ -168,7 +163,7 @@ export const env = {
       otpTemplate: process.env.META_WHATSAPP_OTP_TEMPLATE ?? "",
       billTemplate: process.env.META_WHATSAPP_BILL_TEMPLATE ?? "",
       // Owner billing notices (see src/lib/billing/overage-notify.ts). Leave
-      // blank to fall back to free-form (Twilio/console only).
+      // blank to fall back to a free-form/console send.
       // Alert body params: {{1}} venue, {{2}} usage summary, {{3}} billing URL.
       overageAlertTemplate: process.env.META_WHATSAPP_OVERAGE_ALERT_TEMPLATE ?? "",
       // Paid body params: {{1}} venue, {{2}} amount, {{3}} billing URL.

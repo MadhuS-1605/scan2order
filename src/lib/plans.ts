@@ -93,7 +93,7 @@ export type UsageChannel = "whatsapp" | "email";
 export type UsageAllowance = Record<UsageChannel, number | null>;
 
 // Overage price per unit beyond the monthly allowance, in ₹ (pre-GST). These
-// carry margin over the upstream cost (Meta/Twilio per-message, Resend
+// carry margin over the upstream cost (Meta per-message, Resend
 // per-email); GST is added at billing time like the plan price. Tune here — the
 // metering + billing read these, so it's the single source of truth.
 export const OVERAGE_RATE: Record<UsageChannel, number> = {

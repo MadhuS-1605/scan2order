@@ -590,7 +590,7 @@ export async function requestBillOtpAction(args: {
     return { ok: false, error: e instanceof Error ? e.message : "Could not send code." };
   }
   // Meta Cloud API needs a pre-approved template (body var {{1}} = the code);
-  // Twilio/console use free-form text.
+  // console mode just logs the free-form text.
   const res =
     env.messaging.provider === "meta"
       ? await sendWhatsAppTemplate(phone, env.messaging.meta.otpTemplate, [code])
@@ -650,7 +650,7 @@ export async function verifyBillOtpAction(args: {
 
   // Prefer a free-form session message when the diner has an open 24h WhatsApp
   // window (Meta only): that's free, so we send it that way and don't meter it.
-  // Otherwise (window closed, or Twilio) use the paid utility template / SMS.
+  // Otherwise (window closed) use the paid utility template / SMS fallback.
   const windowOpen =
     !!customer.whatsappWindowUntil && customer.whatsappWindowUntil > new Date();
   let send: { ok: boolean; error?: string; mocked?: boolean };

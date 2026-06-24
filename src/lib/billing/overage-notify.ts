@@ -15,8 +15,8 @@ import type { UsageChannel } from "@/lib/plans";
 //
 // WhatsApp: on the Meta provider, business-initiated messages require a
 // pre-approved template, so we use one when configured (env.messaging.meta
-// .overage*Template); otherwise we fall back to the free-form sender, which
-// delivers on Twilio/console.
+// .overage*Template); otherwise we fall back to the free-form sender (console
+// when unconfigured).
 
 const CHANNEL_LABEL: Record<UsageChannel, string> = {
   whatsapp: "WhatsApp messages",

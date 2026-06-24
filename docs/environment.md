@@ -47,11 +47,10 @@ Pick a provider with `MESSAGING_PROVIDER`. `console` (default) just logs — fin
 
 | Key | Req | What / how to get it |
 |---|---|---|
-| `MESSAGING_PROVIDER` | ⚪ | `console` \| `twilio` \| `meta`. Default `console`. |
-| `TWILIO_ACCOUNT_SID` | 🟡* | Twilio console (console.twilio.com) → Account Info. *If provider=twilio. |
-| `TWILIO_AUTH_TOKEN` | 🟡* | Twilio console → Auth Token. |
-| `TWILIO_WHATSAPP_FROM` | 🟡* | Your Twilio WhatsApp sender, e.g. `whatsapp:+14155238886`. |
-| `TWILIO_SMS_FROM` | ⚪ | Twilio SMS-capable number. |
+| `MESSAGING_PROVIDER` | ⚪ | `console` \| `meta`. Default `console`. |
+| `SMS_FALLBACK_PROVIDER` | ⚪ | `none` \| `twofactor`. SMS OTP fallback when WhatsApp can't deliver. |
+| `TWOFACTOR_API_KEY` | 🟡* | 2Factor.in dashboard → API key. *If `SMS_FALLBACK_PROVIDER=twofactor`. |
+| `TWOFACTOR_TEMPLATE` | ⚪ | Optional approved 2Factor SMS template name. |
 | `META_WHATSAPP_TOKEN` | 🟡* | Meta WhatsApp Cloud API token. developers.facebook.com → your app → WhatsApp → API Setup. *If provider=meta. |
 | `META_WHATSAPP_PHONE_ID` | 🟡* | Phone number ID from the same WhatsApp API Setup page. |
 | `META_WHATSAPP_API_VERSION` | ⚪ | Graph API version, default `v21.0`. |
