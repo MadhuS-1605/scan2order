@@ -170,10 +170,3 @@ export async function sendOtpSms(to: string, code: string): Promise<SendResult> 
   console.log(`\n[SMS fallback → ${to}] code ${code}\n`);
   return { ok: true, mocked: true };
 }
-
-// Generic SMS. The only wired SMS path is the OTP fallback via 2Factor
-// (sendOtpSms); this generic sender logs to the console (dev / unconfigured).
-export async function sendSms(to: string, body: string): Promise<SendResult> {
-  console.log(`\n[SMS → ${to}]\n${body}\n`);
-  return { ok: true, mocked: true };
-}
