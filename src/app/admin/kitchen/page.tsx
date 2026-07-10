@@ -9,6 +9,7 @@ import { setOrderStatusAction } from "@/lib/orders/actions";
 import { KITCHEN_STATUSES } from "@/lib/orders/status";
 import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { PrintButton } from "./print-button";
+import { StatusActionButton } from "./status-action-button";
 
 const COLUMNS: {
   status: "CONFIRMED" | "PREPARING" | "READY";
@@ -23,8 +24,8 @@ const COLUMNS: {
     titleKey: "kitchen.colNew",
     next: "PREPARING",
     actionKey: "kitchen.startPreparing",
-    accent: "border-l-blue-400",
-    dot: "bg-blue-400",
+    accent: "border-l-brand-300",
+    dot: "bg-brand-300",
   },
   {
     status: "PREPARING",
@@ -125,7 +126,7 @@ export default async function KitchenScreen() {
               {col.orders.map((o) => (
                 <div
                   key={o.id}
-                  className={`rounded-xl border border-sand-200 border-l-4 bg-surface p-4 ${col.accent}`}
+                  className={`animate-ticket-in rounded-xl border border-sand-200 border-l-4 bg-surface p-4 ${col.accent}`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -172,12 +173,7 @@ export default async function KitchenScreen() {
                   <form action={setOrderStatusAction} className="mt-3">
                     <input type="hidden" name="orderId" value={o.id} />
                     <input type="hidden" name="status" value={col.next} />
-                    <button
-                      type="submit"
-                      className="w-full rounded-lg bg-brand-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-700 active:translate-y-px"
-                    >
-                      {t(d, col.actionKey)}
-                    </button>
+                    <StatusActionButton label={t(d, col.actionKey)} />
                   </form>
 
                   {col.status === "CONFIRMED" && (
