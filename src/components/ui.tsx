@@ -1,5 +1,12 @@
 import { cn } from "@/lib/utils";
 
+// This is the UI kit for the product itself (admin/kitchen/billing/superadmin
+// — every dense, functional screen). src/components/ui/* (shadcn) is scoped
+// to the marketing site, where its compound primitives (Card/Badge/etc. with
+// Radix-grade accessibility) earn their keep. Deliberately not merging the
+// two: migrating the whole product surface for its own sake isn't worth the
+// risk against a kit that's already themed, proven, and used everywhere.
+
 export function Button({
   className,
   variant = "primary",
@@ -130,10 +137,10 @@ export function Alert({
 
 const badgeStyles: Record<string, string> = {
   PLACED: "bg-sand-200 text-ink/70",
-  CONFIRMED: "bg-blue-100 text-blue-800",
+  CONFIRMED: "bg-brand-50 text-brand-700",
   PREPARING: "bg-brand-100 text-brand-800",
   READY: "bg-olive-500/15 text-olive-600",
-  SERVED: "bg-teal-100 text-teal-800",
+  SERVED: "bg-olive-700/15 text-olive-700",
   COMPLETED: "bg-sand-200 text-ink/55",
   CANCELLED: "bg-red-100 text-red-800",
 };

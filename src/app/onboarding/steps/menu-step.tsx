@@ -7,7 +7,7 @@ import {
   deleteMenuItemAction,
   gotoStepAction,
 } from "@/lib/onboarding/actions";
-import { Button, Input, Textarea, Select, Field, Alert, Card } from "@/components/ui";
+import { Button, Input, Textarea, Select, Field, Alert, Card, VegMark } from "@/components/ui";
 import { ImageUpload } from "@/components/admin/image-upload";
 import { formatMoney } from "@/lib/utils";
 import type { ActionState } from "@/lib/validation";
@@ -61,20 +61,7 @@ export function MenuStep({
                 className="flex items-center justify-between py-3"
               >
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`mt-0.5 inline-block h-3 w-3 rounded-sm border ${
-                      item.isVeg
-                        ? "border-green-600"
-                        : "border-red-600"
-                    }`}
-                    title={item.isVeg ? "Veg" : "Non-veg"}
-                  >
-                    <span
-                      className={`block h-full w-full scale-50 rounded-full ${
-                        item.isVeg ? "bg-green-600" : "bg-red-600"
-                      }`}
-                    />
-                  </span>
+                  <VegMark isVeg={item.isVeg} />
                   <div>
                     <p className="text-sm font-medium text-ink">
                       {item.name}

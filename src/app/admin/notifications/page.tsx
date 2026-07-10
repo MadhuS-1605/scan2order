@@ -22,7 +22,7 @@ const ICON: Record<Notif["kind"], typeof ShoppingBag> = {
   banquet: PartyPopper,
 };
 const TINT: Record<Notif["kind"], string> = {
-  order: "bg-blue-100 text-blue-600",
+  order: "bg-sand-200 text-ink/70",
   service: "bg-brand-100 text-brand-600",
   stock: "bg-red-100 text-red-600",
   reservation: "bg-olive-500/15 text-olive-700",

@@ -213,7 +213,7 @@ const DICTS: Record<Locale, Dict> = {
 };
 
 export function dictFor(locale: string | undefined): Dict {
-  return DICTS[(locale as Locale)] ?? en;
+  return DICTS[(locale as Locale)] ?? DICTS.en;
 }
 
 // Translate a key; falls back to the key's text after "nav." etc. so untranslated

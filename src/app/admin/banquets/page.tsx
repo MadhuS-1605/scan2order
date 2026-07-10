@@ -16,7 +16,7 @@ import { NewBanquetForm, AddPreorderItem } from "./banquets-manager";
 
 const STATUS_STYLES: Record<string, string> = {
   ENQUIRY: "bg-amber-100 text-amber-700",
-  CONFIRMED: "bg-blue-100 text-blue-700",
+  CONFIRMED: "bg-brand-50 text-brand-700",
   COMPLETED: "bg-olive-500/15 text-olive-700",
   CANCELLED: "bg-red-100 text-red-600",
 };

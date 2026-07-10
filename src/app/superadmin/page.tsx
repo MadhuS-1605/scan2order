@@ -124,6 +124,7 @@ export default async function SuperAdminPage({
 
   return (
     <div className="space-y-6">
+      <h1 className="font-display text-2xl font-medium text-ink">Console</h1>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {stat("Restaurants", String(totalCount), `${ordersTotal} orders all-time`, Building2)}
         {stat("Platform GMV", formatMoney(totalGmv), "diner sales, all-time", IndianRupee)}
