@@ -80,6 +80,35 @@ export default async function PaymentPage({
     primary.paymentMethod === "ROOM" && primary.paymentStatus === "PENDING";
   const multiRound = orders.length > 1;
 
+  // Split-by-person: group every item across the session by who it belongs
+  // to (a manual splitLabel override, else the parent order's customerName,
+  // else "Order #N"), then scale each group's raw item subtotal by the same
+  // payable/subtotal ratio so it picks up its proportional share of tax,
+  // service charge, discount and tip. The last group absorbs the rounding
+  // residual so shares always sum exactly to `payable`.
+  const groupSubtotals = new Map<string, number>();
+  const splitItems: { id: string; label: string; nameSnapshot: string; lineTotal: number }[] = [];
+  for (const o of orders) {
+    for (const it of o.items) {
+      const label = it.splitLabel || o.customerName || `Order #${o.orderNumber}`;
+      const lineTotal = toNumber(it.lineTotal);
+      groupSubtotals.set(label, (groupSubtotals.get(label) ?? 0) + lineTotal);
+      splitItems.push({ id: it.id, label, nameSnapshot: it.nameSnapshot, lineTotal: r2(lineTotal) });
+    }
+  }
+  const splitLabels = [...groupSubtotals.keys()];
+  const scaleRatio = subtotal > 0 ? payable / subtotal : 0;
+  const shares = splitLabels.map((label) => r2(groupSubtotals.get(label)! * scaleRatio));
+  if (shares.length > 0) {
+    const sumAllButLast = shares.slice(0, -1).reduce((s, v) => s + v, 0);
+    shares[shares.length - 1] = r2(payable - sumAllButLast);
+  }
+  const peopleBreakdown = splitLabels.map((label, i) => ({
+    label,
+    itemSubtotal: r2(groupSubtotals.get(label)!),
+    share: shares[i],
+  }));
+
   let upiQr: string | null = null;
   let upiLink: string | null = null;
   if (config.upiId && isValidVpa(config.upiId) && !paid && remaining > 0) {
@@ -195,6 +224,8 @@ export default async function PaymentPage({
           upiQr={upiQr}
           upiLink={upiLink}
           pdfUrl={`/api/bill/${primary.id}/pdf?t=${qrToken}`}
+          peopleBreakdown={peopleBreakdown}
+          splitItems={splitItems}
         />
         <PoweredBy />
       </div>

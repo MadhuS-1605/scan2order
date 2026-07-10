@@ -29,6 +29,7 @@ import {
   applyCouponAction,
   removeCouponAction,
   chargeToRoomAction,
+  assignItemSplitAction,
 } from "@/lib/billing/actions";
 import { Button, Input, Alert } from "@/components/ui";
 import { formatMoney } from "@/lib/utils";
@@ -78,6 +79,8 @@ export function BillClient({
   upiQr,
   upiLink,
   pdfUrl,
+  peopleBreakdown,
+  splitItems,
 }: {
   orderId: string;
   qrToken: string;
@@ -100,6 +103,8 @@ export function BillClient({
   upiQr: string | null;
   upiLink: string | null;
   pdfUrl: string;
+  peopleBreakdown: { label: string; itemSubtotal: number; share: number }[];
+  splitItems: { id: string; label: string; nameSnapshot: string; lineTotal: number }[];
 }) {
   const router = useRouter();
   // Once the bill is settled, end the dining session so the next visit at this
@@ -117,6 +122,10 @@ export function BillClient({
   const [busy, setBusy] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [people, setPeople] = useState(1);
+  const [splitMode, setSplitMode] = useState<"even" | "person">("even");
+  const [editSplitOpen, setEditSplitOpen] = useState(false);
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [newLabelDrafts, setNewLabelDrafts] = useState<Record<string, string>>({});
   const [customTip, setCustomTip] = useState("");
   const [coupon, setCoupon] = useState("");
   const [couponErr, setCouponErr] = useState<string | null>(null);
@@ -188,6 +197,19 @@ export function BillClient({
       else setPayError(res.error ?? "Could not set tip.");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function assignItem(itemId: string, label: string) {
+    setAssigningId(itemId);
+    try {
+      const res = await assignItemSplitAction({ orderId, qrToken, itemId, label });
+      if (res.ok) {
+        setNewLabelDrafts((d) => ({ ...d, [itemId]: "" }));
+        router.refresh();
+      }
+    } finally {
+      setAssigningId(null);
     }
   }
 
@@ -439,30 +461,138 @@ export function BillClient({
             )}
 
             {/* Split */}
-            <div className="mt-4 flex items-center gap-3 rounded-lg bg-sand-100 px-3 py-2">
-              <Users className="h-4 w-4 text-ink/50" />
-              <span className="text-sm text-ink/70">Split between</span>
-              <select
-                value={people}
-                onChange={(e) => setPeople(Number(e.target.value))}
-                className="rounded-md border border-sand-300 bg-surface px-2 py-1 text-sm"
-              >
-                {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-              {people > 1 && (
-                <span className="ml-auto text-sm font-medium text-ink">
-                  {formatMoney(perPerson, currency)}/person
-                </span>
+            <div className="mt-4 rounded-lg bg-sand-100 px-3 py-3">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-ink/50" />
+                <span className="text-sm text-ink/70">Split the bill</span>
+                {peopleBreakdown.length > 1 && (
+                  <div className="ml-auto flex gap-0.5 rounded-md bg-surface p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setSplitMode("even")}
+                      className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+                        splitMode === "even" ? "bg-brand-600 text-white" : "text-ink/60 hover:text-ink"
+                      }`}
+                    >
+                      Evenly
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSplitMode("person")}
+                      className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+                        splitMode === "person" ? "bg-brand-600 text-white" : "text-ink/60 hover:text-ink"
+                      }`}
+                    >
+                      By person
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {(splitMode === "even" || peopleBreakdown.length <= 1) ? (
+                <div className="mt-2 flex items-center gap-3">
+                  <span className="text-sm text-ink/70">Between</span>
+                  <select
+                    value={people}
+                    onChange={(e) => setPeople(Number(e.target.value))}
+                    className="rounded-md border border-sand-300 bg-surface px-2 py-1 text-sm"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                  {people > 1 && (
+                    <span className="ml-auto text-sm font-medium text-ink">
+                      {formatMoney(perPerson, currency)}/person
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {peopleBreakdown.map((p) => (
+                    <div
+                      key={p.label}
+                      className="flex items-center justify-between gap-2 rounded-lg bg-surface px-3 py-2"
+                    >
+                      <span className="min-w-0 truncate text-sm font-medium text-ink">{p.label}</span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-sm text-ink/70">{formatMoney(p.share, currency)}</span>
+                        {onlineEnabled && (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handlePay(p.share)}
+                            disabled={busy}
+                          >
+                            Pay
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setEditSplitOpen((o) => !o)}
+                    className="text-xs font-medium text-brand-700 hover:text-brand-800"
+                  >
+                    {editSplitOpen ? "Hide items" : "Edit who ordered what"}
+                  </button>
+                  {editSplitOpen && (
+                    <div className="space-y-3 rounded-lg border border-dashed border-sand-300 p-3">
+                      {splitItems.map((it) => (
+                        <div key={it.id}>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-ink/80">{it.nameSnapshot}</span>
+                            <span className="text-ink/45">{formatMoney(it.lineTotal, currency)}</span>
+                          </div>
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {peopleBreakdown.map((p) => (
+                              <button
+                                key={p.label}
+                                type="button"
+                                onClick={() => assignItem(it.id, p.label)}
+                                disabled={assigningId === it.id || it.label === p.label}
+                                className={`rounded-full border px-2 py-0.5 text-xs transition-colors ${
+                                  it.label === p.label
+                                    ? "border-brand-500 bg-brand-50 text-brand-700"
+                                    : "border-sand-300 text-ink/60 hover:bg-sand-100"
+                                }`}
+                              >
+                                {p.label}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="mt-1.5 flex gap-1.5">
+                            <Input
+                              placeholder="Someone else…"
+                              aria-label={`Assign ${it.nameSnapshot} to someone else`}
+                              value={newLabelDrafts[it.id] ?? ""}
+                              onChange={(e) =>
+                                setNewLabelDrafts((d) => ({ ...d, [it.id]: e.target.value }))
+                              }
+                            />
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              disabled={assigningId === it.id || !(newLabelDrafts[it.id] ?? "").trim()}
+                              onClick={() => assignItem(it.id, (newLabelDrafts[it.id] ?? "").trim())}
+                            >
+                              Save
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
             {onlineEnabled && (
               <div className="mt-3 space-y-2">
-                {people > 1 && (
+                {splitMode === "even" && people > 1 && (
                   <Button
                     size="lg"
                     className="w-full"
@@ -475,15 +605,15 @@ export function BillClient({
                 )}
                 <Button
                   size="lg"
-                  variant={people > 1 ? "secondary" : "primary"}
+                  variant={splitMode === "even" && people > 1 ? "secondary" : "primary"}
                   className="w-full"
                   onClick={() => handlePay(remaining)}
                   disabled={busy}
                 >
-                  {people <= 1 && <CreditCard className="h-4 w-4" />}
+                  {!(splitMode === "even" && people > 1) && <CreditCard className="h-4 w-4" />}
                   {busy
                     ? "Processing…"
-                    : `Pay ${people > 1 ? "the full" : ""} ${formatMoney(remaining, currency)}`}
+                    : `Pay ${splitMode === "even" && people > 1 ? "the full" : ""} ${formatMoney(remaining, currency)}`}
                 </Button>
               </div>
             )}

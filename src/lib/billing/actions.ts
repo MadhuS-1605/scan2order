@@ -275,6 +275,28 @@ export async function setTipAction(args: {
   return { ok: true };
 }
 
+// Split-the-bill: override which person an item counts toward (defaults to
+// the parent order's customerName otherwise — see peopleBreakdown in
+// payment/page.tsx). Scoped to the diner's own session so a guest can only
+// relabel items on their own table's bill, never another table's.
+export async function assignItemSplitAction(args: {
+  orderId: string;
+  qrToken: string;
+  itemId: string;
+  label: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  const session = await getCustomerSession(args.orderId, args.qrToken);
+  if (!session) return { ok: false, error: "Order not found." };
+  const item = session.orders.flatMap((o) => o.items).find((it) => it.id === args.itemId);
+  if (!item) return { ok: false, error: "Item not found in this bill." };
+  const label = args.label.trim().slice(0, 40);
+  await prisma.orderItem.update({
+    where: { id: item.id },
+    data: { splitLabel: label || null },
+  });
+  return { ok: true };
+}
+
 // Hotel in-room dining: post the whole session's bill to the room folio instead
 // of paying now. The front desk settles all open room charges at checkout.
 export async function chargeToRoomAction(args: {

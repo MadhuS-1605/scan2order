@@ -845,6 +845,9 @@ model OrderItem {
   lineTotal     Decimal  @db.Decimal(10, 2)
   // Snapshot of chosen modifiers: [{ group, name, priceDelta }]
   modifiers     Json?
+  // Manual override for "split the bill by person" — defaults to the parent
+  // order's customerName when null (see peopleBreakdown in payment/page.tsx).
+  splitLabel    String?
   // Per-item "prepared" ack, used by the bar KDS to tick off drinks
   // independently of the overall order status.
   preparedAt    DateTime?
