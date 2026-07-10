@@ -75,8 +75,8 @@ export default async function ReservationsPage() {
           </p>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {waitlist.map((r) => (
-              <ResCard key={r.id} r={r} d={d} />
+            {waitlist.map((r, i) => (
+              <ResCard key={r.id} r={r} d={d} position={i + 1} />
             ))}
           </div>
         )}
@@ -107,6 +107,7 @@ function ResCard({
   r,
   d,
   showTime,
+  position,
 }: {
   r: {
     id: string;
@@ -119,6 +120,7 @@ function ResCard({
   };
   d: Dict;
   showTime?: boolean;
+  position?: number;
 }) {
   const actions = NEXT_ACTIONS[r.status] ?? [];
   return (
@@ -126,6 +128,11 @@ function ResCard({
       <div className="flex items-start justify-between">
         <div>
           <p className="font-medium text-ink">
+            {position !== undefined && (
+              <span className="mr-1.5 inline-flex rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-600">
+                #{position}
+              </span>
+            )}
             {r.customerName}{" "}
             <span className="text-sm font-normal text-ink/45">
               · {r.partySize} {r.partySize === 1 ? t(d, "reservations.guest") : t(d, "reservations.guests")}

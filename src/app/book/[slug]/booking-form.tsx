@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarCheck, Clock, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { CalendarCheck, Clock, CheckCircle2, ArrowRight } from "lucide-react";
 import { createReservationAction } from "@/lib/reservations/actions";
 import { Button, Input, Textarea, Field, Alert } from "@/components/ui";
 
@@ -22,6 +23,8 @@ export function BookingForm({
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [mocked, setMocked] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [doneType, setDoneType] = useState<"RESERVATION" | "WAITLIST">("RESERVATION");
 
   async function submit() {
     setErr(null);
@@ -38,6 +41,8 @@ export function BookingForm({
       });
       if (!res.ok) return setErr(res.error ?? "Something went wrong.");
       setMocked(Boolean(res.mocked));
+      setCreatedId(res.id ?? null);
+      setDoneType(type);
       setDone(true);
     } finally {
       setBusy(false);
@@ -53,6 +58,15 @@ export function BookingForm({
           {restaurantName} will confirm your table shortly
           {mocked ? " (WhatsApp is in test mode)." : " on WhatsApp."}
         </p>
+        {doneType === "WAITLIST" && createdId && (
+          <Link
+            href={`/book/${slug}/waitlist/${createdId}`}
+            className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-800"
+          >
+            See your live position
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        )}
       </div>
     );
   }

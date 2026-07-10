@@ -18,7 +18,7 @@ export async function createReservationAction(args: {
   partySize: number;
   reservedFor?: string; // ISO datetime, required for RESERVATION
   notes?: string;
-}): Promise<{ ok: boolean; error?: string; mocked?: boolean }> {
+}): Promise<{ ok: boolean; error?: string; mocked?: boolean; id?: string }> {
   const name = args.customerName.trim();
   const phone = args.customerPhone.trim();
   if (name.length < 2) return { ok: false, error: "Enter your name." };
@@ -42,7 +42,7 @@ export async function createReservationAction(args: {
   });
   if (!restaurant) return { ok: false, error: "Restaurant not found." };
 
-  await prisma.reservation.create({
+  const reservation = await prisma.reservation.create({
     data: {
       restaurantId: restaurant.id,
       type: args.type,
@@ -79,7 +79,7 @@ export async function createReservationAction(args: {
   );
   if (res.ok) await recordUsage(restaurant.id, "whatsapp");
 
-  return { ok: true, mocked: res.mocked };
+  return { ok: true, mocked: res.mocked, id: reservation.id };
 }
 
 const VALID: ReservationStatus[] = [

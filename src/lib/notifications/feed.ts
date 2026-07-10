@@ -89,7 +89,7 @@ export async function getNotificationFeed(restaurantId: string): Promise<Notif[]
     feed.push({
       id: `resv-${r.id}`,
       kind: "reservation",
-      title: `Reservation: ${r.customerName}`,
+      title: r.type === "WAITLIST" ? `Waitlist: ${r.customerName}` : `Reservation: ${r.customerName}`,
       detail: `${r.partySize} guests${r.reservedFor ? ` · ${r.reservedFor.toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}`,
       at: r.createdAt,
       href: "/admin/reservations",
