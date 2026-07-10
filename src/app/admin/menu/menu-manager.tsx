@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import {
   addCategoryAction,
   addMenuItemAction,
@@ -9,11 +9,13 @@ import {
 import {
   toggleAvailabilityAction,
   toggleSpecialAction,
+  toggleCategoryActiveAction,
   deleteCategoryAction,
   updateItemAction,
   moveItemAction,
   moveCategoryAction,
   importMenuCsvAction,
+  bulkUpdateItemsAction,
 } from "@/lib/menu/actions";
 import {
   addModifierGroupAction,
@@ -37,7 +39,7 @@ import { formatMoney } from "@/lib/utils";
 import { LANG_LABEL } from "@/lib/languages";
 import type { ActionState } from "@/lib/validation";
 
-type Category = { id: string; name: string };
+type Category = { id: string; name: string; isActive: boolean };
 type Item = {
   id: string;
   name: string;
@@ -72,34 +74,80 @@ export function MenuManager({
   languages,
   categories,
   items,
+  previewUrl,
 }: {
   currency: string;
   languages: string[];
   categories: Category[];
   items: Item[];
+  previewUrl: string | null;
 }) {
   const tr = useT();
-  const grouped = categories.map((c) => ({
-    category: c,
-    items: items.filter((i) => i.categoryId === c.id),
-  }));
-  const uncategorised = items.filter((i) => !i.categoryId);
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const q = query.trim().toLowerCase();
+  const filteredItems = q ? items.filter((i) => i.name.toLowerCase().includes(q)) : items;
+
+  const grouped = categories
+    .map((c) => ({
+      category: c,
+      items: filteredItems.filter((i) => i.categoryId === c.id),
+    }))
+    .filter(({ items: catItems }) => !q || catItems.length > 0);
+  const uncategorised = filteredItems.filter((i) => !i.categoryId);
+
+  function toggleSelected(id: string) {
+    setSelected((s) => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-16">
       <Card>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <AddCategoryForm />
-          <AddItemForm categories={categories} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="grid flex-1 gap-6 lg:grid-cols-2">
+            <AddCategoryForm />
+            <AddItemForm categories={categories} />
+          </div>
         </div>
       </Card>
 
+      {previewUrl && (
+        <a
+          href={previewUrl}
+          target="_blank"
+          rel="noopener"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-700 hover:text-brand-800"
+        >
+          {tr("menu.previewLiveMenu")} →
+        </a>
+      )}
+
       <ImportExport />
 
+      <Input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={tr("menu.searchItems")}
+        aria-label={tr("menu.searchItems")}
+      />
+
       {grouped.map(({ category, items: catItems }, ci) => (
-        <Card key={category.id}>
+        <Card key={category.id} className={category.isActive ? undefined : "opacity-60"}>
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold text-ink">{category.name}</h3>
+            <h3 className="flex items-center gap-2 font-semibold text-ink">
+              {category.name}
+              {!category.isActive && (
+                <span className="rounded bg-sand-200 px-1.5 py-0.5 text-[10px] font-normal text-ink/55">
+                  {tr("menu.hiddenFromMenu")}
+                </span>
+              )}
+            </h3>
             <div className="flex items-center gap-2">
               <form action={moveCategoryAction}>
                 <input type="hidden" name="id" value={category.id} />
@@ -110,6 +158,12 @@ export function MenuManager({
                 <input type="hidden" name="id" value={category.id} />
                 <input type="hidden" name="dir" value="down" />
                 <Button size="sm" variant="ghost" type="submit" disabled={ci === grouped.length - 1} aria-label={tr("menu.moveDown")}>↓</Button>
+              </form>
+              <form action={toggleCategoryActiveAction}>
+                <input type="hidden" name="id" value={category.id} />
+                <Button size="sm" variant="ghost" type="submit">
+                  {category.isActive ? tr("menu.hideCategory") : tr("menu.showCategory")}
+                </Button>
               </form>
               <form action={deleteCategoryAction}>
                 <input type="hidden" name="id" value={category.id} />
@@ -127,6 +181,8 @@ export function MenuManager({
             categories={categories}
             currency={currency}
             languages={languages}
+            selected={selected}
+            onToggleSelected={toggleSelected}
           />
         </Card>
       ))}
@@ -139,9 +195,72 @@ export function MenuManager({
             categories={categories}
             currency={currency}
             languages={languages}
+            selected={selected}
+            onToggleSelected={toggleSelected}
           />
         </Card>
       )}
+
+      {selected.size > 0 && (
+        <BulkActionBar
+          ids={[...selected]}
+          onClear={() => setSelected(new Set())}
+        />
+      )}
+    </div>
+  );
+}
+
+function BulkActionBar({ ids, onClear }: { ids: string[]; onClear: () => void }) {
+  const tr = useT();
+  const [pct, setPct] = useState("");
+  const idsValue = ids.join(",");
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-sand-200 bg-surface/95 px-4 py-3 backdrop-blur">
+      <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-2">
+        <span className="text-sm font-medium text-ink/70">
+          {ids.length} {tr("menu.selected")}
+        </span>
+        <form action={bulkUpdateItemsAction}>
+          <input type="hidden" name="ids" value={idsValue} />
+          <input type="hidden" name="op" value="enable" />
+          <Button size="sm" variant="secondary" type="submit">
+            {tr("menu.enable")}
+          </Button>
+        </form>
+        <form action={bulkUpdateItemsAction}>
+          <input type="hidden" name="ids" value={idsValue} />
+          <input type="hidden" name="op" value="disable" />
+          <Button size="sm" variant="secondary" type="submit">
+            {tr("menu.disable")}
+          </Button>
+        </form>
+        <form action={bulkUpdateItemsAction} className="flex items-center gap-1.5">
+          <input type="hidden" name="ids" value={idsValue} />
+          <input type="hidden" name="op" value="priceAdjust" />
+          <Input
+            name="pct"
+            type="number"
+            step="1"
+            placeholder="%"
+            value={pct}
+            onChange={(e) => setPct(e.target.value)}
+            className="w-16"
+            aria-label={tr("menu.priceAdjustPercent")}
+          />
+          <Button size="sm" variant="secondary" type="submit" disabled={!pct}>
+            {tr("menu.adjustPrice")}
+          </Button>
+        </form>
+        <button
+          type="button"
+          onClick={onClear}
+          className="ml-auto text-xs font-medium text-ink/45 hover:text-ink/70"
+        >
+          {tr("menu.clearSelection")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -194,11 +313,15 @@ function ItemList({
   categories,
   currency,
   languages,
+  selected,
+  onToggleSelected,
 }: {
   items: Item[];
   categories: Category[];
   currency: string;
   languages: string[];
+  selected: Set<string>;
+  onToggleSelected: (id: string) => void;
 }) {
   const tr = useT();
   if (items.length === 0)
@@ -214,6 +337,8 @@ function ItemList({
           categories={categories}
           currency={currency}
           languages={languages}
+          isSelected={selected.has(item.id)}
+          onToggleSelected={onToggleSelected}
         />
       ))}
     </ul>
@@ -227,6 +352,8 @@ function ItemRow({
   categories,
   currency,
   languages,
+  isSelected,
+  onToggleSelected,
 }: {
   item: Item;
   index: number;
@@ -234,6 +361,8 @@ function ItemRow({
   categories: Category[];
   currency: string;
   languages: string[];
+  isSelected: boolean;
+  onToggleSelected: (id: string) => void;
 }) {
   const tr = useT();
   const [state, action, pending] = useActionState<ActionState, FormData>(
@@ -249,6 +378,13 @@ function ItemRow({
     <li className="py-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelected(item.id)}
+            aria-label={tr("menu.selectItem")}
+            className="h-4 w-4 shrink-0 rounded border-sand-300"
+          />
           <VegMark isVeg={item.isVeg} />
           <div>
             <p className="text-sm font-medium text-ink">

@@ -6,6 +6,8 @@ import { requireAdminWithPermission } from "@/lib/auth/guards";
 import { menuItemSchema, type ActionState } from "@/lib/validation";
 import { parseCsv } from "@/lib/csv";
 import { menuItemQuotaReached } from "@/lib/plan-limits";
+import { round2 } from "@/lib/pricing";
+import { toNumber } from "@/lib/utils";
 
 const truthy = new Set(["1", "true", "yes", "y", "veg"]);
 
@@ -27,6 +29,51 @@ export async function toggleAvailabilityAction(
     where: { id, restaurantId },
     data: { isAvailable: !item.isAvailable },
   });
+  revalidateMenu();
+}
+
+export async function toggleCategoryActiveAction(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminWithPermission("menu");
+  const id = String(formData.get("id"));
+  const category = await prisma.menuCategory.findFirst({
+    where: { id, restaurantId },
+  });
+  if (!category) return;
+  await prisma.menuCategory.updateMany({
+    where: { id, restaurantId },
+    data: { isActive: !category.isActive },
+  });
+  revalidateMenu();
+}
+
+// Enable/disable or percentage-adjust the price of several items at once —
+// scoped to this tenant's own items regardless of which ids were posted.
+export async function bulkUpdateItemsAction(formData: FormData): Promise<void> {
+  const { restaurantId } = await requireAdminWithPermission("menu");
+  const ids = String(formData.get("ids") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  const op = String(formData.get("op"));
+  if (ids.length === 0) return;
+  const where = { id: { in: ids }, restaurantId };
+
+  if (op === "enable") {
+    await prisma.menuItem.updateMany({ where, data: { isAvailable: true } });
+  } else if (op === "disable") {
+    await prisma.menuItem.updateMany({ where, data: { isAvailable: false } });
+  } else if (op === "priceAdjust") {
+    const pct = Number(formData.get("pct")) || 0;
+    const targets = await prisma.menuItem.findMany({ where, select: { id: true, price: true } });
+    await prisma.$transaction(
+      targets.map((it) =>
+        prisma.menuItem.update({
+          where: { id: it.id },
+          data: { price: round2(Math.max(0, toNumber(it.price) * (1 + pct / 100))) },
+        }),
+      ),
+    );
+  }
   revalidateMenu();
 }
 

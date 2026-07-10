@@ -6,6 +6,8 @@ import { prisma } from "@/lib/db";
 import { parseLanguages } from "@/lib/languages";
 import { MENU_TEMPLATES } from "@/lib/templates";
 import { applyTemplateAction } from "@/lib/platform/actions";
+import { getBaseUrl } from "@/lib/request";
+import { tableOrderUrl } from "@/lib/qr";
 import { Card } from "@/components/ui";
 import { MenuManager } from "./menu-manager";
 
@@ -14,7 +16,7 @@ export default async function MenuPage() {
   const { restaurant } = await getCurrentRestaurant("menu");
   const languages = parseLanguages(restaurant.config!.languages);
 
-  const [categories, items] = await Promise.all([
+  const [categories, items, previewTable] = await Promise.all([
     prisma.menuCategory.findMany({
       where: { restaurantId: restaurant.id },
       orderBy: { sortOrder: "asc" },
@@ -29,7 +31,15 @@ export default async function MenuPage() {
         },
       },
     }),
+    prisma.restaurantTable.findFirst({
+      where: { restaurantId: restaurant.id, isActive: true },
+      orderBy: { createdAt: "asc" },
+      select: { qrToken: true },
+    }),
   ]);
+  const previewUrl = previewTable
+    ? tableOrderUrl(previewTable.qrToken, await getBaseUrl())
+    : null;
 
   return (
     <div className="space-y-5">
@@ -65,7 +75,8 @@ export default async function MenuPage() {
       <MenuManager
         currency={restaurant.config!.currency}
         languages={languages}
-        categories={categories.map((c) => ({ id: c.id, name: c.name }))}
+        categories={categories.map((c) => ({ id: c.id, name: c.name, isActive: c.isActive }))}
+        previewUrl={previewUrl}
         items={items.map((i) => ({
           id: i.id,
           name: i.name,

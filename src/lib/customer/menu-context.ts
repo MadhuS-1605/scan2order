@@ -53,7 +53,7 @@ export async function getMenuContext(): Promise<MenuContext | null> {
         include: {
           config: true,
           group: { select: { name: true } },
-          categories: { orderBy: { sortOrder: "asc" } },
+          categories: { where: { isActive: true }, orderBy: { sortOrder: "asc" } },
           menuItems: {
             orderBy: { sortOrder: "asc" },
             include: {
@@ -87,11 +87,18 @@ export async function getMenuContext(): Promise<MenuContext | null> {
   ).onlinePayments;
 
   const tz = config.timezone;
+  // Categories are already pre-filtered to isActive above — a hidden category's
+  // items shouldn't surface either, but an uncategorised item (categoryId null)
+  // always stays visible.
+  const activeCategoryIds = new Set(restaurant.categories.map((c) => c.id));
   // Show items even when outside their time window — the diner sees what's on
   // the menu and when it's available (the row renders disabled). Only manually
-  // unavailable or out-of-stock items are hidden.
+  // unavailable, out-of-stock, or hidden-category items are hidden.
   const shown = restaurant.menuItems.filter(
-    (i) => i.isAvailable && !(i.trackStock && i.stockQty <= 0),
+    (i) =>
+      i.isAvailable &&
+      !(i.trackStock && i.stockQty <= 0) &&
+      (i.categoryId === null || activeCategoryIds.has(i.categoryId)),
   );
 
   const happyHourPercent = happyHourPercentNow(
