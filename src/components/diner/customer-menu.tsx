@@ -326,7 +326,7 @@ export function CustomerMenu({
 
           {!searching && specials.length > 0 && (
             <section id="sec-specials" data-section="sec-specials" className="scroll-mt-32">
-              <h2 className="mb-2 flex items-center gap-1.5 font-display text-xl italic text-brand-600">
+              <h2 className="mb-2 flex items-center gap-1.5 font-display text-xl text-brand-600">
                 <Sparkles className="h-4 w-4" strokeWidth={2} />
                 Today&apos;s specials
               </h2>
