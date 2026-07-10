@@ -1,16 +1,28 @@
 import Link from "next/link";
 import {
-  QrCode,
-  UtensilsCrossed,
-  ChefHat,
-  ReceiptText,
+  ChevronDown,
   ArrowRight,
   Check,
 } from "lucide-react";
-import { VegMark } from "@/components/ui";
 import { PlanDetailsDisclosure } from "@/components/plan-details";
 import { resolvePlans } from "@/lib/plan-settings";
-import { formatMoney } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Reveal } from "@/components/marketing/reveal";
+import { RotatingWord } from "@/components/marketing/rotating-word";
+import { InteractivePhoneDemo } from "@/components/marketing/interactive-phone-demo";
+import { VenueSwitcher } from "@/components/marketing/venue-switcher";
+import { TiltCard } from "@/components/marketing/tilt-card";
+import { StickyMobileCta } from "@/components/marketing/sticky-mobile-cta";
 
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan2order.co.in";
 
@@ -23,182 +35,186 @@ export default async function Home() {
       <Header />
 
       {/* Hero */}
-      <section className="mx-auto max-w-6xl px-6 pb-12 pt-10 lg:pt-16">
-        <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="mx-auto max-w-6xl px-6 pb-16 pt-10 lg:pt-16">
+        <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
-            <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-sand-300 bg-surface px-3 py-1 text-xs font-medium text-ink/60">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
-              QR ordering for restaurants, cafés &amp; hotels
-            </p>
-            <h1 className="font-display text-4xl font-medium leading-[1.05] text-ink sm:text-5xl lg:text-6xl">
-              Your table,{" "}
-              <em className="text-brand-600">now self-serve.</em>
-            </h1>
-            <p className="mt-6 max-w-md text-lg leading-relaxed text-ink/70">
-              Guests scan the code on the table, browse your menu, and order —
-              no app, no waiting for a waiter. Tickets reach your kitchen the
-              moment they tap <span className="text-ink">Place order</span>.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-4">
-              <Link
-                href="/signup"
-                className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-6 py-3 font-medium text-white transition-all hover:bg-brand-700 active:translate-y-px"
+            <Reveal>
+              <Badge
+                variant="outline"
+                className="gap-2 border-sand-300 bg-surface py-1.5 text-xs font-medium text-ink/60"
               >
-                Open your restaurant
-                <ArrowRight className="h-4 w-4" />
-              </Link>
+                <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+                QR ordering for restaurants, cafés &amp; hotels
+              </Badge>
+            </Reveal>
+            <Reveal delay={80}>
+              <h1 className="mt-5 font-display text-4xl font-medium leading-[1.05] text-ink sm:text-5xl lg:text-6xl">
+                Your table, now{" "}
+                <RotatingWord words={["self-serve.", "contactless.", "effortless."]} />
+              </h1>
+            </Reveal>
+            <Reveal delay={160}>
+              <p className="mt-6 max-w-md text-lg leading-relaxed text-ink/70">
+                Guests scan the code on the table, browse your menu, and order —
+                no app, no waiting for a waiter. Tickets reach your kitchen the
+                moment they tap <span className="text-ink">Place order</span>.
+              </p>
+            </Reveal>
+            <Reveal delay={240}>
+              <div className="mt-8 flex flex-wrap items-center gap-4">
+                <Link
+                  href="/signup"
+                  className={cn(buttonVariants({ size: "lg" }), "h-11 gap-2 px-6 text-base")}
+                >
+                  Open your restaurant
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="/signin"
+                  className="text-sm font-medium text-ink/70 underline-offset-4 hover:text-ink hover:underline"
+                >
+                  Sign in to your dashboard
+                </Link>
+              </div>
               <Link
-                href="/signin"
-                className="text-sm font-medium text-ink/70 underline-offset-4 hover:text-ink hover:underline"
+                href="#how-it-works"
+                className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink/45 hover:text-ink/70"
               >
-                Sign in to your dashboard
+                See it in action
+                <ChevronDown className="h-4 w-4 animate-bounce" />
               </Link>
-            </div>
+            </Reveal>
           </div>
 
-          <div className="relative">
-            {/* Soft food-photo accent behind the phone mock (decorative). */}
+          <Reveal delay={200} className="relative">
             <div
-              className="absolute -right-4 -top-10 -z-10 hidden h-64 w-64 rounded-3xl bg-cover bg-center opacity-80 shadow-xl lg:block"
+              className="relative mx-auto aspect-[4/5] w-full max-w-sm overflow-hidden rounded-3xl shadow-2xl lg:aspect-[3/4]"
               style={{
                 backgroundImage:
-                  "url(https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=700&q=80&auto=format&fit=crop)",
+                  "url(https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=900&q=80&auto=format&fit=crop)",
+                backgroundSize: "cover",
+                backgroundPosition: "center",
               }}
-              aria-hidden="true"
-            />
-            <MenuPreview />
-          </div>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="border-y border-sand-200 bg-surface/60">
-        <div className="mx-auto max-w-6xl px-6 py-12">
-          <p className="font-display text-sm italic text-brand-600">
-            How a meal flows
-          </p>
-          <div className="mt-6 grid gap-px overflow-hidden rounded-xl border border-sand-200 bg-sand-200 sm:grid-cols-2 lg:grid-cols-4">
-            {STEPS.map((s, i) => (
-              <div key={s.title} className="bg-surface p-6">
-                <div className="flex items-center gap-3">
-                  <s.icon className="h-5 w-5 text-brand-600" strokeWidth={1.75} />
-                  <span className="font-display text-lg text-ink/30">
-                    0{i + 1}
-                  </span>
-                </div>
-                <h3 className="mt-3 font-medium text-ink">{s.title}</h3>
-                <p className="mt-1 text-sm leading-relaxed text-ink/60">
-                  {s.body}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* For whom — visual cards for each hospitality segment */}
-      <section className="mx-auto max-w-6xl px-6 py-14">
-        <h2 className="font-display text-3xl text-ink">Built for every venue</h2>
-        <p className="mt-2 max-w-md text-sm text-ink/55">
-          One platform that adapts to how your guests dine — fine dining, a busy
-          café counter, or in-room hotel service.
-        </p>
-        <div className="mt-8 grid gap-5 md:grid-cols-3">
-          {AUDIENCES.map((a) => (
-            <div
-              key={a.title}
-              className="group relative aspect-[4/5] overflow-hidden rounded-2xl bg-brand-800"
             >
-              <div
-                className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                style={{ backgroundImage: `url(${a.img})` }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/40 to-ink/5" />
-              <div className="absolute inset-x-0 bottom-0 p-5">
-                <h3 className="font-display text-2xl text-white">{a.title}</h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-white/85">
-                  {a.body}
-                </p>
-              </div>
+              <div className="absolute inset-0 bg-gradient-to-t from-ink/60 via-ink/5 to-transparent" />
             </div>
-          ))}
+            <div className="animate-float-slow absolute -left-4 top-8 hidden rounded-full border border-sand-200 bg-surface/95 px-3.5 py-2 text-xs font-medium text-ink shadow-lg backdrop-blur sm:block">
+              No app to install
+            </div>
+            <div
+              className="animate-float-slow absolute -right-3 bottom-14 hidden rounded-full border border-sand-200 bg-surface/95 px-3.5 py-2 text-xs font-medium text-ink shadow-lg backdrop-blur sm:block"
+              style={{ animationDelay: "1.4s" }}
+            >
+              Bill sent on WhatsApp
+            </div>
+          </Reveal>
         </div>
+      </section>
+
+      {/* How it works — a live, clickable walkthrough instead of a static grid */}
+      <section id="how-it-works" className="border-y border-sand-200 bg-surface/60">
+        <div className="mx-auto max-w-6xl px-6 py-16">
+          <Reveal>
+            <p className="text-sm font-semibold uppercase tracking-wide text-brand-600">How a meal flows</p>
+            <h2 className="mt-1 font-display text-3xl text-ink">Try it — it&apos;s live</h2>
+          </Reveal>
+          <Reveal delay={100} className="mt-8">
+            <InteractivePhoneDemo />
+          </Reveal>
+        </div>
+      </section>
+
+      {/* For whom — an interactive switcher instead of three static cards */}
+      <section className="mx-auto max-w-6xl px-6 py-16">
+        <Reveal>
+          <h2 className="font-display text-3xl text-ink">Built for every venue</h2>
+          <p className="mt-2 max-w-md text-sm text-ink/55">
+            One platform that adapts to how your guests dine — fine dining, a busy
+            café counter, or in-room hotel service.
+          </p>
+        </Reveal>
+        <Reveal delay={100} className="mt-8">
+          <VenueSwitcher />
+        </Reveal>
       </section>
 
       {/* Pricing */}
       <section id="pricing" className="border-t border-sand-200 bg-surface/60">
-        <div className="mx-auto max-w-6xl px-6 py-14">
-          <h2 className="text-center font-display text-3xl text-ink">
-            Simple pricing
-          </h2>
-          <p className="mt-2 text-center text-sm text-ink/55">
-            Start free. Upgrade when you&apos;re ready.
-          </p>
+        <div className="mx-auto max-w-6xl px-6 py-16">
+          <Reveal>
+            <h2 className="text-center font-display text-3xl text-ink">Simple pricing</h2>
+            <p className="mt-2 text-center text-sm text-ink/55">
+              Start free. Upgrade when you&apos;re ready.
+            </p>
+          </Reveal>
           <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {plans.map((p) => {
+            {plans.map((p, i) => {
               const isContact = Boolean(p.contactOnly);
               return (
-                <div
-                  key={p.tier}
-                  className={`flex flex-col rounded-2xl border bg-surface p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
-                    p.highlight
-                      ? "border-brand-400 ring-1 ring-brand-200"
-                      : "border-sand-200 hover:border-brand-300"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-display text-xl text-ink">{p.name}</h3>
-                    {p.highlight && (
-                      <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-medium text-brand-600">
-                        Popular
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-sm text-ink/55">{p.tagline}</p>
-                  <p className="mt-3 font-display text-3xl text-ink">
-                    {isContact ? "Custom" : p.price === 0 ? "Free" : formatMoney(p.price)}
-                    {!isContact && p.price > 0 && (
-                      <span className="text-sm text-ink/45"> /mo</span>
-                    )}
-                  </p>
-                  <p className="mt-0.5 text-xs text-ink/40">
-                    {isContact
-                      ? "Tailored to your group"
-                      : p.price > 0
-                        ? "+ 18% GST · 14-day free trial"
-                        : "Free forever · no card needed"}
-                  </p>
-                  <ul className="mt-4 space-y-1.5">
-                    {p.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-ink/70">
-                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-olive-600" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  <PlanDetailsDisclosure details={p.details} />
-                  <div className="mt-auto pt-5">
-                    {isContact ? (
-                      <a
-                        href={`mailto:sales@${PLATFORM_DOMAIN}?subject=${encodeURIComponent("Scan to Order — Enterprise enquiry")}`}
-                        className="block rounded-lg border border-sand-300 py-2 text-center text-sm font-medium text-ink transition-colors hover:border-brand-300 hover:bg-brand-50"
-                      >
-                        Contact sales
-                      </a>
-                    ) : (
-                      <Link
-                        href="/signup"
-                        className={`block rounded-lg py-2 text-center text-sm font-medium transition-colors ${
-                          p.highlight
-                            ? "bg-brand-600 text-white hover:bg-brand-700"
-                            : "border border-sand-300 text-ink hover:border-brand-300 hover:bg-brand-50"
-                        }`}
-                      >
-                        Get started
-                      </Link>
-                    )}
-                  </div>
-                </div>
+                <Reveal key={p.tier} delay={i * 80}>
+                  <TiltCard>
+                    <Card
+                      className={cn(
+                        "flex flex-col ring-0 transition-shadow duration-200 hover:shadow-lg",
+                        p.highlight
+                          ? "border-2 border-brand-400"
+                          : "border border-sand-200 hover:border-brand-300",
+                      )}
+                    >
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="font-display text-xl">{p.name}</CardTitle>
+                          {p.highlight && <Badge>Popular</Badge>}
+                        </div>
+                        <p className="text-sm text-ink/55">{p.tagline}</p>
+                      </CardHeader>
+                      <CardContent className="flex flex-1 flex-col">
+                        <p className="font-display text-3xl text-ink">
+                          {isContact ? "Custom" : p.price === 0 ? "Free" : formatMoney(p.price)}
+                          {!isContact && p.price > 0 && (
+                            <span className="text-sm text-ink/45"> /mo</span>
+                          )}
+                        </p>
+                        <p className="mt-0.5 text-xs text-ink/40">
+                          {isContact
+                            ? "Tailored to your group"
+                            : p.price > 0
+                              ? "+ 18% GST · 14-day free trial"
+                              : "Free forever · no card needed"}
+                        </p>
+                        <ul className="mt-4 space-y-1.5">
+                          {p.features.map((f) => (
+                            <li key={f} className="flex items-start gap-2 text-sm text-ink/70">
+                              <Check className="mt-0.5 h-4 w-4 shrink-0 text-olive-600" />
+                              {f}
+                            </li>
+                          ))}
+                        </ul>
+                        <PlanDetailsDisclosure details={p.details} />
+                      </CardContent>
+                      <CardFooter className="mt-auto border-t-0 bg-transparent pt-0">
+                        {isContact ? (
+                          <a
+                            href={`mailto:sales@${PLATFORM_DOMAIN}?subject=${encodeURIComponent("Scan to Order — Enterprise enquiry")}`}
+                            className={cn(buttonVariants({ variant: "outline" }), "w-full")}
+                          >
+                            Contact sales
+                          </a>
+                        ) : (
+                          <Link
+                            href="/signup"
+                            className={cn(
+                              buttonVariants({ variant: p.highlight ? "default" : "outline" }),
+                              "w-full",
+                            )}
+                          >
+                            Get started
+                          </Link>
+                        )}
+                      </CardFooter>
+                    </Card>
+                  </TiltCard>
+                </Reveal>
               );
             })}
           </div>
@@ -214,144 +230,68 @@ export default async function Home() {
           </p>
 
           {/* Demo — by request (we don't publish credentials) */}
-          <div className="mt-8 flex flex-col items-center justify-between gap-3 rounded-2xl border border-dashed border-sand-300 bg-surface px-6 py-5 text-center sm:flex-row sm:text-left">
-            <div>
-              <p className="font-medium text-ink">Want a look first?</p>
-              <p className="text-sm text-ink/55">
-                Book a guided walkthrough — we&apos;ll show you the live product on a
-                quick call, or start your 14-day free trial right away.
-              </p>
-            </div>
-            <a
-              href={`mailto:sales@${PLATFORM_DOMAIN}?subject=${encodeURIComponent("Scan to Order — demo request")}`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-brand-300 bg-surface px-5 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50"
-            >
-              Request a demo
-              <ArrowRight className="h-4 w-4" />
-            </a>
-          </div>
+          <Reveal delay={120}>
+            <Card className="mt-8 flex-row flex-wrap items-center justify-between gap-3 border border-dashed border-sand-300 px-6 py-5 text-center ring-0 sm:text-left">
+              <div>
+                <p className="font-medium text-ink">Want a look first?</p>
+                <p className="text-sm text-ink/55">
+                  Book a guided walkthrough — we&apos;ll show you the live product on a
+                  quick call, or start your 14-day free trial right away.
+                </p>
+              </div>
+              <a
+                href={`mailto:sales@${PLATFORM_DOMAIN}?subject=${encodeURIComponent("Scan to Order — demo request")}`}
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "shrink-0 gap-2 border-brand-300 text-brand-700 hover:bg-brand-50",
+                )}
+              >
+                Request a demo
+                <ArrowRight className="h-4 w-4" />
+              </a>
+            </Card>
+          </Reveal>
         </div>
       </section>
 
-      <footer className="border-t border-sand-200">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-6 py-8 text-sm text-ink/50 sm:flex-row">
-          <span className="font-display text-base text-ink">Scan to Order</span>
-          <div className="flex items-center gap-4">
-            <Link href="/privacy" className="hover:text-ink">
-              Privacy
-            </Link>
-            <Link href="/terms" className="hover:text-ink">
-              Terms
-            </Link>
+      <footer>
+        <div className="mx-auto max-w-6xl px-6 py-8">
+          <Separator className="mb-8 bg-sand-200" />
+          <div className="flex flex-col items-center justify-between gap-3 text-sm text-ink/50 sm:flex-row">
+            <span className="font-display text-base text-ink">Scan to Order</span>
+            <div className="flex items-center gap-4">
+              <Link href="/privacy" className="hover:text-ink">
+                Privacy
+              </Link>
+              <Link href="/terms" className="hover:text-ink">
+                Terms
+              </Link>
+            </div>
           </div>
         </div>
       </footer>
+
+      <StickyMobileCta />
     </div>
   );
 }
 
 function Header() {
   return (
-    <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-      <Link href="/" className="font-display text-xl font-medium text-ink">
-        Scan&nbsp;to&nbsp;Order
-      </Link>
-      <nav className="flex items-center gap-5 text-sm">
-        <Link href="/signin" className="text-ink/70 hover:text-ink">
-          Sign in
+    <header className="sticky top-0 z-10 border-b border-sand-200/70 bg-paper/80 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <Link href="/" className="font-display text-xl font-medium text-ink">
+          Scan&nbsp;to&nbsp;Order
         </Link>
-        <Link
-          href="/signup"
-          className="rounded-lg bg-ink px-4 py-2 font-medium text-paper hover:bg-ink/90"
-        >
-          Get started
-        </Link>
-      </nav>
+        <nav className="flex items-center gap-5 text-sm">
+          <Link href="/signin" className="text-ink/70 hover:text-ink">
+            Sign in
+          </Link>
+          <Link href="/signup" className={buttonVariants()}>
+            Get started
+          </Link>
+        </nav>
+      </div>
     </header>
   );
 }
-
-function MenuPreview() {
-  return (
-    <div className="relative mx-auto w-full max-w-sm">
-      <div className="rotate-1 rounded-2xl border border-sand-200 bg-surface p-5 shadow-[0_1px_0_rgba(34,30,24,0.04)]">
-        <div className="flex items-center justify-between border-b border-dashed border-sand-300 pb-3">
-          <div>
-            <p className="font-display text-lg text-ink">Spice Garden</p>
-            <p className="text-xs text-ink/45">Table 4</p>
-          </div>
-          <QrCode className="h-8 w-8 text-ink/30" strokeWidth={1.5} />
-        </div>
-        <ul className="mt-3 space-y-3">
-          {PREVIEW_ITEMS.map((it) => (
-            <li key={it.name} className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-2">
-                <span className="mt-0.5">
-                  <VegMark isVeg={it.veg} />
-                </span>
-                <div>
-                  <p className="text-sm font-medium text-ink">{it.name}</p>
-                  <p className="text-xs text-ink/50">{it.note}</p>
-                </div>
-              </div>
-              <span className="whitespace-nowrap text-sm text-ink/70">
-                ₹{it.price}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-4 flex items-center justify-between rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-medium text-white">
-          <span>Place order</span>
-          <span>₹520</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const STEPS = [
-  {
-    icon: QrCode,
-    title: "Scan",
-    body: "A guest scans the unique QR on their table.",
-  },
-  {
-    icon: UtensilsCrossed,
-    title: "Order",
-    body: "They browse the live menu and place an order.",
-  },
-  {
-    icon: ChefHat,
-    title: "Cook",
-    body: "The ticket appears on your kitchen screen.",
-  },
-  {
-    icon: ReceiptText,
-    title: "Pay",
-    body: "They pay online or at the counter, bill on WhatsApp.",
-  },
-];
-
-const AUDIENCES = [
-  {
-    title: "Restaurants & bars",
-    body: "Per-table QR ordering, a live floor, KOT printing and one consolidated bill.",
-    img: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=900&q=80&auto=format&fit=crop",
-  },
-  {
-    title: "Cafés & QSR",
-    body: "One counter QR, pay-first, pick up by number — fast self-service for busy footfall.",
-    img: "https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=900&q=80&auto=format&fit=crop",
-  },
-  {
-    title: "Hotels",
-    body: "In-room dining charged to the room folio, plus banquets and multi-property management.",
-    img: "https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=900&q=80&auto=format&fit=crop",
-  },
-];
-
-const PREVIEW_ITEMS = [
-  { name: "Paneer Tikka", note: "Chef's special", veg: true, price: 220 },
-  { name: "Butter Chicken", note: "Rich & creamy", veg: false, price: 340 },
-  { name: "Garlic Naan", note: "Stone-baked", veg: true, price: 80 },
-];
