@@ -234,6 +234,11 @@ flowchart TD
 - Live order status to the diner (Placed → Confirmed → Preparing → Ready →
   Served → Completed) over SSE + optional push.
 - Diner-initiated **service requests** (call waiter, water, bill, clean table).
+- **Menu admin**: search/filter the item list, bulk enable/disable or bulk
+  price-adjust-by-percentage a selection, per-category **Hide/Show** (hidden
+  categories drop out of the live diner menu), CSV import/export, drag-free
+  reorder, and a **"Preview live menu"** link straight to the venue's ordering
+  URL.
 
 ### Staff orders (POS) & order editing
 - Waiters create orders on a guest's behalf at **`/admin/orders/new`** (table
@@ -250,7 +255,9 @@ flowchart TD
   bill. The earliest ("primary") order carries the tip, coupon/discount and
   running `amountPaid` (others settle at 0, so the total paid is accurate).
 - Consolidated payable = `total of all open orders − discount + tip`. Supports
-  **split / partial** payments.
+  **split / partial** payments — split evenly by headcount, or **split by
+  person** (items grouped by who ordered them, via `OrderItem.splitLabel`) —
+  each share still paid through the same Razorpay flow as a full bill.
 - **Table moves**: a diner who re-scans a different table has their open orders
   auto-migrated to it (cart follows automatically); waiters can also move an order
   or a whole party between tables from the order detail.
@@ -307,6 +314,9 @@ flowchart TD
 ### Reservations
 - Table bookings + walk-in waitlist with status lifecycle (Pending → Confirmed →
   Seated / Cancelled / No-show). Public booking page at `/book/[slug]`.
+- Waitlist entries show a **queue position (#N)** on the admin cards; a guest
+  who joins gets a public, auto-refreshing **live-position page**
+  (`/book/[slug]/waitlist/[id]`) linked from their booking confirmation.
 
 ### Hotel rooms & banquets
 - **Rooms**: tables of kind `ROOM` for in-room dining; charge-to-room folio
@@ -468,7 +478,7 @@ The app ships a hardened baseline (full audit + remediation in
 | Language | TypeScript, React 19 |
 | Database | PostgreSQL |
 | ORM | Prisma 7 via `@prisma/adapter-pg` driver adapter (+ `pg`) |
-| Styling | Tailwind CSS v4 (`@tailwindcss/postcss`) |
+| Styling | Tailwind CSS v4 (`@tailwindcss/postcss`); **shadcn/ui** (Button/Card/Badge/Separator) scoped to the marketing site (`src/components/ui/*`) and remapped onto the brand palette — the product/admin UI kit (`src/components/ui.tsx`) is separate and unstyled by shadcn |
 | Auth | `jose` JWT session cookie + `bcryptjs`; 2FA via email OTP + dependency-free TOTP (RFC 6238) |
 | Crypto | `node:crypto` — AES-256-GCM secret encryption, constant-time HMAC, CSPRNG tokens |
 | Payments | Razorpay (orders, webhooks, subscriptions/eMandate); UPI deep links |
