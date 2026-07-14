@@ -5,8 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  /* Typography — a single Geist sans across marketing + product (clean,
-     modern SaaS feel over the previous editorial serif/sans pairing). */
+  /* Typography — Geist sans for body/UI density, Fraunces serif for display
+     headings (see .font-display below): warm, editorial, menu-card feel. */
   --font-sans: var(--font-geist), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, sans-serif;
 
@@ -22,12 +22,13 @@
   --color-brand-800: #6f3220;
   --color-brand-900: #5b2b1d;
 
-  /* Warm neutrals — paper, sand, ink */
-  --color-paper: #f7f3ec;
+  /* Warm neutrals — cream paper, sand, ink. Nudged warmer/creamier so flat
+     surfaces read as menu-card stock rather than neutral SaaS gray. */
+  --color-paper: #faf4e7;
   --color-surface: #fffdf8;
-  --color-sand-100: #f1eae0;
-  --color-sand-200: #e6dccc;
-  --color-sand-300: #d6c9b3;
+  --color-sand-100: #f4ecdd;
+  --color-sand-200: #eadec7;
+  --color-sand-300: #dbc9a9;
   --color-ink: #221e18;
 
   /* A quiet olive for "veg"/positive accents that fits the warm palette.
@@ -124,20 +125,20 @@ body {
   }
 }
 
-/* Display helper for headings — same Geist family as body text, but tighter
-   tracking + a touch more weight so headings still read as a deliberate
-   hierarchy rather than just "bigger body text". */
+/* Display helper for headings — Fraunces, a warm editorial serif with optical
+   sizing: menus, chalkboards, restaurant signage. Body text stays Geist. */
 .font-display {
-  font-family: var(--font-sans);
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-family: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  font-weight: 560;
+  letter-spacing: -0.01em;
 }
 
-/* Subtle paper grain so flat surfaces don't read as sterile */
+/* Subtle paper grain so flat surfaces don't read as sterile — warmed toward
+   kraft-paper brown to match the cream canvas. */
 .bg-grain {
   background-color: var(--color-paper);
   background-image: radial-gradient(
-    rgba(34, 30, 24, 0.025) 1px,
+    rgba(122, 74, 34, 0.035) 1px,
     transparent 1px
   );
   background-size: 4px 4px;
@@ -207,6 +208,64 @@ html { scroll-behavior: smooth; }
 }
 .animate-float-slow { animation: float-slow 5s ease-in-out infinite; }
 
+/* Slow drift for the blurred color glows behind the hero. */
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(28px, -20px) scale(1.08); }
+}
+.animate-drift { animation: drift 14s ease-in-out infinite; }
+
+/* Ken Burns — a barely-perceptible zoom that keeps food photography alive. */
+@keyframes kenburns {
+  from { transform: scale(1); }
+  to { transform: scale(1.08); }
+}
+.animate-kenburns { animation: kenburns 16s ease-in-out infinite alternate; }
+
+/* Hand-drawn underline that draws itself in under the hero word. */
+@keyframes draw-underline {
+  to { stroke-dashoffset: 0; }
+}
+.animate-draw-underline {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw-underline 0.9s ease-out 0.6s forwards;
+}
+
+/* QR scan-line sweeping over the code in the phone demo's Scan step. */
+@keyframes scan-sweep {
+  from { top: 8%; }
+  to { top: 86%; }
+}
+.animate-scan-sweep { animation: scan-sweep 1.8s ease-in-out infinite alternate; }
+
+/* Infinite feature marquee — content is rendered twice, slide by half. */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-marquee { animation: marquee 32s linear infinite; }
+
+/* Reading-progress bar (scroll-driven; browsers without animation-timeline
+   simply never scale it up — it stays invisible). */
+@keyframes grow-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 50;
+  height: 2px;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, var(--color-brand-600), #e9a13b);
+  animation: grow-progress auto linear;
+  animation-timeline: scroll();
+}
+
 /* Kitchen ticket entering its column — fires on mount only (first paint, a
    new order landing, or a ticket moving to a new status column), since
    React only mounts a fresh DOM node for a key it hasn't rendered before. */
@@ -217,7 +276,7 @@ html { scroll-behavior: smooth; }
 .animate-ticket-in { animation: ticket-in 0.4s ease-out; }
 
 @theme inline {
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-fraunces), Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);

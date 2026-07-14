@@ -18,7 +18,7 @@ export function Button({
 }) {
   const variants = {
     primary:
-      "bg-brand-600 text-white hover:bg-brand-700 active:translate-y-px disabled:bg-brand-300",
+      "bg-brand-600 text-white shadow-sm shadow-brand-600/25 hover:bg-brand-700 active:translate-y-px disabled:bg-brand-300 disabled:shadow-none",
     secondary:
       "border border-sand-300 bg-surface text-ink hover:border-brand-300 hover:bg-sand-100",
     ghost: "text-ink/70 hover:bg-sand-100 hover:text-ink",
@@ -108,7 +108,7 @@ export function Card({
   return (
     <div
       className={cn(
-        "rounded-xl border border-sand-200 bg-surface p-6",
+        "rounded-xl border border-sand-200 bg-surface p-6 shadow-[0_1px_2px_rgba(93,58,24,0.04),0_10px_28px_-18px_rgba(93,58,24,0.16)]",
         className,
       )}
       {...props}

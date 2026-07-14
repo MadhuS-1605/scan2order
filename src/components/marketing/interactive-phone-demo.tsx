@@ -143,10 +143,23 @@ export function InteractivePhoneDemo() {
           <div key={stage} className="animate-panel-fade">
             {stage === "scan" && (
               <div className="flex min-h-[21rem] flex-col items-center justify-center gap-4 text-center">
-                <QrCode className="h-20 w-20 text-ink/70" strokeWidth={1.25} />
+                {/* Camera viewfinder: corner brackets + a scan line sweeping the QR */}
+                <div className="relative overflow-hidden p-5">
+                  <QrCode className="h-20 w-20 text-ink/70" strokeWidth={1.25} />
+                  <span aria-hidden className="absolute left-0 top-0 h-5 w-5 rounded-tl-lg border-l-2 border-t-2 border-brand-500" />
+                  <span aria-hidden className="absolute right-0 top-0 h-5 w-5 rounded-tr-lg border-r-2 border-t-2 border-brand-500" />
+                  <span aria-hidden className="absolute bottom-0 left-0 h-5 w-5 rounded-bl-lg border-b-2 border-l-2 border-brand-500" />
+                  <span aria-hidden className="absolute bottom-0 right-0 h-5 w-5 rounded-br-lg border-b-2 border-r-2 border-brand-500" />
+                  <span
+                    aria-hidden
+                    className="animate-scan-sweep absolute inset-x-1 h-0.5 rounded-full bg-brand-500 shadow-[0_0_12px_2px_rgba(217,61,11,0.4)]"
+                  />
+                </div>
                 <div>
                   <p className="font-display text-lg text-ink">Spice Garden</p>
-                  <p className="text-xs text-ink/45">Table 4</p>
+                  <p className="text-xs text-ink/45">
+                    Table 4 · <span className="text-brand-600">Scanning…</span>
+                  </p>
                 </div>
                 <button type="button" onClick={() => goTo("order")} className={buttonVariants()}>
                   Tap to scan

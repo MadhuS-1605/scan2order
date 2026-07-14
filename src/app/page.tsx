@@ -35,7 +35,18 @@ export default async function Home() {
       <Header />
 
       {/* Hero */}
-      <section className="mx-auto max-w-6xl px-6 pb-16 pt-10 lg:pt-16">
+      <section className="relative overflow-hidden">
+        {/* Soft drifting color glows behind everything */}
+        <div
+          aria-hidden
+          className="animate-drift pointer-events-none absolute -top-24 left-[8%] h-96 w-96 rounded-full bg-brand-200/40 blur-3xl"
+        />
+        <div
+          aria-hidden
+          className="animate-drift pointer-events-none absolute right-[4%] top-40 hidden h-80 w-80 rounded-full bg-amber-200/30 blur-3xl sm:block"
+          style={{ animationDelay: "4s" }}
+        />
+        <div className="relative mx-auto max-w-6xl px-6 pb-16 pt-10 lg:pt-16">
         <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
           <div>
             <Reveal>
@@ -43,13 +54,33 @@ export default async function Home() {
                 variant="outline"
                 className="gap-2 border-sand-300 bg-surface py-1.5 text-xs font-medium text-ink/60"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-brand-500" />
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-500" />
                 QR ordering for restaurants, cafés &amp; hotels
               </Badge>
             </Reveal>
             <Reveal delay={80}>
               <h1 className="mt-5 font-display text-4xl font-medium leading-[1.05] text-ink sm:text-5xl lg:text-6xl">
-                Your table, now{" "}
+                Your{" "}
+                <span className="relative inline-block">
+                  table
+                  <svg
+                    aria-hidden
+                    className="absolute -bottom-1.5 left-0 w-full"
+                    viewBox="0 0 100 8"
+                    preserveAspectRatio="none"
+                  >
+                    <path
+                      d="M2 6 Q 28 2 54 5 T 98 3"
+                      fill="none"
+                      stroke="var(--color-brand-500)"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      pathLength="1"
+                      className="animate-draw-underline"
+                    />
+                  </svg>
+                </span>
+                , now{" "}
                 <RotatingWord words={["self-serve.", "contactless.", "effortless."]} />
               </h1>
             </Reveal>
@@ -87,19 +118,54 @@ export default async function Home() {
           </div>
 
           <Reveal delay={200} className="relative">
-            <div
-              className="relative mx-auto aspect-[4/5] w-full max-w-sm overflow-hidden rounded-3xl shadow-2xl lg:aspect-[3/4]"
-              style={{
-                backgroundImage:
-                  "url(https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=900&q=80&auto=format&fit=crop)",
-                backgroundSize: "cover",
-                backgroundPosition: "center",
-              }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-t from-ink/60 via-ink/5 to-transparent" />
+            <div className="relative mx-auto w-full max-w-sm">
+              {/* Offset warm frame behind the photo — plated-dish feel */}
+              <div
+                aria-hidden
+                className="absolute -inset-2 rotate-2 rounded-[2rem] bg-brand-100/70"
+              />
+              <div className="relative aspect-[4/5] overflow-hidden rounded-3xl shadow-2xl lg:aspect-[3/4]">
+                <div
+                  className="animate-kenburns absolute inset-0"
+                  style={{
+                    backgroundImage:
+                      "url(https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=900&q=80&auto=format&fit=crop)",
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-ink/60 via-ink/5 to-transparent" />
+              </div>
+              {/* Small overlapping venue photo — collage feel */}
+              <div
+                aria-hidden
+                className="absolute -bottom-8 -left-8 hidden h-28 w-40 -rotate-6 overflow-hidden rounded-2xl border-4 border-surface shadow-xl sm:block"
+                style={{
+                  backgroundImage:
+                    "url(https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600&q=80&auto=format&fit=crop)",
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                }}
+              />
             </div>
-            <div className="animate-float-slow absolute -left-4 top-8 hidden rounded-full border border-sand-200 bg-surface/95 px-3.5 py-2 text-xs font-medium text-ink shadow-lg backdrop-blur sm:block">
-              No app to install
+            {/* Live order ticket — the product, floating over the food */}
+            <div
+              className="animate-float-slow absolute -right-2 top-6 hidden w-52 rounded-xl border border-sand-200 bg-surface/95 p-3 shadow-xl backdrop-blur sm:block"
+              style={{ animationDelay: "0.7s" }}
+            >
+              <div className="flex items-center justify-between text-[11px] font-semibold text-ink">
+                <span>Table 12 · #248</span>
+                <span className="flex items-center gap-1 text-brand-600">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-500" />
+                  Preparing
+                </span>
+              </div>
+              <p className="mt-1 text-[11px] text-ink/60">
+                2× Paneer Tikka · 1× Butter Naan
+              </p>
+              <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-sand-100">
+                <div className="h-full w-2/3 rounded-full bg-brand-500" />
+              </div>
             </div>
             <div
               className="animate-float-slow absolute -right-3 bottom-14 hidden rounded-full border border-sand-200 bg-surface/95 px-3.5 py-2 text-xs font-medium text-ink shadow-lg backdrop-blur sm:block"
@@ -109,7 +175,43 @@ export default async function Home() {
             </div>
           </Reveal>
         </div>
+        </div>
       </section>
+
+      {/* Feature marquee — everything the product does, drifting past */}
+      <div className="relative overflow-hidden border-t border-sand-200 bg-surface/50 py-3.5">
+        <div className="animate-marquee flex w-max items-center gap-8 whitespace-nowrap">
+          {[0, 1].map((copy) => (
+            <div
+              key={copy}
+              aria-hidden={copy === 1}
+              className="flex items-center gap-8 text-sm font-medium text-ink/55"
+            >
+              {[
+                "QR ordering",
+                "Live kitchen board",
+                "KOT printing",
+                "UPI & Razorpay",
+                "WhatsApp bills",
+                "Room-folio billing",
+                "GST invoices",
+                "Split the bill",
+                "Waitlist & reservations",
+                "Happy hour",
+                "Loyalty points",
+                "English · हिंदी · ಕನ್ನಡ",
+              ].map((f) => (
+                <span key={f} className="flex items-center gap-8">
+                  {f}
+                  <span className="text-brand-400">✦</span>
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-paper to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-paper to-transparent" />
+      </div>
 
       {/* How it works — a live, clickable walkthrough instead of a static grid */}
       <section id="how-it-works" className="border-y border-sand-200 bg-surface/60">
@@ -157,7 +259,7 @@ export default async function Home() {
                       className={cn(
                         "flex flex-col ring-0 transition-shadow duration-200 hover:shadow-lg",
                         p.highlight
-                          ? "border-2 border-brand-400"
+                          ? "border-2 border-brand-400 shadow-lg shadow-brand-600/10"
                           : "border border-sand-200 hover:border-brand-300",
                       )}
                     >
@@ -279,6 +381,7 @@ export default async function Home() {
 function Header() {
   return (
     <header className="sticky top-0 z-10 border-b border-sand-200/70 bg-paper/80 backdrop-blur">
+      <div aria-hidden className="scroll-progress" />
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" className="font-display text-xl font-medium text-ink">
           Scan&nbsp;to&nbsp;Order

@@ -53,14 +53,16 @@ export function VenueSwitcher() {
         ))}
       </div>
 
-      <div className="mt-6 grid overflow-hidden rounded-2xl border border-sand-200 lg:grid-cols-2">
-        <div
-          key={a.img}
-          role="img"
-          aria-label={a.title}
-          className="animate-panel-fade aspect-[16/10] bg-cover bg-center lg:aspect-auto"
-          style={{ backgroundImage: `url(${a.img})` }}
-        />
+      <div className="group mt-6 grid overflow-hidden rounded-2xl border border-sand-200 lg:grid-cols-2">
+        <div className="overflow-hidden">
+          <div
+            key={a.img}
+            role="img"
+            aria-label={a.title}
+            className="animate-panel-fade h-full min-h-full aspect-[16/10] bg-cover bg-center transition-transform duration-700 group-hover:scale-105 lg:aspect-auto"
+            style={{ backgroundImage: `url(${a.img})` }}
+          />
+        </div>
         <div key={a.title} className="animate-panel-fade flex flex-col justify-center gap-3 bg-surface p-8">
           <h3 className="font-display text-2xl text-ink">{a.title}</h3>
           <p className="text-sm leading-relaxed text-ink/60">{a.body}</p>

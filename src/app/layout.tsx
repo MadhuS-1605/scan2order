@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Fraunces } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/sw-register";
 import { Analytics } from "@/components/analytics";
@@ -8,6 +8,15 @@ const geist = Geist({
   subsets: ["latin"],
   variable: "--font-geist",
   display: "swap",
+});
+
+// Display serif for headings — warm, editorial, menu-card feel. Body stays
+// Geist for legibility on dense admin/KDS screens.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-fraunces",
+  display: "swap",
+  axes: ["opsz"],
 });
 
 export const metadata: Metadata = {
@@ -69,7 +78,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={geist.variable}
+      className={`${geist.variable} ${fraunces.variable}`}
     >
       <body>
         {children}
