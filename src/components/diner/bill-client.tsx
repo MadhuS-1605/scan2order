@@ -55,7 +55,6 @@ function loadRazorpay(): Promise<RazorpayCtor | null> {
   });
 }
 
-const r2 = round2;
 
 export function BillClient({
   orderId,
@@ -187,7 +186,7 @@ export function BillClient({
   const [mockedOtp, setMockedOtp] = useState(false);
 
   const tipLocked = amountPaid > 0;
-  const perPerson = r2(remaining / Math.max(1, people));
+  const perPerson = round2(remaining / Math.max(1, people));
 
   async function applyTip(amount: number) {
     setBusy(true);
@@ -407,7 +406,7 @@ export function BillClient({
               </p>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {tipPresets.map((p) => {
-                  const amt = r2(total * p);
+                  const amt = round2(total * p);
                   const active = Math.abs(tip - amt) < 0.01;
                   return (
                     <button

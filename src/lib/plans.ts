@@ -50,36 +50,6 @@ export function minTierFor(cap: Capability): PlanTier {
   return TIER_ORDER.find((t) => TIER_GRANTS[t].includes(cap)) ?? "ENTERPRISE";
 }
 
-// Capabilities that also have a per-venue onboarding feature flag. The flag only
-// takes effect when the tier grants the capability.
-export const CAPABILITY_FEATURE_FLAG: Partial<Record<Capability, string>> = {
-  reservations: "featureReservations",
-  rooms: "featureRooms",
-  banquets: "featureBanquets",
-  bar: "featureBar",
-  attendance: "featureAttendance",
-};
-
-// Short English labels for upgrade prompts / pricing rows.
-export const CAPABILITY_LABEL: Record<Capability, string> = {
-  onlinePayments: "Online payments",
-  whatsapp: "WhatsApp bills & OTP",
-  coupons: "Coupons & loyalty",
-  reservations: "Reservations",
-  analytics: "Analytics & export",
-  refunds: "Refunds",
-  rooms: "Hotel rooms",
-  banquets: "Banquets",
-  bar: "Bar KDS",
-  kot: "KOT printing",
-  inventory: "Inventory",
-  attendance: "Staff attendance",
-  audit: "Audit log",
-  multiProperty: "Multi-property console",
-  integrations: "Integrations & webhooks",
-  sso: "SSO",
-};
-
 export type PlanLimits = {
   maxTables: number | null; // null = unlimited
   maxMenuItems: number | null;
@@ -296,16 +266,6 @@ export function withGst(amount: number): number {
 }
 
 export type BillingCycle = "monthly" | "annual";
-
-// Base price (pre-GST) for a plan at the chosen cycle.
-export function cyclePrice(plan: Plan, cycle: BillingCycle): number {
-  return cycle === "annual" ? annualPrice(plan.price) : plan.price;
-}
-
-// Days a paid period covers for the chosen cycle.
-export function cycleDays(cycle: BillingCycle): number {
-  return cycle === "annual" ? 365 : 30;
-}
 
 // --- Usage allowances & overage --------------------------------------------
 

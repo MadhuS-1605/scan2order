@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
 import { requireSuperAdmin } from "@/lib/platform/actions";
 import { formatMoney, toNumber } from "@/lib/utils";
+import { StatCard } from "@/components/superadmin/stat-card";
 
 export default async function PlatformHealthPage() {
   await requireSuperAdmin();
@@ -44,17 +45,6 @@ export default async function PlatformHealthPage() {
     { label: "Sentry", ok: Boolean(env.sentryDsn) },
   ];
 
-  const stat = (label: string, value: string, sub: string, Icon: typeof AlertTriangle, alert = false) => (
-    <div className={`rounded-2xl border bg-surface p-4 ${alert ? "border-amber-300" : "border-sand-200"}`}>
-      <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${alert ? "bg-amber-100 text-amber-700" : "bg-brand-50 text-brand-600"}`}>
-        <Icon className="h-5 w-5" strokeWidth={1.75} />
-      </div>
-      <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink/45">{label}</p>
-      <p className="mt-0.5 text-xl font-semibold text-ink">{value}</p>
-      <p className="text-xs text-ink/40">{sub}</p>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div>
@@ -63,10 +53,10 @@ export default async function PlatformHealthPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {stat("Stuck payments", String(stalePending), "PENDING >30 min (awaiting sweep)", Clock, stalePending > 0)}
-        {stat("Failed plan payments", String(planFailed), "all-time", CreditCard, planFailed > 0)}
-        {stat("Failed diner payments", String(payFailed30), "last 30 days", CreditCard, payFailed30 > 0)}
-        {stat("Refunds", formatMoney(toNumber(refund30._sum.amount ?? 0)), `${refund30._count._all} in 30d · ${refundAll._count._all} all-time`, RotateCcw)}
+        <StatCard label="Stuck payments" value={String(stalePending)} sub="PENDING >30 min (awaiting sweep)" icon={Clock} alert={stalePending > 0} />
+        <StatCard label="Failed plan payments" value={String(planFailed)} sub="all-time" icon={CreditCard} alert={planFailed > 0} />
+        <StatCard label="Failed diner payments" value={String(payFailed30)} sub="last 30 days" icon={CreditCard} alert={payFailed30 > 0} />
+        <StatCard label="Refunds" value={formatMoney(toNumber(refund30._sum.amount ?? 0))} sub={`${refund30._count._all} in 30d · ${refundAll._count._all} all-time`} icon={RotateCcw} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

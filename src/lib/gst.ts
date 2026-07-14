@@ -37,10 +37,6 @@ export function normalizeGstin(input: string): string {
   return input.trim().toUpperCase().replace(/\s+/g, "");
 }
 
-export function isValidGstinFormat(input: string): boolean {
-  return GSTIN_REGEX.test(normalizeGstin(input));
-}
-
 export function gstConfigured(): boolean {
   return env.gst.configured();
 }

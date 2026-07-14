@@ -3,6 +3,7 @@ import { requireSuperAdmin } from "@/lib/platform/actions";
 import { subscriptionState } from "@/lib/subscription";
 import { STEPS } from "@/lib/onboarding/steps";
 import { formatMoney, toNumber } from "@/lib/utils";
+import { StatCard } from "@/components/superadmin/stat-card";
 
 export default async function PlatformGrowthPage() {
   await requireSuperAdmin();
@@ -65,10 +66,10 @@ export default async function PlatformGrowthPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        <Metric label="Total venues" value={String(configTotal)} sub="with config" />
-        <Metric label="Onboarding done" value={`${convPct}%`} sub={`${configDone} of ${configTotal}`} />
-        <Metric label="Active + trial" value={String(active + trial)} sub={`${active} paid · ${trial} trial`} />
-        <Metric label="Churn" value={`${churnPct}%`} sub={`${lapsed} lapsed of ${paidBase}`} alert={churnPct >= 20} />
+        <StatCard label="Total venues" value={String(configTotal)} sub="with config" />
+        <StatCard label="Onboarding done" value={`${convPct}%`} sub={`${configDone} of ${configTotal}`} />
+        <StatCard label="Active + trial" value={String(active + trial)} sub={`${active} paid · ${trial} trial`} />
+        <StatCard label="Churn" value={`${churnPct}%`} sub={`${lapsed} lapsed of ${paidBase}`} alert={churnPct >= 20} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -154,16 +155,6 @@ export default async function PlatformGrowthPage() {
           </ul>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Metric({ label, value, sub, alert }: { label: string; value: string; sub: string; alert?: boolean }) {
-  return (
-    <div className={`rounded-2xl border bg-surface p-4 ${alert ? "border-amber-300" : "border-sand-200"}`}>
-      <p className="text-xs font-medium uppercase tracking-wide text-ink/45">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-ink">{value}</p>
-      <p className="text-xs text-ink/40">{sub}</p>
     </div>
   );
 }

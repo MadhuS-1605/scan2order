@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import { requireSuperAdmin, bulkTenantAction } from "@/lib/platform/actions";
 import { PLANS, type PlanTier } from "@/lib/plans";
 import { formatMoney, toNumber } from "@/lib/utils";
+import { StatCard } from "@/components/superadmin/stat-card";
 
 const PAGE_SIZE = 20;
 const TIERS = new Set(PLANS.map((p) => p.tier));
@@ -111,25 +112,14 @@ export default async function SuperAdminPage({
     return s ? `/superadmin?${s}` : "/superadmin";
   };
 
-  const stat = (label: string, value: string, sub: string, Icon: typeof Building2) => (
-    <div className="rounded-2xl border border-sand-200 bg-surface p-4">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-        <Icon className="h-5 w-5" strokeWidth={1.75} />
-      </div>
-      <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink/45">{label}</p>
-      <p className="mt-0.5 text-xl font-semibold text-ink">{value}</p>
-      <p className="text-xs text-ink/40">{sub}</p>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <h1 className="font-display text-2xl font-medium text-ink">Console</h1>
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {stat("Restaurants", String(totalCount), `${ordersTotal} orders all-time`, Building2)}
-        {stat("Platform GMV", formatMoney(totalGmv), "diner sales, all-time", IndianRupee)}
-        {stat("Today", formatMoney(toNumber(todayAgg._sum.totalAmount ?? 0)), `${todayAgg._count._all} orders`, ShoppingBag)}
-        {stat("Avg / restaurant", formatMoney(totalCount ? totalGmv / totalCount : 0), "lifetime GMV", TrendingUp)}
+        <StatCard label="Restaurants" value={String(totalCount)} sub={`${ordersTotal} orders all-time`} icon={Building2} />
+        <StatCard label="Platform GMV" value={formatMoney(totalGmv)} sub="diner sales, all-time" icon={IndianRupee} />
+        <StatCard label="Today" value={formatMoney(toNumber(todayAgg._sum.totalAmount ?? 0))} sub={`${todayAgg._count._all} orders`} icon={ShoppingBag} />
+        <StatCard label="Avg / restaurant" value={formatMoney(totalCount ? totalGmv / totalCount : 0)} sub="lifetime GMV" icon={TrendingUp} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">

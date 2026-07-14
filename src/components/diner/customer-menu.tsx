@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Sparkles, X, ReceiptText, UtensilsCrossed, Search } from "lucide-react";
@@ -461,6 +461,11 @@ function Customizer({
   onClose: () => void;
   onAdd: (optionIds: string[]) => void;
 }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    dialogRef.current?.showModal();
+  }, []);
+
   const loc = localize(item, item.translations, lang);
   // initialise required single-select groups with their first option
   const [selected, setSelected] = useState<Record<string, string[]>>(() => {
@@ -498,8 +503,12 @@ function Customizer({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end bg-black/40">
-      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-surface p-4">
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      className="m-0 max-h-[90vh] w-full max-w-none overflow-y-auto rounded-t-2xl rounded-b-none border-0 bg-surface p-4 backdrop:bg-black/40"
+      style={{ position: "fixed", top: "auto", right: 0, bottom: 0, left: 0 }}
+    >
         <div className="mx-auto max-w-lg space-y-4">
           <div className="flex items-start justify-between">
             <div>
@@ -508,7 +517,11 @@ function Customizer({
                 <p className="text-sm text-ink/55">{loc.description}</p>
               )}
             </div>
-            <button onClick={onClose} aria-label="Close" className="text-ink/45">
+            <button
+              onClick={() => dialogRef.current?.close()}
+              aria-label="Close"
+              className="text-ink/45"
+            >
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -572,8 +585,7 @@ function Customizer({
             Add to order · {formatMoney(optionPrice(item, allIds, hhFactor), cur)}
           </Button>
         </div>
-      </div>
-    </div>
+    </dialog>
   );
 }
 

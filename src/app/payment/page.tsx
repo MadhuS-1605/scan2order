@@ -9,7 +9,6 @@ import { CustomerHeader, PoweredBy } from "@/components/customer-header";
 import { CustomerTabBar } from "@/components/diner/tab-bar";
 import { BillClient } from "@/components/diner/bill-client";
 
-const r2 = round2;
 
 export default async function PaymentPage({
   searchParams,
@@ -64,16 +63,16 @@ export default async function PaymentPage({
   const cur = config.currency;
   const gstPct = toNumber(config.gstPercentage);
 
-  const subtotal = r2(orders.reduce((s, o) => s + toNumber(o.subtotal), 0));
-  const tax = r2(orders.reduce((s, o) => s + toNumber(o.taxAmount), 0));
-  const total = r2(orders.reduce((s, o) => s + toNumber(o.totalAmount), 0));
+  const subtotal = round2(orders.reduce((s, o) => s + toNumber(o.subtotal), 0));
+  const tax = round2(orders.reduce((s, o) => s + toNumber(o.taxAmount), 0));
+  const total = round2(orders.reduce((s, o) => s + toNumber(o.totalAmount), 0));
   const tip = toNumber(primary.tipAmount);
   const discount = toNumber(primary.discountAmount);
   const scPct = toNumber(config.serviceChargePercent);
-  const serviceCharge = scPct > 0 ? r2((subtotal * scPct) / 100) : 0;
-  const payable = r2(Math.max(0, total - discount) + serviceCharge + tip);
+  const serviceCharge = scPct > 0 ? round2((subtotal * scPct) / 100) : 0;
+  const payable = round2(Math.max(0, total - discount) + serviceCharge + tip);
   const amountPaid = toNumber(primary.amountPaid);
-  const remaining = Math.max(0, r2(payable - amountPaid));
+  const remaining = Math.max(0, round2(payable - amountPaid));
   const paid = primary.paymentStatus === "PAID";
   const isRoom = entry.table?.kind === "ROOM";
   const roomCharged =
@@ -93,19 +92,19 @@ export default async function PaymentPage({
       const label = it.splitLabel || o.customerName || `Order #${o.orderNumber}`;
       const lineTotal = toNumber(it.lineTotal);
       groupSubtotals.set(label, (groupSubtotals.get(label) ?? 0) + lineTotal);
-      splitItems.push({ id: it.id, label, nameSnapshot: it.nameSnapshot, lineTotal: r2(lineTotal) });
+      splitItems.push({ id: it.id, label, nameSnapshot: it.nameSnapshot, lineTotal: round2(lineTotal) });
     }
   }
   const splitLabels = [...groupSubtotals.keys()];
   const scaleRatio = subtotal > 0 ? payable / subtotal : 0;
-  const shares = splitLabels.map((label) => r2(groupSubtotals.get(label)! * scaleRatio));
+  const shares = splitLabels.map((label) => round2(groupSubtotals.get(label)! * scaleRatio));
   if (shares.length > 0) {
     const sumAllButLast = shares.slice(0, -1).reduce((s, v) => s + v, 0);
-    shares[shares.length - 1] = r2(payable - sumAllButLast);
+    shares[shares.length - 1] = round2(payable - sumAllButLast);
   }
   const peopleBreakdown = splitLabels.map((label, i) => ({
     label,
-    itemSubtotal: r2(groupSubtotals.get(label)!),
+    itemSubtotal: round2(groupSubtotals.get(label)!),
     share: shares[i],
   }));
 

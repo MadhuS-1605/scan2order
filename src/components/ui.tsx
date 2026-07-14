@@ -66,7 +66,7 @@ export function Select({
   return <select className={cn(fieldBase, "pr-8", className)} {...props} />;
 }
 
-export function Label({
+function Label({
   className,
   ...props
 }: React.LabelHTMLAttributes<HTMLLabelElement>) {

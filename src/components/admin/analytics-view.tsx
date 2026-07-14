@@ -15,7 +15,7 @@ import { Card } from "@/components/ui";
 
 const DAY = 24 * 60 * 60 * 1000;
 
-export const RANGES: { key: string; label: string; days: number }[] = [
+const RANGES: { key: string; label: string; days: number }[] = [
   { key: "1d", label: "1 day", days: 1 },
   { key: "7d", label: "7 days", days: 7 },
   { key: "30d", label: "30 days", days: 30 },

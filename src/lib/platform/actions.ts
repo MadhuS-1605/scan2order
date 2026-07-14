@@ -23,24 +23,9 @@ import type { ActionState } from "@/lib/validation";
 import { setFlag, type FlagKey, FLAGS } from "@/lib/platform/flags";
 import type { SessionPayload } from "@/lib/auth/session";
 
-const TIERS: PlanTier[] = ["FREE", "STARTER", "PRO"];
 // Super-admin can assign any tier, including ENTERPRISE (no self-serve checkout).
 const SUPER_TIERS: PlanTier[] = ["FREE", "STARTER", "PRO", "ENTERPRISE"];
 const DAY = 86_400_000;
-
-// Owner changes their own plan (scaffolding — no payment gateway yet).
-export async function setPlanAction(formData: FormData): Promise<void> {
-  const session = await requireOnboardedAdmin();
-  if (!hasPermission(session.role, "settings")) return;
-  const tier = String(formData.get("tier") ?? "") as PlanTier;
-  if (!TIERS.includes(tier)) return;
-  await prisma.restaurant.update({
-    where: { id: session.restaurantId },
-    data: { planTier: tier },
-  });
-  await recordAudit(session.restaurantId, session, "plan.changed", tier);
-  revalidatePath("/admin/billing");
-}
 
 // Apply a starter menu template — creates its categories and items.
 export async function applyTemplateAction(formData: FormData): Promise<void> {
@@ -101,22 +86,6 @@ export async function requirePlatformCapability(
     throw new Error("You don't have permission for this platform action.");
   }
   return session;
-}
-
-// Super-admin changes any restaurant's plan tier from the console (quick set —
-// tier only, does not touch the paid window; for that use superGrantPlanAction).
-export async function superSetPlanAction(formData: FormData): Promise<void> {
-  const session = await requirePlatformCapability("billing.manage");
-  const restaurantId = String(formData.get("restaurantId") ?? "");
-  const tier = String(formData.get("tier") ?? "") as PlanTier;
-  if (!SUPER_TIERS.includes(tier) || !restaurantId) return;
-  await prisma.restaurant.update({
-    where: { id: restaurantId },
-    data: { planTier: tier },
-  });
-  await recordPlatformAudit(session, "plan.set", tier, restaurantId);
-  revalidatePath("/superadmin");
-  revalidatePath(`/superadmin/restaurants/${restaurantId}`);
 }
 
 // Apply one action to many tenants at once from the console. Each op is

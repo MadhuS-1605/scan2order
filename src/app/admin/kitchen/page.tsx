@@ -8,6 +8,7 @@ import { KitchenAlert } from "@/components/admin/kitchen-alert";
 import { setOrderStatusAction } from "@/lib/orders/actions";
 import { KITCHEN_STATUSES } from "@/lib/orders/status";
 import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
+import { formatDuration } from "@/lib/utils";
 import { PrintButton } from "./print-button";
 import { StatusActionButton } from "./status-action-button";
 
@@ -49,7 +50,7 @@ function elapsed(from: Date, d: ReturnType<typeof dictFor>): string {
   const mins = Math.floor((Date.now() - from.getTime()) / 60000);
   if (mins < 1) return t(d, "kitchen.justNow");
   if (mins < 60) return `${mins} ${t(d, "kitchen.min")}`;
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  return formatDuration(mins);
 }
 
 export default async function KitchenScreen() {

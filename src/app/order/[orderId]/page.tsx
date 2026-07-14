@@ -23,7 +23,6 @@ import { CustomerTabBar } from "@/components/diner/tab-bar";
 import { StatusBadge } from "@/components/ui";
 
 const STEP_ICONS = [ClipboardList, CheckCircle2, ChefHat, BellRing, UtensilsCrossed];
-const r2 = round2;
 
 export default async function OrderStatusPage({
   params,
@@ -94,8 +93,8 @@ export default async function OrderStatusPage({
         )
       : null;
 
-  const sessionTotal = r2(sessionOrders.reduce((s, o) => s + toNumber(o.totalAmount), 0));
-  const payable = r2(
+  const sessionTotal = round2(sessionOrders.reduce((s, o) => s + toNumber(o.totalAmount), 0));
+  const payable = round2(
     Math.max(0, sessionTotal - toNumber(primary.discountAmount)) + toNumber(primary.tipAmount),
   );
   const allPaid = sessionOrders.every((o) => o.paymentStatus === "PAID");

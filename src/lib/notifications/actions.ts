@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { requireOnboardedAdmin } from "@/lib/auth/guards";
-import { saveSubscription, removeSubscription, type WebPushSub } from "@/lib/push";
+import { saveSubscription, type WebPushSub } from "@/lib/push";
 
 // Admin/kitchen device subscribes to its restaurant's order alerts.
 export async function subscribeRestaurantPushAction(
@@ -30,12 +30,5 @@ export async function subscribeOrderPushAction(args: {
     orderId: order.id,
     restaurantId: order.restaurantId,
   });
-  return { ok: true };
-}
-
-export async function unsubscribePushAction(
-  endpoint: string,
-): Promise<{ ok: boolean }> {
-  await removeSubscription(endpoint);
   return { ok: true };
 }

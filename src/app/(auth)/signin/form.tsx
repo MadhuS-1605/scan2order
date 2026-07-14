@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { signinAction, verifyAdminOtpAction, sendAdminEmailOtpAction } from "@/lib/auth/actions";
 import { Button, Input, Field, Alert } from "@/components/ui";
 import { PasswordInput } from "@/components/password-input";
@@ -17,8 +17,6 @@ export function SigninForm({ googleEnabled = false }: { googleEnabled?: boolean 
     sendAdminEmailOtpAction,
     {},
   );
-  const [email, setEmail] = useState("");
-
   // After a correct super-admin password, signinAction returns otp:true.
   if (state.otp) {
     // Token from the password step (persists across resend/failed-verify).
@@ -71,8 +69,6 @@ export function SigninForm({ googleEnabled = false }: { googleEnabled?: boolean 
           id="email"
           name="email"
           type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
           placeholder="you@restaurant.com"
           required
         />

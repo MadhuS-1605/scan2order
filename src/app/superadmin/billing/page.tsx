@@ -9,6 +9,7 @@ import { resolvePlans } from "@/lib/plan-settings";
 import { subscriptionState } from "@/lib/subscription";
 import { usagePeriod } from "@/lib/usage";
 import { formatMoney, toNumber } from "@/lib/utils";
+import { StatCard } from "@/components/superadmin/stat-card";
 
 export default async function PlatformBillingPage() {
   const s = await requireSuperAdmin();
@@ -67,17 +68,6 @@ export default async function PlatformBillingPage() {
     .sort((a, b) => b.sends - a.sends)
     .slice(0, 5);
 
-  const stat = (label: string, value: string, sub: string, Icon: typeof IndianRupee) => (
-    <div className="rounded-2xl border border-sand-200 bg-surface p-4">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
-        <Icon className="h-5 w-5" strokeWidth={1.75} />
-      </div>
-      <p className="mt-3 text-xs font-medium uppercase tracking-wide text-ink/45">{label}</p>
-      <p className="mt-0.5 text-xl font-semibold text-ink">{value}</p>
-      <p className="text-xs text-ink/40">{sub}</p>
-    </div>
-  );
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -94,17 +84,17 @@ export default async function PlatformBillingPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {stat("MRR", formatMoney(mrr), `${activeSubs} active subscriptions`, Repeat)}
-        {stat("ARR", formatMoney(mrr * 12), "annualised run-rate", TrendingUp)}
-        {stat("Plan revenue", formatMoney(toNumber(planPaidAll._sum.amount ?? 0)), `${planPaidAll._count._all} payments all-time`, IndianRupee)}
-        {stat("Last 30 days", formatMoney(toNumber(planPaid30._sum.amount ?? 0)), "plan payments", TrendingUp)}
+        <StatCard label="MRR" value={formatMoney(mrr)} sub={`${activeSubs} active subscriptions`} icon={Repeat} />
+        <StatCard label="ARR" value={formatMoney(mrr * 12)} sub="annualised run-rate" icon={TrendingUp} />
+        <StatCard label="Plan revenue" value={formatMoney(toNumber(planPaidAll._sum.amount ?? 0))} sub={`${planPaidAll._count._all} payments all-time`} icon={IndianRupee} />
+        <StatCard label="Last 30 days" value={formatMoney(toNumber(planPaid30._sum.amount ?? 0))} sub="plan payments" icon={TrendingUp} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {stat("Trials", String(trials), `${trialsExpiring} expiring ≤7 days`, Hourglass)}
-        {stat("Lapsed", String(lapsed), "expired → Free limits", AlertTriangle)}
-        {stat("Overage collected", formatMoney(toNumber(overagePaidAll._sum.amount ?? 0)), "all-time, paid", MessageSquare)}
-        {stat("Active venues", String(restaurants.length), "total tenants", IndianRupee)}
+        <StatCard label="Trials" value={String(trials)} sub={`${trialsExpiring} expiring ≤7 days`} icon={Hourglass} />
+        <StatCard label="Lapsed" value={String(lapsed)} sub="expired → Free limits" icon={AlertTriangle} />
+        <StatCard label="Overage collected" value={formatMoney(toNumber(overagePaidAll._sum.amount ?? 0))} sub="all-time, paid" icon={MessageSquare} />
+        <StatCard label="Active venues" value={String(restaurants.length)} sub="total tenants" icon={IndianRupee} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

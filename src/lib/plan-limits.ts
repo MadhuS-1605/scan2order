@@ -1,17 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { planLimits } from "@/lib/plans";
-import { subscriptionState } from "@/lib/subscription";
-
-// The tier actually in force right now — a lapsed paid plan falls back to FREE.
-async function tierOf(restaurantId: string): Promise<string> {
-  const r = await prisma.restaurant.findUnique({
-    where: { id: restaurantId },
-    select: { planTier: true, planActiveUntil: true, planIsTrial: true },
-  });
-  if (!r) return "FREE";
-  return subscriptionState(r).effectiveTier;
-}
+import { effectiveTierOf as tierOf } from "@/lib/billing/effective-tier";
 
 // True when the restaurant has hit its plan's table cap (excludes the
 // self-service COUNTER pseudo-table, which isn't a real table).
