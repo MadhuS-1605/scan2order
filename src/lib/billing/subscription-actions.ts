@@ -84,13 +84,20 @@ async function applyPlanCoupon(
   return { discounted, coupon: c.code };
 }
 
-// Redeem a promo code atomically — re-check the cap inside a transaction so
-// concurrent settlements can't push redeemedCount past maxRedemptions.
+// Redeem a promo code atomically — the conditional UPDATE only succeeds while
+// redeemedCount is still under the cap, so concurrent settlements (browser
+// callback + webhook racing on the same order) can't both slip past
+// maxRedemptions; the loser affects 0 rows. Mirrors the diner-coupon guard in
+// src/lib/billing/actions.ts.
 async function redeemPlanCoupon(code: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    const c = await tx.planCoupon.findUnique({ where: { code }, select: { redeemedCount: true, maxRedemptions: true } });
-    if (!c || (c.maxRedemptions != null && c.redeemedCount >= c.maxRedemptions)) return;
-    await tx.planCoupon.update({ where: { code }, data: { redeemedCount: { increment: 1 } } });
+  const c = await prisma.planCoupon.findUnique({ where: { code }, select: { maxRedemptions: true } });
+  if (!c) return;
+  await prisma.planCoupon.updateMany({
+    where: {
+      code,
+      ...(c.maxRedemptions != null ? { redeemedCount: { lt: c.maxRedemptions } } : {}),
+    },
+    data: { redeemedCount: { increment: 1 } },
   });
 }
 
@@ -225,9 +232,7 @@ export async function reconcilePlanPaymentByRazorpayOrder(
   // Settle any overage bundled onto the same order, then notify the owner.
   const ovg = await reconcileOverageByRazorpayOrder(razorpayOrderId, razorpayPaymentId, pp.restaurantId);
   if (ovg.amount > 0) await notifyOverageSettled(pp.restaurantId, ovg.amount);
-  if (pp.couponCode) {
-    await prisma.planCoupon.updateMany({ where: { code: pp.couponCode }, data: { redeemedCount: { increment: 1 } } });
-  }
+  if (pp.couponCode) await redeemPlanCoupon(pp.couponCode);
   return { ok: true };
 }
 

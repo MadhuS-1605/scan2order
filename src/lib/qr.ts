@@ -1,5 +1,13 @@
+import { randomBytes } from "node:crypto";
 import QRCode from "qrcode";
 import { env } from "@/lib/env";
+
+// Unguessable QR token (the sole secret gating diner bill/order access) —
+// generate this for every RestaurantTable row rather than relying on the
+// schema's id-style default, which isn't a CSPRNG.
+export function newQrToken(): string {
+  return randomBytes(24).toString("base64url");
+}
 
 // Public URL a diner lands on after scanning a table's QR code. Pass a base URL
 // (from the current request host) so the QR works on the active network.

@@ -710,7 +710,7 @@ model RestaurantTable {
   label        String // e.g. "T1", "Patio 3", "204"
   kind         TableKind  @default(TABLE) // ROOM = hotel in-room dining point
   seats        Int        @default(4)
-  qrToken      String     @unique @default(cuid()) // opaque token encoded in the QR
+  qrToken      String     @unique // CSPRNG token encoded in the QR — set explicitly via newQrToken() (src/lib/qr.ts), never DB-defaulted
   isActive     Boolean    @default(true)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt

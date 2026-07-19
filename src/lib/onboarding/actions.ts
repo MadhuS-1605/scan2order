@@ -1,12 +1,9 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
-
-// Unguessable QR token (the sole secret gating diner bill/order access).
-const newQrToken = () => randomBytes(24).toString("base64url");
+import { newQrToken } from "@/lib/qr";
 import {
   requireAdmin,
   requireOnboardedAdmin,
