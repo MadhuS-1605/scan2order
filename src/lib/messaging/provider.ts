@@ -53,25 +53,41 @@ const isMeta = () =>
   env.messaging.provider === "meta" &&
   Boolean(env.messaging.meta.token && env.messaging.meta.phoneNumberId);
 
+// Body parameters can be positional (Meta's classic {{1}}, {{2}}, … templates —
+// pass plain strings, filled in array order) or named (newer templates authored
+// with {{customer_name}}-style placeholders in Meta's template composer — pass
+// {name, value} pairs; Meta requires a matching `parameter_name` per parameter
+// for these, not positional order).
+type TemplateParam = string | { name: string; value: string };
+
+function bodyParameter(p: TemplateParam): Record<string, string> {
+  return typeof p === "string"
+    ? { type: "text", text: p }
+    : { type: "text", parameter_name: p.name, text: p.value };
+}
+
 // Send a WhatsApp message via Meta's Cloud API using a pre-approved template
 // (required for business-initiated messages like OTP / bills). `params` fill the
-// template's body variables ({{1}}, {{2}}, …) in order. `headerDocument`, when
-// given, fills a template's Document header (e.g. the "Receipt attachment"
-// library template) — Meta fetches the PDF from `link` at send time. Logs to
-// the console when Meta isn't configured, so the flow stays testable without
-// credentials.
+// template's body variables — see TemplateParam above for positional vs named.
+// `headerDocument`, when given, fills a template's Document header (e.g. the
+// "Receipt attachment" library template) — Meta fetches the PDF from `link` at
+// send time. Logs to the console when Meta isn't configured, so the flow stays
+// testable without credentials.
 export async function sendWhatsAppTemplate(
   to: string,
   template: string,
-  params: string[],
+  params: TemplateParam[],
   lang: string = env.messaging.meta.lang,
   headerDocument?: { link: string; filename: string },
 ): Promise<SendResult> {
   if (!(await flagEnabled("whatsapp_enabled"))) return { ok: false, error: "WhatsApp sending is disabled." };
   const m = env.messaging.meta;
   if (!isMeta() || !template) {
+    const paramsText = params
+      .map((p) => (typeof p === "string" ? p : `${p.name}=${p.value}`))
+      .join(" | ");
     console.log(
-      `\n[WhatsApp template "${template}" → ${to}]\n${params.join(" | ")}` +
+      `\n[WhatsApp template "${template}" → ${to}]\n${paramsText}` +
         `${headerDocument ? `\n[attachment] ${headerDocument.filename} — ${headerDocument.link}` : ""}\n`,
     );
     return { ok: true, mocked: true };
@@ -107,7 +123,7 @@ export async function sendWhatsAppTemplate(
                   ]
                 : []),
               ...(params.length
-                ? [{ type: "body", parameters: params.map((text) => ({ type: "text", text })) }]
+                ? [{ type: "body", parameters: params.map(bodyParameter) }]
                 : []),
             ],
           },

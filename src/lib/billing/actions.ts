@@ -682,10 +682,16 @@ export async function verifyBillOtpAction(args: {
   // Otherwise (window closed) use the paid utility template / SMS fallback.
   const windowOpen =
     !!customer.whatsappWindowUntil && customer.whatsappWindowUntil > new Date();
-  // Template body vars: {{1}} restaurant, {{2}} total — the bill PDF itself
-  // rides in the Document header (e.g. Meta's "Receipt attachment" library
-  // template), so no link needs to be spelled out in the body text.
+  // Named template params ({{name}}, {{amount}} — the approved "Receipt
+  // attachment" template's own body text already bakes in the ₹ symbol, so
+  // `amount` is the bare number, not currency-prefixed). The bill PDF itself
+  // rides in the Document header, so no link needs to be spelled out in the
+  // body text.
   const billHeaderDoc = { link, filename: `bill-${order.orderNumber}.pdf` };
+  const billBodyParams = [
+    { name: "name", value: order.restaurant.name },
+    { name: "amount", value: total },
+  ];
   let send: { ok: boolean; error?: string; mocked?: boolean };
   let billable = true;
   if (env.messaging.provider === "meta" && windowOpen) {
@@ -697,7 +703,7 @@ export async function verifyBillOtpAction(args: {
       send = await sendWhatsAppTemplate(
         phone,
         env.messaging.meta.billTemplate,
-        [order.restaurant.name, `${cur} ${total}`],
+        billBodyParams,
         undefined,
         billHeaderDoc,
       );
@@ -706,7 +712,7 @@ export async function verifyBillOtpAction(args: {
     send = await sendWhatsAppTemplate(
       phone,
       env.messaging.meta.billTemplate,
-      [order.restaurant.name, `${cur} ${total}`],
+      billBodyParams,
       undefined,
       billHeaderDoc,
     );
