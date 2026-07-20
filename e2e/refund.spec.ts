@@ -29,6 +29,10 @@ test("owner can refund a counter-paid order", async ({ page }) => {
 
   // Counter payment → "Record refund" (manual note). Defaults to the full amount.
   await page.getByRole("button", { name: /record refund/i }).click();
-  // Order flips to REFUNDED once fully refunded.
-  await expect(page.getByText("REFUNDED", { exact: true })).toBeVisible();
+  // Order flips to REFUNDED once fully refunded. The action does several
+  // sequential writes (refund row, order update, audit log) then Next.js
+  // re-renders the whole order-detail RSC tree — on a loaded CI runner this
+  // can occasionally exceed the suite's default 10s assertion timeout even
+  // though the action itself succeeds, so give this one more headroom.
+  await expect(page.getByText("REFUNDED", { exact: true })).toBeVisible({ timeout: 20_000 });
 });
