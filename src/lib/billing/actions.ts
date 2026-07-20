@@ -390,8 +390,12 @@ export async function createPaymentIntentAction(args: {
 
   const creds = resolveRazorpayCreds(config);
   // No keys configured -> mock path (dev only) so the flow stays demoable.
+  // E2E_ALLOW_MOCK_PAYMENTS is a narrow CI-only escape hatch: the e2e suite
+  // exercises a production build (npm run build && next start, which forces
+  // NODE_ENV=production) but never has real Razorpay credentials. It's set
+  // only in the CI workflow's e2e job env — never in a real deployment.
   if (!creds) {
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV === "production" && process.env.E2E_ALLOW_MOCK_PAYMENTS !== "true") {
       return { ok: false, error: "Online payment is not configured." };
     }
     return { ok: true, mock: true, amount };
@@ -563,12 +567,15 @@ export async function reconcilePaidByRazorpayOrder(
 }
 
 // Dev-only: simulate a successful online payment when Razorpay isn't configured.
+// See E2E_ALLOW_MOCK_PAYMENTS note on createPaymentIntentAction above — same
+// CI-only escape hatch, since this is only ever called after that action
+// returns `mock: true`.
 export async function mockMarkPaidAction(args: {
   orderId: string;
   qrToken: string;
   amount?: number;
 }): Promise<{ ok: boolean; error?: string }> {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && process.env.E2E_ALLOW_MOCK_PAYMENTS !== "true") {
     return { ok: false, error: "Disabled." };
   }
   const session = await getCustomerSession(args.orderId, args.qrToken);

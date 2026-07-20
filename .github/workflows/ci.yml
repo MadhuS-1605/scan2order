@@ -53,6 +53,11 @@ jobs:
       AUTH_SECRET: ci-e2e-secret-at-least-32-characters-long-xyz
       NEXT_PUBLIC_APP_URL: http://localhost:3000
       MESSAGING_PROVIDER: console
+      # This job builds+serves a production build (next start => NODE_ENV=production)
+      # but never has real Razorpay credentials, so the diner mock-payment path
+      # (src/lib/billing/actions.ts) needs an explicit opt-in here. Never set this
+      # in a real deployment — it exists only to unblock e2e/payment.spec.ts.
+      E2E_ALLOW_MOCK_PAYMENTS: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
