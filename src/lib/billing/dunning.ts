@@ -33,7 +33,9 @@ async function notifyOwner(
     if (r.phone) {
       const tpl = env.messaging.meta.dunningTemplate;
       if (env.messaging.provider === "meta" && tpl) {
-        await sendWhatsAppTemplate(r.phone, tpl, [r.name, `${subject}. ${body}`, billingUrl()]);
+        // Billing URL is a static "Manage Subscription" button on the
+        // approved template, not a body variable — no runtime param needed.
+        await sendWhatsAppTemplate(r.phone, tpl, [r.name, `${subject}. ${body}`]);
       } else {
         await sendWhatsApp(r.phone, `${subject}. ${body} ${billingUrl()}`);
       }

@@ -57,9 +57,9 @@ Pick a provider with `MESSAGING_PROVIDER`. `console` (default) just logs — fin
 | `META_WHATSAPP_LANG` | ⚪ | Template language code, default `en`. |
 | `META_WHATSAPP_OTP_TEMPLATE` | 🟡* | Approved template name for bill-OTP (body var `{{1}}`=code). Meta → WhatsApp → Message Templates. |
 | `META_WHATSAPP_BILL_TEMPLATE` | 🟡* | Approved template for the bill — Document header (the bill PDF) + named body vars `{{name}}` (venue) and `{{amount}}` (bare number, no currency code — bake the symbol into the template text). Meta's "Receipt attachment" library template (category Utility) uses this shape. |
-| `META_WHATSAPP_OVERAGE_ALERT_TEMPLATE` | ⚪ | Owner usage-alert template ({{1}} venue, {{2}} usage, {{3}} URL). Blank = free-form fallback. |
-| `META_WHATSAPP_OVERAGE_PAID_TEMPLATE` | ⚪ | Overage-paid receipt template ({{1}} venue, {{2}} amount, {{3}} URL). |
-| `META_WHATSAPP_DUNNING_TEMPLATE` | ⚪ | Trial-ending / lapsed reminder template ({{1}} venue, {{2}} message, {{3}} URL). |
+| `META_WHATSAPP_OVERAGE_ALERT_TEMPLATE` | ⚪ | Owner usage-alert template ({{1}} venue, {{2}} usage) + static "Review Usage" button → `/admin/billing`. Blank = free-form fallback. |
+| `META_WHATSAPP_OVERAGE_PAID_TEMPLATE` | ⚪ | Overage-paid receipt template ({{1}} venue, {{2}} amount) + static "View Billing" button → `/admin/billing`. |
+| `META_WHATSAPP_DUNNING_TEMPLATE` | ⚪ | Trial-ending / lapsed reminder template ({{1}} venue, {{2}} message) + static "Manage Subscription" button → `/admin/billing`. |
 
 ## Image storage — Cloudflare R2
 Cloudflare dash → **R2** → create a bucket; → Manage R2 API Tokens → create an Access Key.

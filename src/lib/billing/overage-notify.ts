@@ -83,7 +83,9 @@ export async function notifyOverageThreshold(
         r.phone,
         `${subject}. ${body} ${billingUrl()}`,
         env.messaging.meta.overageAlertTemplate,
-        [r.name, `${used} of ${allowance} ${label} (${pct}%)`, billingUrl()],
+        // Billing URL is a static "Review Usage" button on the approved
+        // template, not a body variable — no runtime param needed for it.
+        [r.name, `${used} of ${allowance} ${label} (${pct}%)`],
       );
     }
     await notifyRestaurant(restaurantId, {
@@ -115,7 +117,9 @@ export async function notifyOverageSettled(
         r.phone,
         `${subject}. ${body}`,
         env.messaging.meta.overagePaidTemplate,
-        [r.name, amt, billingUrl()],
+        // Billing URL is a static "View Billing" button on the approved
+        // template, not a body variable — no runtime param needed for it.
+        [r.name, amt],
       );
     }
     await notifyRestaurant(restaurantId, {
