@@ -682,6 +682,10 @@ export async function verifyBillOtpAction(args: {
   // Otherwise (window closed) use the paid utility template / SMS fallback.
   const windowOpen =
     !!customer.whatsappWindowUntil && customer.whatsappWindowUntil > new Date();
+  // Template body vars: {{1}} restaurant, {{2}} total — the bill PDF itself
+  // rides in the Document header (e.g. Meta's "Receipt attachment" library
+  // template), so no link needs to be spelled out in the body text.
+  const billHeaderDoc = { link, filename: `bill-${order.orderNumber}.pdf` };
   let send: { ok: boolean; error?: string; mocked?: boolean };
   let billable = true;
   if (env.messaging.provider === "meta" && windowOpen) {
@@ -690,19 +694,22 @@ export async function verifyBillOtpAction(args: {
       billable = false; // free inside the service window
     } else {
       // Window unexpectedly unusable — fall back to the paid template.
-      // Template body vars: {{1}} restaurant, {{2}} total, {{3}} bill link.
-      send = await sendWhatsAppTemplate(phone, env.messaging.meta.billTemplate, [
-        order.restaurant.name,
-        `${cur} ${total}`,
-        link,
-      ]);
+      send = await sendWhatsAppTemplate(
+        phone,
+        env.messaging.meta.billTemplate,
+        [order.restaurant.name, `${cur} ${total}`],
+        undefined,
+        billHeaderDoc,
+      );
     }
   } else if (env.messaging.provider === "meta") {
-    send = await sendWhatsAppTemplate(phone, env.messaging.meta.billTemplate, [
-      order.restaurant.name,
-      `${cur} ${total}`,
-      link,
-    ]);
+    send = await sendWhatsAppTemplate(
+      phone,
+      env.messaging.meta.billTemplate,
+      [order.restaurant.name, `${cur} ${total}`],
+      undefined,
+      billHeaderDoc,
+    );
   } else {
     send = await sendWhatsApp(phone, freeText, order.restaurant.config!.whatsappFrom);
   }

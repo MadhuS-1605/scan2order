@@ -55,18 +55,25 @@ const isMeta = () =>
 
 // Send a WhatsApp message via Meta's Cloud API using a pre-approved template
 // (required for business-initiated messages like OTP / bills). `params` fill the
-// template's body variables ({{1}}, {{2}}, …) in order. Logs to the console when
-// Meta isn't configured, so the flow stays testable without credentials.
+// template's body variables ({{1}}, {{2}}, …) in order. `headerDocument`, when
+// given, fills a template's Document header (e.g. the "Receipt attachment"
+// library template) — Meta fetches the PDF from `link` at send time. Logs to
+// the console when Meta isn't configured, so the flow stays testable without
+// credentials.
 export async function sendWhatsAppTemplate(
   to: string,
   template: string,
   params: string[],
   lang: string = env.messaging.meta.lang,
+  headerDocument?: { link: string; filename: string },
 ): Promise<SendResult> {
   if (!(await flagEnabled("whatsapp_enabled"))) return { ok: false, error: "WhatsApp sending is disabled." };
   const m = env.messaging.meta;
   if (!isMeta() || !template) {
-    console.log(`\n[WhatsApp template "${template}" → ${to}]\n${params.join(" | ")}\n`);
+    console.log(
+      `\n[WhatsApp template "${template}" → ${to}]\n${params.join(" | ")}` +
+        `${headerDocument ? `\n[attachment] ${headerDocument.filename} — ${headerDocument.link}` : ""}\n`,
+    );
     return { ok: true, mocked: true };
   }
   try {
@@ -85,9 +92,24 @@ export async function sendWhatsAppTemplate(
           template: {
             name: template,
             language: { code: lang },
-            components: params.length
-              ? [{ type: "body", parameters: params.map((text) => ({ type: "text", text })) }]
-              : [],
+            components: [
+              ...(headerDocument
+                ? [
+                    {
+                      type: "header",
+                      parameters: [
+                        {
+                          type: "document",
+                          document: { link: headerDocument.link, filename: headerDocument.filename },
+                        },
+                      ],
+                    },
+                  ]
+                : []),
+              ...(params.length
+                ? [{ type: "body", parameters: params.map((text) => ({ type: "text", text })) }]
+                : []),
+            ],
           },
         }),
       },

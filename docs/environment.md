@@ -56,7 +56,7 @@ Pick a provider with `MESSAGING_PROVIDER`. `console` (default) just logs — fin
 | `META_WHATSAPP_API_VERSION` | ⚪ | Graph API version, default `v21.0`. |
 | `META_WHATSAPP_LANG` | ⚪ | Template language code, default `en`. |
 | `META_WHATSAPP_OTP_TEMPLATE` | 🟡* | Approved template name for bill-OTP (body var `{{1}}`=code). Meta → WhatsApp → Message Templates. |
-| `META_WHATSAPP_BILL_TEMPLATE` | 🟡* | Approved template for the bill ({{1}} venue, {{2}} total, {{3}} link). |
+| `META_WHATSAPP_BILL_TEMPLATE` | 🟡* | Approved template for the bill — Document header (the bill PDF) + body ({{1}} venue, {{2}} total). Meta's "Receipt attachment" library template (category Utility) matches this shape. |
 | `META_WHATSAPP_OVERAGE_ALERT_TEMPLATE` | ⚪ | Owner usage-alert template ({{1}} venue, {{2}} usage, {{3}} URL). Blank = free-form fallback. |
 | `META_WHATSAPP_OVERAGE_PAID_TEMPLATE` | ⚪ | Overage-paid receipt template ({{1}} venue, {{2}} amount, {{3}} URL). |
 | `META_WHATSAPP_DUNNING_TEMPLATE` | ⚪ | Trial-ending / lapsed reminder template ({{1}} venue, {{2}} message, {{3}} URL). |
