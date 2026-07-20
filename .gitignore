@@ -52,3 +52,6 @@ next-env.d.ts
 /playwright/.cache/
 /e2e/fixtures.json
 .mcp.json
+.postman
+postman
+
