@@ -72,8 +72,12 @@ export const env = {
   gst: {
     apiKey: process.env.SANDBOX_API_KEY ?? "",
     apiSecret: process.env.SANDBOX_API_SECRET ?? "",
-    // Overridable in case Sandbox bumps the contract; defaults match their docs.
-    baseUrl: process.env.SANDBOX_BASE_URL ?? "https://api.sandbox.co.in",
+    // Sandbox splits test/live traffic by host, not by key prefix: hit
+    // SANDBOX_TEST_BASE_URL outside production, SANDBOX_BASE_URL in prod.
+    baseUrl:
+      process.env.NODE_ENV === "production"
+        ? (process.env.SANDBOX_BASE_URL ?? "https://api.sandbox.co.in")
+        : (process.env.SANDBOX_TEST_BASE_URL ?? "https://test-api.sandbox.co.in"),
     apiVersion: process.env.SANDBOX_API_VERSION ?? "1.0",
     configured: () =>
       Boolean(process.env.SANDBOX_API_KEY && process.env.SANDBOX_API_SECRET),
