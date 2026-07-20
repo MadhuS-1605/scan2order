@@ -97,6 +97,7 @@ Sign up at **api.sandbox.co.in** (India KYC/GST APIs).
 | `SANDBOX_API_SECRET` | ⚪ | Same. |
 | `SANDBOX_BASE_URL` | ⚪ | Defaults to `https://api.sandbox.co.in`. |
 | `SANDBOX_API_VERSION` | ⚪ | Defaults to `1.0`. |
+| `SANDBOX_TEST_API_KEY` / `_SECRET` / `_BASE_URL` | ⚪ | Local dev only — same test-credential pattern as the Razorpay `_TEST_` vars above: takes priority whenever `NODE_ENV=development`, never in a built deployment. |
 
 > Without these, the onboarding GSTIN field still works — it just isn't auto-verified.
 

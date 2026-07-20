@@ -84,16 +84,27 @@ export const env = {
   // onboarding Settings step verifies a tenant's GSTIN against the GSTN and
   // auto-fills the registered legal name instead of trusting typed input.
   // Fail-soft: if unset or the API errors, the tenant can still save manually.
-  // See src/lib/gst.ts.
-  gst: {
-    apiKey: process.env.SANDBOX_API_KEY ?? "",
-    apiSecret: process.env.SANDBOX_API_SECRET ?? "",
+  // See src/lib/gst.ts. Same local-dev test-credential fallback as Razorpay
+  // above — SANDBOX_TEST_* (including a separate test host) takes priority
+  // when NODE_ENV=development; never applies to a built deployment.
+  gst: (() => {
+    const useTest = process.env.NODE_ENV === "development";
+    const apiKey = (useTest && process.env.SANDBOX_TEST_API_KEY) || process.env.SANDBOX_API_KEY || "";
+    const apiSecret =
+      (useTest && process.env.SANDBOX_TEST_API_SECRET) || process.env.SANDBOX_API_SECRET || "";
     // Overridable in case Sandbox bumps the contract; defaults match their docs.
-    baseUrl: process.env.SANDBOX_BASE_URL ?? "https://api.sandbox.co.in",
-    apiVersion: process.env.SANDBOX_API_VERSION ?? "1.0",
-    configured: () =>
-      Boolean(process.env.SANDBOX_API_KEY && process.env.SANDBOX_API_SECRET),
-  },
+    const baseUrl =
+      (useTest && process.env.SANDBOX_TEST_BASE_URL) ||
+      process.env.SANDBOX_BASE_URL ||
+      "https://api.sandbox.co.in";
+    return {
+      apiKey,
+      apiSecret,
+      baseUrl,
+      apiVersion: process.env.SANDBOX_API_VERSION ?? "1.0",
+      configured: () => Boolean(apiKey && apiSecret),
+    };
+  })(),
 
   // Cloudflare R2 (S3-compatible) object storage for tenant image uploads (menu
   // photos, logos). Files are stored under a per-tenant key prefix and served
