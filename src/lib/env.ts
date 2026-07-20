@@ -49,20 +49,36 @@ export const env = {
       ),
   },
 
-  razorpay: {
-    keyId: process.env.RAZORPAY_KEY_ID ?? "",
-    keySecret: process.env.RAZORPAY_KEY_SECRET ?? "",
-    publicKeyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "",
-    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
-    // Razorpay Subscription Plan IDs per tier (for auto-renew / eMandate). Create
-    // these in the Razorpay dashboard; leave blank to keep pay-to-extend only.
-    planIds: {
-      STARTER: process.env.RAZORPAY_PLAN_STARTER ?? "",
-      PRO: process.env.RAZORPAY_PLAN_PRO ?? "",
-    } as Record<string, string>,
-    configured: () =>
-      Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
-  },
+  // In local dev (NODE_ENV=development, i.e. `next dev`), prefer RAZORPAY_TEST_*
+  // over the live RAZORPAY_* vars when both are set — so local work never
+  // touches the live platform Razorpay account. `next build`/`next start`
+  // always run with NODE_ENV=production, so this fallback never applies to a
+  // real deployment regardless of what's in its env. Per-tenant keys (Settings
+  // → Payment & messaging) are separate and unaffected by this.
+  razorpay: (() => {
+    const useTest = process.env.NODE_ENV === "development";
+    const keyId = (useTest && process.env.RAZORPAY_TEST_KEY_ID) || process.env.RAZORPAY_KEY_ID || "";
+    const keySecret =
+      (useTest && process.env.RAZORPAY_TEST_KEY_SECRET) || process.env.RAZORPAY_KEY_SECRET || "";
+    const publicKeyId =
+      (useTest && process.env.NEXT_PUBLIC_RAZORPAY_TEST_KEY_ID) ||
+      process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
+      "";
+    return {
+      keyId,
+      keySecret,
+      publicKeyId,
+      webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
+      // Razorpay Subscription Plan IDs per tier (for auto-renew / eMandate).
+      // Create these in the Razorpay dashboard; leave blank to keep
+      // pay-to-extend only.
+      planIds: {
+        STARTER: process.env.RAZORPAY_PLAN_STARTER ?? "",
+        PRO: process.env.RAZORPAY_PLAN_PRO ?? "",
+      } as Record<string, string>,
+      configured: () => Boolean(keyId && keySecret),
+    };
+  })(),
 
   // GSTIN verification via Sandbox (api.sandbox.co.in). When configured, the
   // onboarding Settings step verifies a tenant's GSTIN against the GSTN and

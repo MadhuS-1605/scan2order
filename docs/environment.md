@@ -33,6 +33,7 @@ Sign up at **dashboard.razorpay.com** → Settings → API Keys.
 | `RAZORPAY_WEBHOOK_SECRET` | 🟡 | Dashboard → Settings → Webhooks → add `…/api/webhook/razorpay`, events `payment.captured`, `order.paid`, `subscription.*`; set + copy the signing secret. |
 | `RAZORPAY_PLAN_STARTER` | ⚪ | Subscription Plan id for auto-renew (Starter). Dashboard → Subscriptions → Plans. Blank = pay-to-extend only. |
 | `RAZORPAY_PLAN_PRO` | ⚪ | Same, for Pro. |
+| `RAZORPAY_TEST_KEY_ID` / `_SECRET` / `NEXT_PUBLIC_RAZORPAY_TEST_KEY_ID` | ⚪ | Local dev only — when set, these take priority over the vars above whenever `NODE_ENV=development` (i.e. `next dev`), so local work uses Razorpay's test mode instead of the live platform account. Never take effect in a built deployment (`next build`/`next start` always run `NODE_ENV=production`), regardless of what's in that deployment's env — so don't bother unsetting them for prod. |
 
 ## Email — Resend
 Create an account at **resend.com**.
