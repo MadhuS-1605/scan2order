@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { overageBreakdown, overageCost, type UsageCounts } from "@/lib/plans";
+import { overageBreakdown, overageCost, withGst, type UsageCounts } from "@/lib/plans";
 import { usagePeriod } from "@/lib/usage";
 import { effectiveTierOf } from "@/lib/billing/effective-tier";
 
@@ -24,9 +24,12 @@ export type OverageMonth = {
   period: string;
   whatsappUnits: number;
   emailUnits: number;
-  cost: number; // pre-GST ₹
+  cost: number; // pre-GST ₹ (per-channel breakdown transparency only — not a charge amount)
 };
 
+// `total` is GST-inclusive (sum of each month's cost + 18% GST) — the actual
+// amount that will be charged/invoiced, so it matches the settle button and
+// the eventual OverageCharge rows exactly (see buildPendingOverageCharges).
 export type OutstandingOverage = { total: number; months: OverageMonth[] };
 
 // Unsettled overage across all CLOSED months (read-only; safe in render).
@@ -69,7 +72,7 @@ export async function getOutstandingOverage(
       emailUnits: b.email.units,
       cost,
     });
-    total += cost;
+    total += withGst(cost); // GST added per month, matching the OverageCharge row it becomes
   }
   months.sort((a, b) => (a.period < b.period ? -1 : 1));
   return { total: round2(total), months };
@@ -92,7 +95,7 @@ export async function buildPendingOverageCharges(
         period: m.period,
         whatsappUnits: m.whatsappUnits,
         emailUnits: m.emailUnits,
-        amount: m.cost,
+        amount: withGst(m.cost), // GST-inclusive — this row IS the amount charged/invoiced
         status: "PENDING",
       },
     });

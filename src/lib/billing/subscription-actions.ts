@@ -13,9 +13,10 @@ import {
   cancelRazorpaySubscription,
   verifyRazorpaySubscriptionSignature,
 } from "@/lib/payments/razorpay";
-import { planByTier, type PlanTier } from "@/lib/plans";
+import { planByTier, withGst, type PlanTier } from "@/lib/plans";
 import { resolvePlanPrice } from "@/lib/plan-settings";
 import { recordAudit } from "@/lib/audit";
+import { round2 } from "@/lib/pricing";
 import {
   getOutstandingOverage,
   buildPendingOverageCharges,
@@ -111,17 +112,21 @@ export async function startPlanCheckoutAction(tierInput: string, codeInput?: str
   const creds = platformCreds();
   if (!creds) return { ok: true, mock: true }; // dev: no gateway -> client calls mock activate
 
-  // Apply a promo code (if valid) to the (operator-set) plan price.
+  // Apply a promo code (if valid) to the (operator-set) plan price, then add
+  // 18% GST on top of the discounted (taxable) price — matches what the
+  // pricing/plans pages promise ("+18% GST at checkout").
   const basePrice = await resolvePlanPrice(tier);
   const { discounted, coupon } = await applyPlanCoupon(basePrice, codeInput);
+  const grossPlan = withGst(discounted);
 
   // Bundle any outstanding usage overage into this plan-extend order, so the
-  // owner settles plan + overage in one payment.
+  // owner settles plan + overage in one payment. `overage` is already
+  // GST-inclusive (see buildPendingOverageCharges).
   const { total: overage } = await buildPendingOverageCharges(session.restaurantId);
 
   const order = await createRazorpayOrder(
     creds,
-    discounted + overage,
+    round2(grossPlan + overage),
     "INR",
     `plan-${session.restaurantId.slice(-6)}-${tier}`,
   );
@@ -129,7 +134,7 @@ export async function startPlanCheckoutAction(tierInput: string, codeInput?: str
     data: {
       restaurantId: session.restaurantId,
       tier,
-      amount: discounted,
+      amount: grossPlan,
       periodDays: PERIOD_DAYS,
       status: "PENDING",
       razorpayOrderId: order.id,
@@ -205,7 +210,13 @@ export async function mockActivatePlanAction(tierInput: string): Promise<{ ok: b
   const plan = planByTier(tier);
   if (plan.tier === "FREE" || plan.price <= 0) return { ok: false, error: "Choose a paid plan." };
   await prisma.planPayment.create({
-    data: { restaurantId: session.restaurantId, tier, amount: plan.price, periodDays: PERIOD_DAYS, status: "PAID" },
+    data: {
+      restaurantId: session.restaurantId,
+      tier,
+      amount: withGst(plan.price), // mirror the live flow's GST-inclusive amount
+      periodDays: PERIOD_DAYS,
+      status: "PAID",
+    },
   });
   await activate(session.restaurantId, tier);
   // Mirror the live bundle: clear any outstanding overage too.
