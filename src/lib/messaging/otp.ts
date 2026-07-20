@@ -17,9 +17,20 @@ export class OtpRateLimitError extends Error {
   }
 }
 
-export function generateOtp(): string {
-  return String(randomInt(0, 1_000_000)).padStart(6, "0");
+export function generateOtp(digits: number = 6): string {
+  return String(randomInt(0, 10 ** digits)).padStart(digits, "0");
 }
+
+// Phone-purpose OTPs may fall back to 2Factor SMS (src/lib/messaging/provider.ts
+// sendOtpSms), whose DLT-registered template only accepts a 4-digit code — use
+// 4 digits for those so the same code works whether it goes out over WhatsApp
+// or the SMS fallback. ADMIN_LOGIN is email-only (never SMS, see the schema
+// comment on OtpPurpose), so it keeps the stronger 6-digit code.
+const OTP_DIGITS: Record<OtpPurpose, number> = {
+  WHATSAPP_BILL: 4,
+  LOGIN: 4,
+  ADMIN_LOGIN: 6,
+};
 
 // Creates and stores a hashed OTP, returning the plain code to send.
 export async function createOtp(
@@ -31,7 +42,7 @@ export async function createOtp(
   });
   if (recent >= MAX_PER_WINDOW) throw new OtpRateLimitError();
 
-  const code = generateOtp();
+  const code = generateOtp(OTP_DIGITS[purpose]);
   await prisma.otpVerification.create({
     data: {
       phone,
