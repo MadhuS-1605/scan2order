@@ -61,7 +61,7 @@ export function PoweredBy() {
     <div className="py-6 text-center text-xs text-ink/35">
       <p>
         Powered by{" "}
-        <span className="font-medium text-ink/45">Scan to Order</span>
+        <span className="font-medium text-ink/45">Scan2Order</span>
       </p>
       <p className="mt-1">
         <Link href="/privacy" className="hover:text-ink/60">

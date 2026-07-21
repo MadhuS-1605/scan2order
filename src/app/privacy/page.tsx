@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "Privacy Policy · Scan to Order" };
+export const metadata = { title: "Privacy Policy · Scan2Order" };
 
 // Baseline privacy policy template — review and adapt to your jurisdiction
 // (India DPDP / GDPR etc.) and replace the contact details.
@@ -36,6 +36,17 @@ export default function PrivacyPage() {
             We share data only with the restaurant you ordered from and the
             service providers needed to run the service (payments, messaging,
             hosting). We do not sell your data.
+          </p>
+        </section>
+        <section>
+          <h2 className="font-display text-lg text-ink">Analytics</h2>
+          <p>
+            If enabled by the platform operator, we use Google Analytics to
+            understand how the site is used—pages visited, general location,
+            device type. Google may set cookies for this. Analytics is off by
+            default and only runs when the operator has configured it; you can
+            also opt out via your browser&apos;s Do Not Track setting or an
+            ad-blocking extension.
           </p>
         </section>
         <section>

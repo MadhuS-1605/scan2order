@@ -1,4 +1,4 @@
-/* Scan to Order — service worker: offline fallback + web push */
+/* Scan2Order — service worker: offline fallback + web push */
 const CACHE = "sto-v1";
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png"];
@@ -45,7 +45,7 @@ self.addEventListener("push", (event) => {
   } catch {
     data = { body: event.data ? event.data.text() : "" };
   }
-  const title = data.title || "Scan to Order";
+  const title = data.title || "Scan2Order";
   const options = {
     body: data.body || "",
     icon: "/icons/icon-192.png",

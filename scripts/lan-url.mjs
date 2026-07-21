@@ -12,7 +12,7 @@ for (const iface of Object.values(os.networkInterfaces())) {
   }
 }
 
-console.log("\n  [1mScan to Order[0m — reachable at:");
+console.log("\n  [1mScan2Order[0m — reachable at:");
 console.log(`  → ${scheme}://localhost:${port}  (this machine)`);
 for (const ip of ips) {
   console.log(`  → ${scheme}://${ip}:${port}  (other devices on your network)`);

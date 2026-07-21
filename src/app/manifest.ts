@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Scan to Order",
+    name: "Scan2Order",
     short_name: "ScanOrder",
     description:
       "QR-based restaurant ordering — scan, browse, order, and pay from your table.",

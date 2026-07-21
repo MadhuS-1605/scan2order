@@ -390,8 +390,12 @@ export async function createPaymentIntentAction(args: {
 
   const creds = resolveRazorpayCreds(config);
   // No keys configured -> mock path (dev only) so the flow stays demoable.
+  // E2E_ALLOW_MOCK_PAYMENTS is a narrow CI-only escape hatch: the e2e suite
+  // exercises a production build (npm run build && next start, which forces
+  // NODE_ENV=production) but never has real Razorpay credentials. It's set
+  // only in the CI workflow's e2e job env — never in a real deployment.
   if (!creds) {
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV === "production" && process.env.E2E_ALLOW_MOCK_PAYMENTS !== "true") {
       return { ok: false, error: "Online payment is not configured." };
     }
     return { ok: true, mock: true, amount };
@@ -563,12 +567,15 @@ export async function reconcilePaidByRazorpayOrder(
 }
 
 // Dev-only: simulate a successful online payment when Razorpay isn't configured.
+// See E2E_ALLOW_MOCK_PAYMENTS note on createPaymentIntentAction above — same
+// CI-only escape hatch, since this is only ever called after that action
+// returns `mock: true`.
 export async function mockMarkPaidAction(args: {
   orderId: string;
   qrToken: string;
   amount?: number;
 }): Promise<{ ok: boolean; error?: string }> {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV === "production" && process.env.E2E_ALLOW_MOCK_PAYMENTS !== "true") {
     return { ok: false, error: "Disabled." };
   }
   const session = await getCustomerSession(args.orderId, args.qrToken);
@@ -675,6 +682,16 @@ export async function verifyBillOtpAction(args: {
   // Otherwise (window closed) use the paid utility template / SMS fallback.
   const windowOpen =
     !!customer.whatsappWindowUntil && customer.whatsappWindowUntil > new Date();
+  // Named template params ({{name}}, {{amount}} — the approved "Receipt
+  // attachment" template's own body text already bakes in the ₹ symbol, so
+  // `amount` is the bare number, not currency-prefixed). The bill PDF itself
+  // rides in the Document header, so no link needs to be spelled out in the
+  // body text.
+  const billHeaderDoc = { link, filename: `bill-${order.orderNumber}.pdf` };
+  const billBodyParams = [
+    { name: "name", value: order.restaurant.name },
+    { name: "amount", value: total },
+  ];
   let send: { ok: boolean; error?: string; mocked?: boolean };
   let billable = true;
   if (env.messaging.provider === "meta" && windowOpen) {
@@ -683,19 +700,22 @@ export async function verifyBillOtpAction(args: {
       billable = false; // free inside the service window
     } else {
       // Window unexpectedly unusable — fall back to the paid template.
-      // Template body vars: {{1}} restaurant, {{2}} total, {{3}} bill link.
-      send = await sendWhatsAppTemplate(phone, env.messaging.meta.billTemplate, [
-        order.restaurant.name,
-        `${cur} ${total}`,
-        link,
-      ]);
+      send = await sendWhatsAppTemplate(
+        phone,
+        env.messaging.meta.billTemplate,
+        billBodyParams,
+        undefined,
+        billHeaderDoc,
+      );
     }
   } else if (env.messaging.provider === "meta") {
-    send = await sendWhatsAppTemplate(phone, env.messaging.meta.billTemplate, [
-      order.restaurant.name,
-      `${cur} ${total}`,
-      link,
-    ]);
+    send = await sendWhatsAppTemplate(
+      phone,
+      env.messaging.meta.billTemplate,
+      billBodyParams,
+      undefined,
+      billHeaderDoc,
+    );
   } else {
     send = await sendWhatsApp(phone, freeText, order.restaurant.config!.whatsappFrom);
   }
@@ -726,7 +746,7 @@ export async function emailBillAction(args: {
     <h2 style="margin:0 0 8px">Thanks for dining at ${safeName}!</h2>
     <p style="margin:0 0 16px">Here's your bill (#${order.orderNumber}) — total <strong>${cur} ${total}</strong>.</p>
     <p style="margin:0 0 20px"><a href="${link}" style="background:#d93d0b;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Download your bill (PDF)</a></p>
-    <p style="color:#999;font-size:12px;margin:0">Powered by Scan to Order</p>
+    <p style="color:#999;font-size:12px;margin:0">Powered by Scan2Order</p>
   </div>`;
   const send = await sendEmail(email, `Your bill from ${name} (#${order.orderNumber})`, html);
   if (!send.ok) return { ok: false, error: send.error ?? "Could not send the email." };

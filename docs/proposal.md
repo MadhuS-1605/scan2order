@@ -1,4 +1,4 @@
-# Scan to Order — Product Proposal
+# Scan2Order — Product Proposal
 
 **Prepared for:** Restaurant, café & hotel owners and managers
 **Prepared by:** [Your name / company]
@@ -8,7 +8,7 @@
 
 ## 1. Executive summary
 
-Scan to Order is an all-in-one platform that lets your guests **scan a QR code,
+Scan2Order is an all-in-one platform that lets your guests **scan a QR code,
 browse your menu, order and pay from their own phone** — while your kitchen,
 floor, billing, and reporting run on one connected system. No app for guests to
 install, no new hardware to buy.

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "Terms of Service · Scan to Order" };
+export const metadata = { title: "Terms of Service · Scan2Order" };
 
 // Baseline terms template — review and adapt before relying on it.
 export default function TermsPage() {

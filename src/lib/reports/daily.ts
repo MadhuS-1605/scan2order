@@ -135,7 +135,7 @@ function summaryHtml(name: string, rep: DayReport): string {
       ${row("Refunds", m(rep.refunds))}
     </table>
     ${items ? `<p style="margin:16px 0 4px;font-weight:600">Top items</p><ul style="margin:0;padding-left:18px;color:#333;font-size:14px">${items}</ul>` : ""}
-    <p style="color:#999;font-size:12px;margin:20px 0 0">Powered by Scan to Order</p>
+    <p style="color:#999;font-size:12px;margin:20px 0 0">Powered by Scan2Order</p>
   </div>`;
 }
 

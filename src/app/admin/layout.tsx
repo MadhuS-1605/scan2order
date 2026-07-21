@@ -221,7 +221,7 @@ export default async function AdminLayout({
       </div>
 
       <footer className="mx-auto max-w-7xl px-4 pb-8 pt-2 text-center text-xs text-ink/35 sm:px-6">
-        Powered by Scan to Order
+        Powered by Scan2Order
       </footer>
       <Toaster />
     </div>

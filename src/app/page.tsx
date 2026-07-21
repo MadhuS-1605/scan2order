@@ -297,7 +297,7 @@ export default async function Home() {
                       <CardFooter className="mt-auto border-t-0 bg-transparent pt-0">
                         {isContact ? (
                           <a
-                            href={`mailto:sales@${PLATFORM_DOMAIN}?subject=${encodeURIComponent("Scan to Order — Enterprise enquiry")}`}
+                            href={`mailto:sales@${PLATFORM_DOMAIN}?subject=${encodeURIComponent("Scan2Order — Enterprise enquiry")}`}
                             className={cn(buttonVariants({ variant: "outline" }), "w-full")}
                           >
                             Contact sales
@@ -327,7 +327,7 @@ export default async function Home() {
             email beyond your plan are billed per message — bills sent inside a
             guest&apos;s 24-hour WhatsApp window are free.{" "}
             <span className="text-ink/55">
-              &ldquo;Powered by Scan to Order&rdquo; stays on every plan.
+              &ldquo;Powered by Scan2Order&rdquo; stays on every plan.
             </span>
           </p>
 
@@ -342,7 +342,7 @@ export default async function Home() {
                 </p>
               </div>
               <a
-                href={`mailto:sales@${PLATFORM_DOMAIN}?subject=${encodeURIComponent("Scan to Order — demo request")}`}
+                href={`mailto:sales@${PLATFORM_DOMAIN}?subject=${encodeURIComponent("Scan2Order — demo request")}`}
                 className={cn(
                   buttonVariants({ variant: "outline" }),
                   "shrink-0 gap-2 border-brand-300 text-brand-700 hover:bg-brand-50",
@@ -360,7 +360,7 @@ export default async function Home() {
         <div className="mx-auto max-w-6xl px-6 py-8">
           <Separator className="mb-8 bg-sand-200" />
           <div className="flex flex-col items-center justify-between gap-3 text-sm text-ink/50 sm:flex-row">
-            <span className="font-display text-base text-ink">Scan to Order</span>
+            <span className="font-display text-base text-ink">Scan2Order</span>
             <div className="flex items-center gap-4">
               <Link href="/privacy" className="hover:text-ink">
                 Privacy
@@ -370,6 +370,9 @@ export default async function Home() {
               </Link>
             </div>
           </div>
+          <p className="mt-4 text-center text-xs text-ink/35">
+            © 2026 Scan2Order. All rights reserved.
+          </p>
         </div>
       </footer>
 

@@ -747,7 +747,7 @@ export function BillClient({
         {phase === "otp" && (
           <div className="space-y-2">
             <p className="text-xs text-ink/55">
-              We sent a 6-digit code to{" "}
+              We sent a 4-digit code to{" "}
               <span className="font-medium text-ink">{phone}</span>.
             </p>
             {mockedOtp && (
@@ -756,12 +756,12 @@ export function BillClient({
               </p>
             )}
             <Input
-              placeholder="Enter 6-digit code"
-              aria-label="6-digit verification code"
+              placeholder="Enter 4-digit code"
+              aria-label="4-digit verification code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               inputMode="numeric"
-              maxLength={6}
+              maxLength={4}
               className="text-center text-lg tracking-[0.4em]"
             />
             <div className="flex gap-2">

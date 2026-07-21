@@ -33,6 +33,7 @@ Sign up at **dashboard.razorpay.com** → Settings → API Keys.
 | `RAZORPAY_WEBHOOK_SECRET` | 🟡 | Dashboard → Settings → Webhooks → add `…/api/webhook/razorpay`, events `payment.captured`, `order.paid`, `subscription.*`; set + copy the signing secret. |
 | `RAZORPAY_PLAN_STARTER` | ⚪ | Subscription Plan id for auto-renew (Starter). Dashboard → Subscriptions → Plans. Blank = pay-to-extend only. |
 | `RAZORPAY_PLAN_PRO` | ⚪ | Same, for Pro. |
+| `RAZORPAY_TEST_KEY_ID` / `_SECRET` / `NEXT_PUBLIC_RAZORPAY_TEST_KEY_ID` | ⚪ | Local dev only — when set, these take priority over the vars above whenever `NODE_ENV=development` (i.e. `next dev`), so local work uses Razorpay's test mode instead of the live platform account. Never take effect in a built deployment (`next build`/`next start` always run `NODE_ENV=production`), regardless of what's in that deployment's env — so don't bother unsetting them for prod. |
 
 ## Email — Resend
 Create an account at **resend.com**.
@@ -40,7 +41,7 @@ Create an account at **resend.com**.
 | Key | Req | What / how to get it |
 |---|---|---|
 | `RESEND_API_KEY` | 🟡 | Resend → API Keys → Create. Without it, emails are logged to the console (dev). |
-| `EMAIL_FROM` | ⚪ | Sender, e.g. `Scan to Order <noreply@yourdomain.com>`. Verify the domain in Resend → Domains first. Has a default test sender. |
+| `EMAIL_FROM` | ⚪ | Sender, e.g. `Scan2Order <noreply@yourdomain.com>`. Verify the domain in Resend → Domains first — the code default (`noreply@email.scan2order.co.in`) still needs verifying like any other domain. For zero-setup testing before you've verified anything, override to Resend's shared test sender, `onboarding@resend.dev`. |
 
 ## WhatsApp & SMS
 Pick a provider with `MESSAGING_PROVIDER`. `console` (default) just logs — fine for dev.
@@ -56,10 +57,10 @@ Pick a provider with `MESSAGING_PROVIDER`. `console` (default) just logs — fin
 | `META_WHATSAPP_API_VERSION` | ⚪ | Graph API version, default `v21.0`. |
 | `META_WHATSAPP_LANG` | ⚪ | Template language code, default `en`. |
 | `META_WHATSAPP_OTP_TEMPLATE` | 🟡* | Approved template name for bill-OTP (body var `{{1}}`=code). Meta → WhatsApp → Message Templates. |
-| `META_WHATSAPP_BILL_TEMPLATE` | 🟡* | Approved template for the bill ({{1}} venue, {{2}} total, {{3}} link). |
-| `META_WHATSAPP_OVERAGE_ALERT_TEMPLATE` | ⚪ | Owner usage-alert template ({{1}} venue, {{2}} usage, {{3}} URL). Blank = free-form fallback. |
-| `META_WHATSAPP_OVERAGE_PAID_TEMPLATE` | ⚪ | Overage-paid receipt template ({{1}} venue, {{2}} amount, {{3}} URL). |
-| `META_WHATSAPP_DUNNING_TEMPLATE` | ⚪ | Trial-ending / lapsed reminder template ({{1}} venue, {{2}} message, {{3}} URL). |
+| `META_WHATSAPP_BILL_TEMPLATE` | 🟡* | Approved template for the bill — Document header (the bill PDF) + named body vars `{{name}}` (venue) and `{{amount}}` (bare number, no currency code — bake the symbol into the template text). Meta's "Receipt attachment" library template (category Utility) uses this shape. |
+| `META_WHATSAPP_OVERAGE_ALERT_TEMPLATE` | ⚪ | Owner usage-alert template ({{1}} venue, {{2}} usage) + static "Review Usage" button → `/admin/billing`. Blank = free-form fallback. |
+| `META_WHATSAPP_OVERAGE_PAID_TEMPLATE` | ⚪ | Overage-paid receipt template ({{1}} venue, {{2}} amount) + static "View Billing" button → `/admin/billing`. |
+| `META_WHATSAPP_DUNNING_TEMPLATE` | ⚪ | Trial-ending / lapsed reminder template ({{1}} venue, {{2}} message) + static "Manage Subscription" button → `/admin/billing`. |
 
 ## Image storage — Cloudflare R2
 Cloudflare dash → **R2** → create a bucket; → Manage R2 API Tokens → create an Access Key.
@@ -96,6 +97,7 @@ Sign up at **api.sandbox.co.in** (India KYC/GST APIs).
 | `SANDBOX_API_SECRET` | ⚪ | Same. |
 | `SANDBOX_BASE_URL` | ⚪ | Defaults to `https://api.sandbox.co.in`. |
 | `SANDBOX_API_VERSION` | ⚪ | Defaults to `1.0`. |
+| `SANDBOX_TEST_API_KEY` / `_SECRET` / `_BASE_URL` | ⚪ | Local dev only — same test-credential pattern as the Razorpay `_TEST_` vars above: takes priority whenever `NODE_ENV=development`, never in a built deployment. |
 
 > Without these, the onboarding GSTIN field still works — it just isn't auto-verified.
 
@@ -103,7 +105,7 @@ Sign up at **api.sandbox.co.in** (India KYC/GST APIs).
 
 | Key | Req | What / how to get it |
 |---|---|---|
-| `PLATFORM_LEGAL_NAME` | ⚪ | Your registered company name on subscription invoices. Default "Scan to Order". |
+| `PLATFORM_LEGAL_NAME` | ⚪ | Your registered company name on subscription invoices. Default "Scan2Order". |
 | `PLATFORM_GSTIN` | ⚪ | Your company's GSTIN. |
 | `PLATFORM_ADDRESS` | ⚪ | Your company's registered address. |
 | `PLATFORM_BILLING_EMAIL` | ⚪ | Billing contact shown on invoices. |

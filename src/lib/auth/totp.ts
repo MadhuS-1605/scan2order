@@ -81,7 +81,7 @@ export function verifyTotp(secretB32: string, token: string, window = 1): boolea
 }
 
 // otpauth:// URI to render as a QR for authenticator-app enrolment.
-export function totpUri(secret: string, account: string, issuer = "Scan to Order"): string {
+export function totpUri(secret: string, account: string, issuer = "Scan2Order"): string {
   const label = encodeURIComponent(`${issuer}:${account}`);
   const params = new URLSearchParams({ secret, issuer, algorithm: "SHA1", digits: String(DIGITS), period: String(STEP) });
   return `otpauth://totp/${label}?${params.toString()}`;

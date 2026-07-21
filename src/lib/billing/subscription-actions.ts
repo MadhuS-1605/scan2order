@@ -13,9 +13,10 @@ import {
   cancelRazorpaySubscription,
   verifyRazorpaySubscriptionSignature,
 } from "@/lib/payments/razorpay";
-import { planByTier, type PlanTier } from "@/lib/plans";
+import { planByTier, withGst, type PlanTier } from "@/lib/plans";
 import { resolvePlanPrice } from "@/lib/plan-settings";
 import { recordAudit } from "@/lib/audit";
+import { round2 } from "@/lib/pricing";
 import {
   getOutstandingOverage,
   buildPendingOverageCharges,
@@ -84,13 +85,20 @@ async function applyPlanCoupon(
   return { discounted, coupon: c.code };
 }
 
-// Redeem a promo code atomically — re-check the cap inside a transaction so
-// concurrent settlements can't push redeemedCount past maxRedemptions.
+// Redeem a promo code atomically — the conditional UPDATE only succeeds while
+// redeemedCount is still under the cap, so concurrent settlements (browser
+// callback + webhook racing on the same order) can't both slip past
+// maxRedemptions; the loser affects 0 rows. Mirrors the diner-coupon guard in
+// src/lib/billing/actions.ts.
 async function redeemPlanCoupon(code: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    const c = await tx.planCoupon.findUnique({ where: { code }, select: { redeemedCount: true, maxRedemptions: true } });
-    if (!c || (c.maxRedemptions != null && c.redeemedCount >= c.maxRedemptions)) return;
-    await tx.planCoupon.update({ where: { code }, data: { redeemedCount: { increment: 1 } } });
+  const c = await prisma.planCoupon.findUnique({ where: { code }, select: { maxRedemptions: true } });
+  if (!c) return;
+  await prisma.planCoupon.updateMany({
+    where: {
+      code,
+      ...(c.maxRedemptions != null ? { redeemedCount: { lt: c.maxRedemptions } } : {}),
+    },
+    data: { redeemedCount: { increment: 1 } },
   });
 }
 
@@ -104,17 +112,21 @@ export async function startPlanCheckoutAction(tierInput: string, codeInput?: str
   const creds = platformCreds();
   if (!creds) return { ok: true, mock: true }; // dev: no gateway -> client calls mock activate
 
-  // Apply a promo code (if valid) to the (operator-set) plan price.
+  // Apply a promo code (if valid) to the (operator-set) plan price, then add
+  // 18% GST on top of the discounted (taxable) price — matches what the
+  // pricing/plans pages promise ("+18% GST at checkout").
   const basePrice = await resolvePlanPrice(tier);
   const { discounted, coupon } = await applyPlanCoupon(basePrice, codeInput);
+  const grossPlan = withGst(discounted);
 
   // Bundle any outstanding usage overage into this plan-extend order, so the
-  // owner settles plan + overage in one payment.
+  // owner settles plan + overage in one payment. `overage` is already
+  // GST-inclusive (see buildPendingOverageCharges).
   const { total: overage } = await buildPendingOverageCharges(session.restaurantId);
 
   const order = await createRazorpayOrder(
     creds,
-    discounted + overage,
+    round2(grossPlan + overage),
     "INR",
     `plan-${session.restaurantId.slice(-6)}-${tier}`,
   );
@@ -122,7 +134,7 @@ export async function startPlanCheckoutAction(tierInput: string, codeInput?: str
     data: {
       restaurantId: session.restaurantId,
       tier,
-      amount: discounted,
+      amount: grossPlan,
       periodDays: PERIOD_DAYS,
       status: "PENDING",
       razorpayOrderId: order.id,
@@ -139,7 +151,7 @@ export async function startPlanCheckoutAction(tierInput: string, codeInput?: str
     amount: order.amount,
     keyId: creds.keyId,
     currency: "INR",
-    name: "Scan to Order",
+    name: "Scan2Order",
   };
 }
 
@@ -198,7 +210,13 @@ export async function mockActivatePlanAction(tierInput: string): Promise<{ ok: b
   const plan = planByTier(tier);
   if (plan.tier === "FREE" || plan.price <= 0) return { ok: false, error: "Choose a paid plan." };
   await prisma.planPayment.create({
-    data: { restaurantId: session.restaurantId, tier, amount: plan.price, periodDays: PERIOD_DAYS, status: "PAID" },
+    data: {
+      restaurantId: session.restaurantId,
+      tier,
+      amount: withGst(plan.price), // mirror the live flow's GST-inclusive amount
+      periodDays: PERIOD_DAYS,
+      status: "PAID",
+    },
   });
   await activate(session.restaurantId, tier);
   // Mirror the live bundle: clear any outstanding overage too.
@@ -225,9 +243,7 @@ export async function reconcilePlanPaymentByRazorpayOrder(
   // Settle any overage bundled onto the same order, then notify the owner.
   const ovg = await reconcileOverageByRazorpayOrder(razorpayOrderId, razorpayPaymentId, pp.restaurantId);
   if (ovg.amount > 0) await notifyOverageSettled(pp.restaurantId, ovg.amount);
-  if (pp.couponCode) {
-    await prisma.planCoupon.updateMany({ where: { code: pp.couponCode }, data: { redeemedCount: { increment: 1 } } });
-  }
+  if (pp.couponCode) await redeemPlanCoupon(pp.couponCode);
   return { ok: true };
 }
 
@@ -252,7 +268,7 @@ export async function startAutoRenewAction(tierInput: string): Promise<AutoRenew
     where: { id: session.restaurantId },
     data: { razorpaySubscriptionId: sub.id },
   });
-  return { ok: true, subscriptionId: sub.id, keyId: creds.keyId, name: "Scan to Order" };
+  return { ok: true, subscriptionId: sub.id, keyId: creds.keyId, name: "Scan2Order" };
 }
 
 export async function verifyAutoRenewAction(args: {
@@ -388,7 +404,7 @@ export async function startOverageCheckoutAction(): Promise<PlanIntent> {
     amount: order.amount,
     keyId: creds.keyId,
     currency: "INR",
-    name: "Scan to Order",
+    name: "Scan2Order",
   };
 }
 

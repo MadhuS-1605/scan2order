@@ -258,7 +258,7 @@ export async function generateBillPdf(data: BillPdfData): Promise<Buffer> {
         2,
       );
     }
-    center("Powered by Scan to Order", 6, "Helvetica", 0);
+    center("Powered by Scan2Order", 6, "Helvetica", 0);
 
     doc.end();
   });

@@ -22,12 +22,12 @@ const fraunces = Fraunces({
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: {
-    default: "Scan to Order — QR ordering for restaurants, cafés & hotels",
-    template: "%s · Scan to Order",
+    default: "Scan2Order — QR ordering for restaurants, cafés & hotels",
+    template: "%s · Scan2Order",
   },
   description:
     "QR ordering for restaurants, cafés, bars & hotels — guests scan, browse your menu, order and pay from their table. No app to install.",
-  applicationName: "Scan to Order",
+  applicationName: "Scan2Order",
   keywords: [
     "QR ordering",
     "restaurant ordering app",
@@ -42,22 +42,22 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Scan to Order",
+    title: "Scan2Order",
   },
   formatDetection: { telephone: false },
   // Rich link previews when an owner shares the site (WhatsApp, social, search).
   // The OG/Twitter image is provided by app/opengraph-image.tsx automatically.
   openGraph: {
     type: "website",
-    siteName: "Scan to Order",
-    title: "Scan to Order — QR ordering for restaurants, cafés & hotels",
+    siteName: "Scan2Order",
+    title: "Scan2Order — QR ordering for restaurants, cafés & hotels",
     description:
       "Guests scan, browse your menu, order and pay from their table. Live kitchen tickets, one consolidated bill, GST invoices — no app to install.",
     url: "/",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Scan to Order — QR ordering for restaurants, cafés & hotels",
+    title: "Scan2Order — QR ordering for restaurants, cafés & hotels",
     description:
       "QR ordering for restaurants, cafés, bars & hotels. Scan, order, pay — no app to install.",
   },

@@ -13,6 +13,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { hashPassword } from "../src/lib/auth/password";
 import { computeTotals } from "../src/lib/pricing";
+import { newQrToken } from "../src/lib/qr";
 
 const SLUG = "cafe-two";
 
@@ -62,7 +63,7 @@ async function main() {
     },
   });
   const table = await prisma.restaurantTable.create({
-    data: { restaurantId: restaurant.id, label: "C1", seats: 2 },
+    data: { restaurantId: restaurant.id, label: "C1", seats: 2, qrToken: newQrToken() },
   });
 
   const totals = computeTotals([{ price: 150, quantity: 2 }], "EXCLUSIVE", 5);

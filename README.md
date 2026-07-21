@@ -1,4 +1,4 @@
-# Scan to Order — Restaurant Management SaaS
+# Scan2Order — Restaurant Management SaaS
 
 A multi-tenant, QR-based dine-in ordering platform for restaurants, cafés, bars,
 cloud kitchens and hotels. Diners scan a table's QR code, browse the menu and
@@ -51,7 +51,7 @@ constant-time signature checks, an enforcing CSP, and fail-closed rate limits).
 
 ## Overview & value proposition
 
-Scan to Order is a single SaaS that a venue signs up for, onboards in a few
+Scan2Order is a single SaaS that a venue signs up for, onboards in a few
 minutes, and immediately starts taking contactless orders. Each tenant
 (restaurant) gets:
 
@@ -148,7 +148,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     participant G as Guest
-    participant App as Scan to Order
+    participant App as Scan2Order
     participant RZP as Razorpay
     participant WH as Webhook
     G->>App: Create payment intent (amount clamped server-side)

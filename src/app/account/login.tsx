@@ -78,11 +78,11 @@ export function AccountLogin() {
               </p>
             )}
             <Input
-              placeholder="Enter 6-digit code"
+              placeholder="Enter 4-digit code"
               value={code}
               onChange={(e) => setCode(e.target.value)}
               inputMode="numeric"
-              maxLength={6}
+              maxLength={4}
               className="text-center text-lg tracking-[0.4em]"
             />
             <div className="flex gap-2">

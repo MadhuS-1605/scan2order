@@ -20,6 +20,18 @@ async function signIn(page: Page, email: string, password: string) {
 }
 
 test("owner can refund a counter-paid order", async ({ page }) => {
+  // The refund action does several sequential writes (refund row, order
+  // update, audit log), then Next.js re-renders the ENTIRE order-detail RSC
+  // tree — which means re-running the admin layout's own query waterfall
+  // (session, restaurant, announcement, notification counts, attendance,
+  // group membership) on top of the order page's own queries. On a shared CI
+  // runner this combination has been observed to occasionally exceed 20s
+  // even though the action itself succeeds (confirmed by a subsequent retry
+  // finding the order already refunded). Raise the WHOLE TEST's timeout, not
+  // just the assertion's — an assertion timeout longer than the enclosing
+  // test timeout is a no-op once the outer clock runs out.
+  test.setTimeout(60_000);
+
   const fx = fixtures();
   await signIn(page, fx.owner2Email, fx.password);
 
@@ -30,5 +42,5 @@ test("owner can refund a counter-paid order", async ({ page }) => {
   // Counter payment → "Record refund" (manual note). Defaults to the full amount.
   await page.getByRole("button", { name: /record refund/i }).click();
   // Order flips to REFUNDED once fully refunded.
-  await expect(page.getByText("REFUNDED", { exact: true })).toBeVisible();
+  await expect(page.getByText("REFUNDED", { exact: true })).toBeVisible({ timeout: 45_000 });
 });

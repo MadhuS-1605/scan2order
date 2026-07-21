@@ -1,4 +1,4 @@
-# Scan to Order — How It Works (Visual Flows)
+# Scan2Order — How It Works (Visual Flows)
 
 Diagrams render automatically on GitHub and in any Mermaid-aware viewer
 (VS Code, Obsidian, etc.). Use these in demos to show the journeys end-to-end.
@@ -44,7 +44,7 @@ stateDiagram-v2
 
 ```mermaid
 flowchart TD
-    Q[Scan to Order] --> R[Dine-in<br/>per-table, shared bill]
+    Q[Scan2Order] --> R[Dine-in<br/>per-table, shared bill]
     Q --> S[Self-service / QSR / counter<br/>pay-first, pick up by number]
     Q --> T[Cloud kitchen / takeaway<br/>pickup or delivery + address]
     R --> U[Restaurants · Cafés · Bars]
@@ -57,7 +57,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     participant G as Guest
-    participant App as Scan to Order
+    participant App as Scan2Order
     participant RZP as Razorpay
     participant K as Kitchen/Staff
     G->>App: Place order
@@ -118,7 +118,7 @@ flowchart TB
     subgraph Staff
       Admin[Admin · KDS · Floor · Reports]
     end
-    Phone --> App[Scan to Order<br/>Next.js app]
+    Phone --> App[Scan2Order<br/>Next.js app]
     Admin --> App
     App --> DB[(PostgreSQL)]
     App --> RZP[Razorpay]

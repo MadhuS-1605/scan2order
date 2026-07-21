@@ -49,39 +49,62 @@ export const env = {
       ),
   },
 
-  razorpay: {
-    keyId: process.env.RAZORPAY_KEY_ID ?? "",
-    keySecret: process.env.RAZORPAY_KEY_SECRET ?? "",
-    publicKeyId: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "",
-    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
-    // Razorpay Subscription Plan IDs per tier (for auto-renew / eMandate). Create
-    // these in the Razorpay dashboard; leave blank to keep pay-to-extend only.
-    planIds: {
-      STARTER: process.env.RAZORPAY_PLAN_STARTER ?? "",
-      PRO: process.env.RAZORPAY_PLAN_PRO ?? "",
-    } as Record<string, string>,
-    configured: () =>
-      Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
-  },
+  // In local dev (NODE_ENV=development, i.e. `next dev`), prefer RAZORPAY_TEST_*
+  // over the live RAZORPAY_* vars when both are set — so local work never
+  // touches the live platform Razorpay account. `next build`/`next start`
+  // always run with NODE_ENV=production, so this fallback never applies to a
+  // real deployment regardless of what's in its env. Per-tenant keys (Settings
+  // → Payment & messaging) are separate and unaffected by this.
+  razorpay: (() => {
+    const useTest = process.env.NODE_ENV === "development";
+    const keyId = (useTest && process.env.RAZORPAY_TEST_KEY_ID) || process.env.RAZORPAY_KEY_ID || "";
+    const keySecret =
+      (useTest && process.env.RAZORPAY_TEST_KEY_SECRET) || process.env.RAZORPAY_KEY_SECRET || "";
+    const publicKeyId =
+      (useTest && process.env.NEXT_PUBLIC_RAZORPAY_TEST_KEY_ID) ||
+      process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
+      "";
+    return {
+      keyId,
+      keySecret,
+      publicKeyId,
+      webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
+      // Razorpay Subscription Plan IDs per tier (for auto-renew / eMandate).
+      // Create these in the Razorpay dashboard; leave blank to keep
+      // pay-to-extend only.
+      planIds: {
+        STARTER: process.env.RAZORPAY_PLAN_STARTER ?? "",
+        PRO: process.env.RAZORPAY_PLAN_PRO ?? "",
+      } as Record<string, string>,
+      configured: () => Boolean(keyId && keySecret),
+    };
+  })(),
 
   // GSTIN verification via Sandbox (api.sandbox.co.in). When configured, the
   // onboarding Settings step verifies a tenant's GSTIN against the GSTN and
   // auto-fills the registered legal name instead of trusting typed input.
   // Fail-soft: if unset or the API errors, the tenant can still save manually.
-  // See src/lib/gst.ts.
-  gst: {
-    apiKey: process.env.SANDBOX_API_KEY ?? "",
-    apiSecret: process.env.SANDBOX_API_SECRET ?? "",
-    // Sandbox splits test/live traffic by host, not by key prefix: hit
-    // SANDBOX_TEST_BASE_URL outside production, SANDBOX_BASE_URL in prod.
-    baseUrl:
-      process.env.NODE_ENV === "production"
-        ? (process.env.SANDBOX_BASE_URL ?? "https://api.sandbox.co.in")
-        : (process.env.SANDBOX_TEST_BASE_URL ?? "https://test-api.sandbox.co.in"),
-    apiVersion: process.env.SANDBOX_API_VERSION ?? "1.0",
-    configured: () =>
-      Boolean(process.env.SANDBOX_API_KEY && process.env.SANDBOX_API_SECRET),
-  },
+  // See src/lib/gst.ts. Same local-dev test-credential fallback as Razorpay
+  // above — SANDBOX_TEST_* (including a separate test host) takes priority
+  // when NODE_ENV=development; never applies to a built deployment.
+  gst: (() => {
+    const useTest = process.env.NODE_ENV === "development";
+    const apiKey = (useTest && process.env.SANDBOX_TEST_API_KEY) || process.env.SANDBOX_API_KEY || "";
+    const apiSecret =
+      (useTest && process.env.SANDBOX_TEST_API_SECRET) || process.env.SANDBOX_API_SECRET || "";
+    // Overridable in case Sandbox bumps the contract; defaults match their docs.
+    const baseUrl =
+      (useTest && process.env.SANDBOX_TEST_BASE_URL) ||
+      process.env.SANDBOX_BASE_URL ||
+      "https://api.sandbox.co.in";
+    return {
+      apiKey,
+      apiSecret,
+      baseUrl,
+      apiVersion: process.env.SANDBOX_API_VERSION ?? "1.0",
+      configured: () => Boolean(apiKey && apiSecret),
+    };
+  })(),
 
   // Cloudflare R2 (S3-compatible) object storage for tenant image uploads (menu
   // photos, logos). Files are stored under a per-tenant key prefix and served
@@ -112,7 +135,7 @@ export const env = {
   // tenants. The charged amount is treated as GST-inclusive and decomposed on
   // the invoice. See src/lib/billing/invoice-pdf.ts.
   platform: {
-    legalName: process.env.PLATFORM_LEGAL_NAME ?? "Scan to Order",
+    legalName: process.env.PLATFORM_LEGAL_NAME ?? "Scan2Order",
     gstin: process.env.PLATFORM_GSTIN ?? "",
     address: process.env.PLATFORM_ADDRESS ?? "",
     billingEmail: process.env.PLATFORM_BILLING_EMAIL ?? "",
@@ -143,13 +166,13 @@ export const env = {
   sentryDsn: process.env.SENTRY_DSN ?? "",
 
   // Transactional email via Resend. Falls back to console logging when unset.
-  // EMAIL_FROM defaults to Resend's shared test sender (works without a verified
-  // domain); set a verified domain sender in production.
+  // The default below requires email.scan2order.co.in to be a verified
+  // sending domain in Resend (Domains -> Add Domain) — set EMAIL_FROM to
+  // override, or to Resend's no-verification test sender
+  // (onboarding@resend.dev) while you don't have a domain verified yet.
   email: {
     resendApiKey: process.env.RESEND_API_KEY ?? "",
-    // Sender at the verified Resend domain (email.astechlabs.co.in). Override
-    // the local-part/name via EMAIL_FROM.
-    from: process.env.EMAIL_FROM ?? "Scan to Order <noreply@email.astechlabs.co.in>",
+    from: process.env.EMAIL_FROM ?? "Scan2Order <noreply@email.scan2order.co.in>",
     configured: () => Boolean(process.env.RESEND_API_KEY),
   },
 

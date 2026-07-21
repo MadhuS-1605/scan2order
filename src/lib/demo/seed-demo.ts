@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../auth/password";
 import { computeTotals } from "../pricing";
+import { newQrToken } from "../qr";
 
 // Builds (and resets) the public demo tenant — "Spice Garden (Demo)". Shared by
 // the CLI seed (prisma/seed.ts) and the nightly reset cron
@@ -205,7 +206,7 @@ export async function seedDemoRestaurant(prisma: PrismaClient): Promise<{ orders
   const tables = await Promise.all(
     ["T1", "T2", "T3", "T4", "T5", "T6"].map((label, i) =>
       prisma.restaurantTable.create({
-        data: { restaurantId: restaurant.id, label, seats: i < 2 ? 2 : 4 },
+        data: { restaurantId: restaurant.id, label, seats: i < 2 ? 2 : 4, qrToken: newQrToken() },
       }),
     ),
   );

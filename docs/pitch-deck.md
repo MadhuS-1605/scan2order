@@ -3,7 +3,7 @@ marp: true
 theme: default
 paginate: true
 size: 16:9
-header: 'Scan to Order'
+header: 'Scan2Order'
 footer: 'Confidential · for venue owners & managers'
 style: |
   section { font-size: 26px; }
@@ -17,7 +17,7 @@ style: |
 
 <!-- _class: lead -->
 
-# Scan to Order
+# Scan2Order
 
 ### QR ordering, payments & operations for restaurants, cafés & hotels
 
@@ -166,7 +166,7 @@ Sign up → Profile → Menu → Settings → Tables & QR → OPEN
 
 ---
 
-## Why Scan to Order
+## Why Scan2Order
 
 - ✅ **All-in-one** — ordering, payments, kitchen, hotel, analytics
 - ✅ **No new hardware** — runs on the guest's phone & your existing devices

@@ -1,4 +1,4 @@
-# Scan to Order — Sales & Presentation Kit
+# Scan2Order — Sales & Presentation Kit
 
 Everything you need to present the product to restaurant, café and hotel owners.
 All content is accurate to the **shipping product** (kept separate from the
