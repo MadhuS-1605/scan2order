@@ -166,13 +166,13 @@ export const env = {
   sentryDsn: process.env.SENTRY_DSN ?? "",
 
   // Transactional email via Resend. Falls back to console logging when unset.
-  // EMAIL_FROM defaults to Resend's shared test sender (works without a verified
-  // domain); set a verified domain sender in production.
+  // The default below requires email.scan2order.co.in to be a verified
+  // sending domain in Resend (Domains -> Add Domain) — set EMAIL_FROM to
+  // override, or to Resend's no-verification test sender
+  // (onboarding@resend.dev) while you don't have a domain verified yet.
   email: {
     resendApiKey: process.env.RESEND_API_KEY ?? "",
-    // Sender at the verified Resend domain (email.astechlabs.co.in). Override
-    // the local-part/name via EMAIL_FROM.
-    from: process.env.EMAIL_FROM ?? "Scan to Order <noreply@email.astechlabs.co.in>",
+    from: process.env.EMAIL_FROM ?? "Scan to Order <noreply@email.scan2order.co.in>",
     configured: () => Boolean(process.env.RESEND_API_KEY),
   },
 
