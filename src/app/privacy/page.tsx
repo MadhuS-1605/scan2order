@@ -39,6 +39,17 @@ export default function PrivacyPage() {
           </p>
         </section>
         <section>
+          <h2 className="font-display text-lg text-ink">Analytics</h2>
+          <p>
+            If enabled by the platform operator, we use Google Analytics to
+            understand how the site is used—pages visited, general location,
+            device type. Google may set cookies for this. Analytics is off by
+            default and only runs when the operator has configured it; you can
+            also opt out via your browser&apos;s Do Not Track setting or an
+            ad-blocking extension.
+          </p>
+        </section>
+        <section>
           <h2 className="font-display text-lg text-ink">Your rights</h2>
           <p>
             You can view your dining history, correct your name, and{" "}
