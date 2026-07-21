@@ -1,6 +1,6 @@
 # Backup & disaster recovery
 
-Operational runbook for the Scan to Order platform data. Keep this current.
+Operational runbook for the Scan2Order platform data. Keep this current.
 
 ## What to protect
 - **PostgreSQL** — the system of record (tenants, orders, billing, usage, config). This is the critical asset.

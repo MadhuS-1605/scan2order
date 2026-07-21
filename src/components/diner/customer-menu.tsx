@@ -406,7 +406,7 @@ export function CustomerMenu({
 
           <p className="py-6 text-center text-xs text-ink/35">
             Powered by{" "}
-            <span className="font-medium text-ink/45">Scan to Order</span>
+            <span className="font-medium text-ink/45">Scan2Order</span>
           </p>
         </div>
       </div>

@@ -1,4 +1,4 @@
-// Scan-to-Order — Prisma schema
+// Scan2Order — Prisma schema
 // Datasource: PostgreSQL. Generator: prisma-client-js.
 
 generator client {

@@ -1,6 +1,6 @@
 import { WifiOff } from "lucide-react";
 
-export const metadata = { title: "Offline · Scan to Order" };
+export const metadata = { title: "Offline · Scan2Order" };
 
 export default function OfflinePage() {
   return (

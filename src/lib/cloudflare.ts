@@ -85,7 +85,7 @@ export async function ensureSubdomain(subdomain: string): Promise<DnsResult> {
     content: env.cloudflare.dnsTarget,
     proxied: env.cloudflare.proxied,
     ttl: 1, // "auto" — required when proxied
-    comment: "scan-to-order tenant subdomain",
+    comment: "scan2order tenant subdomain",
   };
   try {
     const id = await findRecordId(name);

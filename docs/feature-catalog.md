@@ -1,4 +1,4 @@
-# Scan to Order — Complete Feature Catalog
+# Scan2Order — Complete Feature Catalog
 
 > The exhaustive, accurate list of what the product does today. Use this as the
 > master checklist when presenting so nothing is missed. Items are grouped by

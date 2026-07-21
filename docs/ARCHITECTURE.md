@@ -1,6 +1,6 @@
 # Architecture
 
-Scan to Order is a single Next.js 16 (App Router) application serving three
+Scan2Order is a single Next.js 16 (App Router) application serving three
 browser surfaces — the **diner** ordering app, the **admin** dashboard, and the
 **kitchen/monitor** screens — plus a cross-tenant **super-admin** console. It is
 backed by a single PostgreSQL database accessed through Prisma 7's `pg` driver

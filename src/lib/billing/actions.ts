@@ -746,7 +746,7 @@ export async function emailBillAction(args: {
     <h2 style="margin:0 0 8px">Thanks for dining at ${safeName}!</h2>
     <p style="margin:0 0 16px">Here's your bill (#${order.orderNumber}) — total <strong>${cur} ${total}</strong>.</p>
     <p style="margin:0 0 20px"><a href="${link}" style="background:#d93d0b;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Download your bill (PDF)</a></p>
-    <p style="color:#999;font-size:12px;margin:0">Powered by Scan to Order</p>
+    <p style="color:#999;font-size:12px;margin:0">Powered by Scan2Order</p>
   </div>`;
   const send = await sendEmail(email, `Your bill from ${name} (#${order.orderNumber})`, html);
   if (!send.ok) return { ok: false, error: send.error ?? "Could not send the email." };

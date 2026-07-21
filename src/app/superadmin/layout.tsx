@@ -37,7 +37,7 @@ export default async function SuperAdminLayout({
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3">
           <div className="flex items-center gap-3">
             <p className="hidden shrink-0 font-display text-lg text-ink sm:block">
-              Scan to Order <span className="text-ink/40">· Platform</span>
+              Scan2Order <span className="text-ink/40">· Platform</span>
             </p>
             <SuperAdminNav items={navItems} />
           </div>

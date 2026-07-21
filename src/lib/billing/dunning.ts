@@ -26,7 +26,7 @@ async function notifyOwner(
         <h2 style="margin:0 0 8px">${escapeHtml(subject)}</h2>
         <p style="margin:0 0 16px">${escapeHtml(body)}</p>
         <p style="margin:0 0 20px"><a href="${billingUrl()}" style="background:#d93d0b;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Manage your plan</a></p>
-        <p style="color:#999;font-size:12px;margin:0">Powered by Scan to Order</p>
+        <p style="color:#999;font-size:12px;margin:0">Powered by Scan2Order</p>
       </div>`;
       await sendEmail(r.email, subject, html);
     }

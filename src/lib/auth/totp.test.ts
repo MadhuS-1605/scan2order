@@ -56,9 +56,9 @@ describe("verifyTotpStep (replay guard primitive)", () => {
 
 describe("totpUri", () => {
   it("builds a scannable otpauth URI", () => {
-    const uri = totpUri("ABC234", "admin@x.com", "Scan to Order");
+    const uri = totpUri("ABC234", "admin@x.com", "Scan2Order");
     expect(uri).toContain("otpauth://totp/");
     expect(uri).toContain("secret=ABC234");
-    expect(uri).toContain("issuer=Scan+to+Order");
+    expect(uri).toContain("issuer=Scan2Order");
   });
 });

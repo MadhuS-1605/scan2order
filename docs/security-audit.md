@@ -1,4 +1,4 @@
-# Security Audit — Scan to Order
+# Security Audit — Scan2Order
 
 > **STATUS: REMEDIATED 2026-06-22.** All Critical/High and the actioned
 > Medium/Low findings below were fixed (build green, 111 tests pass — incl. new

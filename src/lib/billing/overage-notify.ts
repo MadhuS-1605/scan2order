@@ -52,7 +52,7 @@ function wrap(title: string, body: string): string {
     <h2 style="margin:0 0 8px">${escapeHtml(title)}</h2>
     <p style="margin:0 0 16px">${escapeHtml(body)}</p>
     <p style="margin:0 0 20px"><a href="${billingUrl()}" style="background:#d93d0b;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">View usage &amp; billing</a></p>
-    <p style="color:#999;font-size:12px;margin:0">Powered by Scan to Order</p>
+    <p style="color:#999;font-size:12px;margin:0">Powered by Scan2Order</p>
   </div>`;
 }
 

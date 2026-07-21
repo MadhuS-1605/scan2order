@@ -130,12 +130,12 @@ export const PLANS: Plan[] = [
     allowance: { whatsapp: 0, email: 50 },
     details: {
       blurb:
-        "Everything you need to take QR orders and run the kitchen — at no cost. Ideal for trying Scan to Order or running a small outlet.",
+        "Everything you need to take QR orders and run the kitchen — at no cost. Ideal for trying Scan2Order or running a small outlet.",
       included: [
         "QR menu & ordering for up to 10 tables with a live kitchen screen.",
         "Guests pay at the counter (online card/UPI payments need Starter).",
         "Up to 50 bill emails a month; WhatsApp bills & OTP aren't included.",
-        '"Powered by Scan to Order" appears on your guest menu and bills.',
+        '"Powered by Scan2Order" appears on your guest menu and bills.',
       ],
       usageCosts: [
         `Extra bill emails beyond 50/month: ${EMAIL_RATE} each + 18% GST.`,
@@ -169,7 +169,7 @@ export const PLANS: Plan[] = [
         "Online payments through your own Razorpay account (card/UPI).",
         "WhatsApp login OTP and bills, coupons, happy-hour, loyalty, reservations, analytics, CSV export and refunds.",
         "1,000 WhatsApp messages and 2,000 emails included every month.",
-        '"Powered by Scan to Order" stays on guest-facing pages.',
+        '"Powered by Scan2Order" stays on guest-facing pages.',
       ],
       usageCosts: METERED_USAGE_COSTS,
     },

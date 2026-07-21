@@ -110,7 +110,7 @@ export async function sendTestWebhook(
         body: JSON.stringify({
           event: "test.ping",
           at: new Date().toISOString(),
-          message: "Hello from Scan to Order",
+          message: "Hello from Scan2Order",
         }),
         signal: controller.signal,
       });

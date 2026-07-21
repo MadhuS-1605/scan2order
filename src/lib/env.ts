@@ -135,7 +135,7 @@ export const env = {
   // tenants. The charged amount is treated as GST-inclusive and decomposed on
   // the invoice. See src/lib/billing/invoice-pdf.ts.
   platform: {
-    legalName: process.env.PLATFORM_LEGAL_NAME ?? "Scan to Order",
+    legalName: process.env.PLATFORM_LEGAL_NAME ?? "Scan2Order",
     gstin: process.env.PLATFORM_GSTIN ?? "",
     address: process.env.PLATFORM_ADDRESS ?? "",
     billingEmail: process.env.PLATFORM_BILLING_EMAIL ?? "",
@@ -172,7 +172,7 @@ export const env = {
   // (onboarding@resend.dev) while you don't have a domain verified yet.
   email: {
     resendApiKey: process.env.RESEND_API_KEY ?? "",
-    from: process.env.EMAIL_FROM ?? "Scan to Order <noreply@email.scan2order.co.in>",
+    from: process.env.EMAIL_FROM ?? "Scan2Order <noreply@email.scan2order.co.in>",
     configured: () => Boolean(process.env.RESEND_API_KEY),
   },
 

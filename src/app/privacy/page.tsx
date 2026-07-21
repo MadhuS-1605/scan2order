@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "Privacy Policy · Scan to Order" };
+export const metadata = { title: "Privacy Policy · Scan2Order" };
 
 // Baseline privacy policy template — review and adapt to your jurisdiction
 // (India DPDP / GDPR etc.) and replace the contact details.

@@ -151,7 +151,7 @@ export async function startPlanCheckoutAction(tierInput: string, codeInput?: str
     amount: order.amount,
     keyId: creds.keyId,
     currency: "INR",
-    name: "Scan to Order",
+    name: "Scan2Order",
   };
 }
 
@@ -268,7 +268,7 @@ export async function startAutoRenewAction(tierInput: string): Promise<AutoRenew
     where: { id: session.restaurantId },
     data: { razorpaySubscriptionId: sub.id },
   });
-  return { ok: true, subscriptionId: sub.id, keyId: creds.keyId, name: "Scan to Order" };
+  return { ok: true, subscriptionId: sub.id, keyId: creds.keyId, name: "Scan2Order" };
 }
 
 export async function verifyAutoRenewAction(args: {
@@ -404,7 +404,7 @@ export async function startOverageCheckoutAction(): Promise<PlanIntent> {
     amount: order.amount,
     keyId: creds.keyId,
     currency: "INR",
-    name: "Scan to Order",
+    name: "Scan2Order",
   };
 }
 

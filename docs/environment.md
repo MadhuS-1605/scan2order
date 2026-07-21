@@ -41,7 +41,7 @@ Create an account at **resend.com**.
 | Key | Req | What / how to get it |
 |---|---|---|
 | `RESEND_API_KEY` | 🟡 | Resend → API Keys → Create. Without it, emails are logged to the console (dev). |
-| `EMAIL_FROM` | ⚪ | Sender, e.g. `Scan to Order <noreply@yourdomain.com>`. Verify the domain in Resend → Domains first — the code default (`noreply@email.scan2order.co.in`) still needs verifying like any other domain. For zero-setup testing before you've verified anything, override to Resend's shared test sender, `onboarding@resend.dev`. |
+| `EMAIL_FROM` | ⚪ | Sender, e.g. `Scan2Order <noreply@yourdomain.com>`. Verify the domain in Resend → Domains first — the code default (`noreply@email.scan2order.co.in`) still needs verifying like any other domain. For zero-setup testing before you've verified anything, override to Resend's shared test sender, `onboarding@resend.dev`. |
 
 ## WhatsApp & SMS
 Pick a provider with `MESSAGING_PROVIDER`. `console` (default) just logs — fine for dev.
@@ -105,7 +105,7 @@ Sign up at **api.sandbox.co.in** (India KYC/GST APIs).
 
 | Key | Req | What / how to get it |
 |---|---|---|
-| `PLATFORM_LEGAL_NAME` | ⚪ | Your registered company name on subscription invoices. Default "Scan to Order". |
+| `PLATFORM_LEGAL_NAME` | ⚪ | Your registered company name on subscription invoices. Default "Scan2Order". |
 | `PLATFORM_GSTIN` | ⚪ | Your company's GSTIN. |
 | `PLATFORM_ADDRESS` | ⚪ | Your company's registered address. |
 | `PLATFORM_BILLING_EMAIL` | ⚪ | Billing contact shown on invoices. |

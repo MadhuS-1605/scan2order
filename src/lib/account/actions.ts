@@ -29,7 +29,7 @@ export async function requestLoginOtpAction(args: {
       ? await sendWhatsAppTemplate(phone, env.messaging.meta.otpTemplate, [code])
       : await sendWhatsApp(
           phone,
-          `Your Scan to Order login code is ${code}. It expires in 5 minutes.`,
+          `Your Scan2Order login code is ${code}. It expires in 5 minutes.`,
         );
   if (!res.ok) {
     // WhatsApp didn't go through (often the number isn't on WhatsApp) — try the

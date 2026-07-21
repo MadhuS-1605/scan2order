@@ -52,7 +52,7 @@ async function forwardToSentry(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Sentry-Auth": `Sentry sentry_version=7, sentry_client=scan-to-order/1.0, sentry_key=${dsn.publicKey}`,
+        "X-Sentry-Auth": `Sentry sentry_version=7, sentry_client=scan2order/1.0, sentry_key=${dsn.publicKey}`,
       },
       body: JSON.stringify({
         event_id: randomUUID().replace(/-/g, ""),

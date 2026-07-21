@@ -386,7 +386,7 @@ export async function inviteOwnerAction(_prev: ActionState, formData: FormData):
   const url = `${env.appUrl.replace(/\/$/, "")}/set-password/${token}`;
   await sendEmail(
     email,
-    "Set up your Scan to Order account",
+    "Set up your Scan2Order account",
     `<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;color:#1c1917">
       <h2 style="margin:0 0 8px">Welcome, ${escapeHtml(name)} 👋</h2>
       <p>An account has been created for you. Set your password to get started — this link expires in 7 days.</p>
@@ -434,9 +434,9 @@ export async function sendWinbackAction(formData: FormData): Promise<void> {
     `We'd love to have ${r.name} back`,
     `<div style="font-family:system-ui,Segoe UI,Arial,sans-serif;color:#1c1917">
       <h2 style="margin:0 0 8px">We miss you at ${escapeHtml(r.name)} 👋</h2>
-      <p>Your Scan to Order plan has lapsed. Reactivate today and pick up right where you left off — your menu, tables and history are all still here.</p>
+      <p>Your Scan2Order plan has lapsed. Reactivate today and pick up right where you left off — your menu, tables and history are all still here.</p>
       <p style="margin:16px 0"><a href="${url}" style="background:#d93d0b;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;display:inline-block">Reactivate your plan</a></p>
-      <p style="color:#999;font-size:12px">Powered by Scan to Order</p>
+      <p style="color:#999;font-size:12px">Powered by Scan2Order</p>
     </div>`,
   );
   await recordPlatformAudit(session, "tenant.winback", undefined, restaurantId);
