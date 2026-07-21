@@ -6,8 +6,24 @@ function required(name: string, value: string | undefined): string {
   return value;
 }
 
+// Single source of truth for which environment this is running in. NODE_ENV
+// only ever tells us dev vs. built (staging and prod both run `next
+// build`/`next start`, so NODE_ENV is "production" for both) — APP_ENV is the
+// explicit signal, set per deployment. Falls back to NODE_ENV so local `next
+// dev` works without setting anything.
+type AppEnv = "development" | "staging" | "production";
+const APP_ENV: AppEnv =
+  process.env.APP_ENV === "staging" || process.env.APP_ENV === "development"
+    ? process.env.APP_ENV
+    : process.env.NODE_ENV === "development"
+      ? "development"
+      : "production";
+const isStagingOrDev = APP_ENV !== "production";
+
 export const env = {
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+  appEnv: APP_ENV,
+  isStaging: APP_ENV === "staging",
   authSecret: () => {
     const s = required("AUTH_SECRET", process.env.AUTH_SECRET);
     // A weak secret makes session JWTs forgeable — require ≥32 chars.
@@ -49,14 +65,12 @@ export const env = {
       ),
   },
 
-  // In local dev (NODE_ENV=development, i.e. `next dev`), prefer RAZORPAY_TEST_*
-  // over the live RAZORPAY_* vars when both are set — so local work never
-  // touches the live platform Razorpay account. `next build`/`next start`
-  // always run with NODE_ENV=production, so this fallback never applies to a
-  // real deployment regardless of what's in its env. Per-tenant keys (Settings
-  // → Payment & messaging) are separate and unaffected by this.
+  // In local dev or staging (APP_ENV=staging), prefer RAZORPAY_TEST_* over the
+  // live RAZORPAY_* vars when both are set — so neither ever touches the live
+  // platform Razorpay account. Per-tenant keys (Settings → Payment &
+  // messaging) are separate and unaffected by this.
   razorpay: (() => {
-    const useTest = process.env.NODE_ENV === "development";
+    const useTest = isStagingOrDev;
     const keyId = (useTest && process.env.RAZORPAY_TEST_KEY_ID) || process.env.RAZORPAY_KEY_ID || "";
     const keySecret =
       (useTest && process.env.RAZORPAY_TEST_KEY_SECRET) || process.env.RAZORPAY_KEY_SECRET || "";
@@ -84,11 +98,10 @@ export const env = {
   // onboarding Settings step verifies a tenant's GSTIN against the GSTN and
   // auto-fills the registered legal name instead of trusting typed input.
   // Fail-soft: if unset or the API errors, the tenant can still save manually.
-  // See src/lib/gst.ts. Same local-dev test-credential fallback as Razorpay
-  // above — SANDBOX_TEST_* (including a separate test host) takes priority
-  // when NODE_ENV=development; never applies to a built deployment.
+  // See src/lib/gst.ts. Same dev/staging test-credential fallback as Razorpay
+  // above — SANDBOX_TEST_* (including a separate test host) takes priority.
   gst: (() => {
-    const useTest = process.env.NODE_ENV === "development";
+    const useTest = isStagingOrDev;
     const apiKey = (useTest && process.env.SANDBOX_TEST_API_KEY) || process.env.SANDBOX_API_KEY || "";
     const apiSecret =
       (useTest && process.env.SANDBOX_TEST_API_SECRET) || process.env.SANDBOX_API_SECRET || "";
