@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // (/spicegarden/T1) which resolves the table. Locally (bare IP/host) the QR
 // already uses the path form, so this is a no-op.
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan.to";
-const NON_TENANT = new Set(["www", "app", "admin", "api", "m", "t"]);
+const NON_TENANT = new Set(["www", "app", "admin", "api", "m", "t", "staging-app"]);
 
 // Single-segment app routes that must NOT be treated as a table label. On a
 // tenant subdomain only the QR's table path (e.g. /T1) is rewritten to

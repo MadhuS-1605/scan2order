@@ -23,7 +23,8 @@
     "db:superadmin": "tsx scripts/create-superadmin.ts",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "db:seed:e2e": "tsx prisma/seed-e2e.ts"
+    "db:seed:e2e": "tsx prisma/seed-e2e.ts",
+    "db:remove-demo": "tsx scripts/remove-demo-restaurant.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
