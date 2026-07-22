@@ -72,6 +72,7 @@ async function forwardToSentry(
         platform: "node",
         level: "error",
         logger: context,
+        environment: env.appEnv,
         exception: {
           values: [
             {

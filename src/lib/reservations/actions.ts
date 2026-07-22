@@ -6,7 +6,7 @@ import { requireOnboardedAdmin } from "@/lib/auth/guards";
 import { hasPermission } from "@/lib/auth/permissions";
 import { emitEvent } from "@/lib/realtime/bus";
 import { notifyRestaurant } from "@/lib/push";
-import { sendWhatsApp } from "@/lib/messaging/provider";
+import { sendWhatsAppFreeform } from "@/lib/messaging/provider";
 import { recordUsage } from "@/lib/usage";
 import type { ReservationStatus } from "@prisma/client";
 
@@ -70,7 +70,7 @@ export async function createReservationAction(args: {
   const when = reservedFor
     ? ` for ${reservedFor.toLocaleString("en-IN")}`
     : "";
-  const res = await sendWhatsApp(
+  const res = await sendWhatsAppFreeform(
     phone,
     `Hi ${name}, we've received your ${
       args.type === "WAITLIST" ? "waitlist request" : "reservation"
@@ -116,7 +116,7 @@ export async function setReservationStatusAction(
     const when = reservation.reservedFor
       ? ` for ${reservation.reservedFor.toLocaleString("en-IN")}`
       : "";
-    const res = await sendWhatsApp(
+    const res = await sendWhatsAppFreeform(
       reservation.customerPhone,
       `Good news ${reservation.customerName}! Your table at ${reservation.restaurant.name}${when} is confirmed. See you soon.`,
       reservation.restaurant.config?.whatsappFrom,

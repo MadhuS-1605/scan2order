@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
-import { sendEmail, sendWhatsApp, sendWhatsAppTemplate } from "@/lib/messaging/provider";
+import { sendEmail, sendWhatsAppFreeform, sendWhatsAppTemplate } from "@/lib/messaging/provider";
 import { notifyRestaurant } from "@/lib/push";
 import { reportError } from "@/lib/observability";
 import { notifyOps } from "@/lib/platform/alerts";
@@ -36,7 +36,7 @@ async function ownerWhatsApp(
   if (env.messaging.provider === "meta" && template) {
     await sendWhatsAppTemplate(phone, template, params);
   } else {
-    await sendWhatsApp(phone, freeFormText);
+    await sendWhatsAppFreeform(phone, freeFormText);
   }
 }
 

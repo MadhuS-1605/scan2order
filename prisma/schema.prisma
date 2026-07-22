@@ -319,6 +319,10 @@ model Restaurant {
   // webhooks extend planActiveUntil each cycle.
   planAutoRenew          Boolean          @default(false)
   razorpaySubscriptionId String?
+  // Payment id from the last subscription.charged/activated webhook we acted
+  // on — Razorpay can redeliver the same event, so this makes extending
+  // planActiveUntil idempotent per payment instead of per delivery.
+  lastSubscriptionPaymentId String?
   // Platform lifecycle: a super-admin can SUSPEND a venue (blocks its admin until
   // reactivated). Default ACTIVE; diner-facing behaviour is unaffected for now.
   status                 RestaurantStatus @default(ACTIVE)
