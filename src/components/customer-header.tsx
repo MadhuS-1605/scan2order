@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { UtensilsCrossed } from "lucide-react";
@@ -15,11 +18,12 @@ export function CustomerHeader({
   seat?: string | null;
   logoUrl?: string | null;
 }) {
+  const [logoFailed, setLogoFailed] = useState(false);
   return (
     <header className="sticky top-0 z-10 border-b border-sand-200 bg-surface/95 backdrop-blur">
       <div className="mx-auto flex max-w-lg items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          {logoUrl && (
+          {logoUrl && !logoFailed && (
             <Image
               src={logoUrl}
               alt=""
@@ -27,6 +31,7 @@ export function CustomerHeader({
               height={40}
               unoptimized
               className="h-10 w-10 shrink-0 rounded-lg object-contain"
+              onError={() => setLogoFailed(true)}
             />
           )}
           <div className="min-w-0">
