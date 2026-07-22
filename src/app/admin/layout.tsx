@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { Bell, LogOut } from "lucide-react";
@@ -220,8 +221,9 @@ export default async function AdminLayout({
         <main className="min-w-0 flex-1">{children}</main>
       </div>
 
-      <footer className="mx-auto max-w-7xl px-4 pb-8 pt-2 text-center text-xs text-ink/35 sm:px-6">
-        Powered by Scan2Order
+      <footer className="mx-auto flex max-w-7xl items-center justify-center gap-1.5 px-4 pb-8 pt-2 text-xs text-ink/35 sm:px-6">
+        Powered by
+        <Image src="/logo-mark.png" alt="Scan2Order" width={16} height={16} className="h-4 w-4" />
       </footer>
       <Toaster />
     </div>
