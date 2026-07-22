@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { requireSuperAdmin } from "@/lib/platform/actions";
 import { signoutAction } from "@/lib/auth/actions";
 import { platformCan, type PlatformCapability } from "@/lib/platform/roles";
@@ -7,11 +8,13 @@ import { SuperAdminNav } from "./nav";
 const NAV: { href: string; label: string; cap?: PlatformCapability }[] = [
   { href: "/superadmin", label: "Console" },
   { href: "/superadmin/billing", label: "Revenue", cap: "billing.manage" },
+  { href: "/superadmin/vendor-bills", label: "Vendor bills", cap: "billing.manage" },
   { href: "/superadmin/plans", label: "Plans", cap: "billing.manage" },
   { href: "/superadmin/promos", label: "Promos", cap: "billing.manage" },
   { href: "/superadmin/growth", label: "Growth" },
   { href: "/superadmin/health", label: "Health" },
   { href: "/superadmin/retention", label: "Retention" },
+  { href: "/superadmin/support", label: "Support", cap: "tenants.manage" },
   { href: "/superadmin/onboard", label: "Invite", cap: "platform.manage" },
   { href: "/superadmin/analytics", label: "Analytics" },
   { href: "/superadmin/announcements", label: "Announce", cap: "platform.manage" },
@@ -36,9 +39,13 @@ export default async function SuperAdminLayout({
       <header className="sticky top-0 z-30 border-b border-sand-200 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3">
           <div className="flex items-center gap-3">
-            <p className="hidden shrink-0 font-display text-lg text-ink sm:block">
-              Scan2Order <span className="text-ink/40">· Platform</span>
-            </p>
+            <Image
+              src="/logo-mark.png"
+              alt="Scan2Order · Platform"
+              width={40}
+              height={40}
+              className="hidden h-10 w-10 shrink-0 sm:block"
+            />
             <SuperAdminNav items={navItems} />
           </div>
           <div className="flex shrink-0 items-center gap-3">

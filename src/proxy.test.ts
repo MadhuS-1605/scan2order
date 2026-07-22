@@ -40,3 +40,27 @@ describe("proxy — tenant subdomain routing", () => {
     expect(rewriteTo(res)).toBeNull();
   });
 });
+
+describe("proxy — apex is marketing-only", () => {
+  it("redirects a non-home apex path to the same path on app.<domain>", () => {
+    const res = proxy(req("https://scan.to/signin"));
+    expect(res.headers.get("location")).toBe("https://app.scan.to/signin");
+  });
+
+  it("redirects www the same as the bare apex", () => {
+    const res = proxy(req("https://www.scan.to/pricing"));
+    expect(res.headers.get("location")).toBe("https://app.scan.to/pricing");
+  });
+
+  it("does NOT redirect the apex homepage", () => {
+    const res = proxy(req("https://scan.to/"));
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("does not open-redirect off-domain via a double-slash path", () => {
+    const res = proxy(req("https://scan.to//evil.com/phish"));
+    const location = res.headers.get("location");
+    expect(location).not.toBeNull();
+    expect(new URL(location!).host).toBe("app.scan.to");
+  });
+});
