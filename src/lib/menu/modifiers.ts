@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireAdminWithPermission } from "@/lib/auth/guards";
+import type { ActionState } from "@/lib/validation";
 
 function revalidate() {
   revalidatePath("/admin/menu");
@@ -51,6 +52,67 @@ export async function addModifierGroupAction(formData: FormData): Promise<void> 
     },
   });
   revalidate();
+}
+
+// Copies a modifier group (and its options) from one item onto N other items —
+// so "Spice level" doesn't have to be re-typed by hand on every dish that needs it.
+export async function copyModifierGroupToItemsAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const { restaurantId } = await requireAdminWithPermission("menu");
+  const sourceGroupId = String(formData.get("sourceGroupId") ?? "");
+  const targetItemIds = String(formData.get("targetItemIds") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  const source = await prisma.modifierGroup.findFirst({
+    where: { id: sourceGroupId, menuItem: { restaurantId } },
+    include: { options: true },
+  });
+  if (!source) return { error: "Modifier group not found." };
+
+  const otherIds = targetItemIds.filter((id) => id !== source.menuItemId);
+  if (otherIds.length === 0) {
+    return { error: "Select at least one other item to apply it to." };
+  }
+  const targets = await prisma.menuItem.findMany({
+    where: { id: { in: otherIds }, restaurantId },
+    select: { id: true },
+  });
+  if (targets.length === 0) return { error: "No matching items found." };
+
+  for (const t of targets) {
+    const count = await prisma.modifierGroup.count({ where: { menuItemId: t.id } });
+    const group = await prisma.modifierGroup.create({
+      data: {
+        menuItemId: t.id,
+        name: source.name,
+        required: source.required,
+        minSelect: source.minSelect,
+        maxSelect: source.maxSelect,
+        sortOrder: count,
+        translations: source.translations ?? undefined,
+      },
+    });
+    if (source.options.length) {
+      await prisma.modifierOption.createMany({
+        data: source.options.map((o, i) => ({
+          groupId: group.id,
+          name: o.name,
+          priceDelta: o.priceDelta,
+          sortOrder: i,
+          translations: o.translations ?? undefined,
+        })),
+      });
+    }
+  }
+  revalidate();
+  return {
+    ok: true,
+    message: `Applied "${source.name}" to ${targets.length} item${targets.length === 1 ? "" : "s"}.`,
+  };
 }
 
 export async function deleteModifierGroupAction(

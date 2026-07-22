@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import {
   createCouponAction,
+  bulkCreateCouponsAction,
   toggleCouponAction,
   deleteCouponAction,
 } from "@/lib/coupons/actions";
@@ -33,7 +34,10 @@ export function CouponManager({
   const tr = useT();
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-      <AddCouponForm />
+      <div className="space-y-6">
+        <AddCouponForm />
+        <BulkCouponForm />
+      </div>
 
       <Card>
         <h2 className="mb-3 font-semibold text-ink">{tr("coupons.yourCodes")} ({coupons.length})</h2>
@@ -149,6 +153,68 @@ function AddCouponForm() {
           {pending ? tr("coupons.creating") : tr("coupons.createCoupon")}
         </Button>
       </form>
+    </Card>
+  );
+}
+
+// Plain English (not routed through the i18n dict) — same reasoning as the
+// other bulk admin forms in this pass.
+function BulkCouponForm() {
+  const [state, action, pending] = useActionState<ActionState, FormData>(
+    bulkCreateCouponsAction,
+    {},
+  );
+
+  return (
+    <Card className="h-fit">
+      <details className="group">
+        <summary className="cursor-pointer list-none font-semibold text-ink">
+          Generate a batch of codes
+        </summary>
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-ink/55">
+            Generates unique, single-use codes — e.g. for a referral campaign where every recipient needs their own.
+          </p>
+          {state.error && <Alert>{state.error}</Alert>}
+          {state.ok && state.message && (
+            <Alert variant="success">
+              <span className="whitespace-pre-wrap">{state.message}</span>
+            </Alert>
+          )}
+          <form action={action} className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Prefix" htmlFor="bc-prefix" hint="Optional">
+                <Input id="bc-prefix" name="prefix" placeholder="WELCOME" className="uppercase" />
+              </Field>
+              <Field label="How many" htmlFor="bc-count">
+                <Input id="bc-count" name="count" type="number" min="1" max="500" placeholder="50" required />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Type" htmlFor="bc-type">
+                <Select id="bc-type" name="type" defaultValue="PERCENT">
+                  <option value="PERCENT">% off</option>
+                  <option value="FLAT">Flat off</option>
+                </Select>
+              </Field>
+              <Field label="Value" htmlFor="bc-value">
+                <Input id="bc-value" name="value" type="number" step="0.01" min="0" placeholder="10" required />
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="Min order" htmlFor="bc-min" hint="Optional">
+                <Input id="bc-min" name="minOrder" type="number" min="0" placeholder="0" />
+              </Field>
+              <Field label="Max discount" htmlFor="bc-max" hint="% only, optional">
+                <Input id="bc-max" name="maxDiscount" type="number" min="0" />
+              </Field>
+            </div>
+            <Button type="submit" size="sm" disabled={pending} className="w-full">
+              {pending ? "Generating…" : "Generate codes"}
+            </Button>
+          </form>
+        </div>
+      </details>
     </Card>
   );
 }
