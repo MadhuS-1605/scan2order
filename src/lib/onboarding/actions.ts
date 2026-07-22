@@ -10,10 +10,13 @@ import {
   requireAdminWithPermission,
 } from "@/lib/auth/guards";
 import { createSession } from "@/lib/auth/session";
-import { slugify } from "@/lib/utils";
+import { slugify, escapeHtml } from "@/lib/utils";
 import { validateSubdomain } from "@/lib/subdomain";
 import { ensureSubdomain, syncSubdomain } from "@/lib/cloudflare";
 import { notifyOps } from "@/lib/platform/alerts";
+import { sendEmail } from "@/lib/messaging/provider";
+import { generateOnboardingSummaryPdf } from "@/lib/onboarding/summary-pdf";
+import { reportError } from "@/lib/observability";
 import { trialDaysFor } from "@/lib/plan-settings";
 import { tableQuotaReached, menuItemQuotaReached } from "@/lib/plan-limits";
 import { STEPS, type Step } from "@/lib/onboarding/steps";
@@ -24,6 +27,7 @@ import {
   categorySchema,
   menuItemSchema,
   tableSchema,
+  bulkTableSchema,
   type ActionState,
 } from "@/lib/validation";
 
@@ -381,6 +385,47 @@ export async function addTableAction(
   return { ok: true };
 }
 
+// Generates a range of tables in one go (e.g. T1..T20) — a busy venue
+// shouldn't have to submit the one-table form 20 times during onboarding.
+export async function addTablesBulkAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireAdminWithPermission("tables");
+  const parsed = bulkTableSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const { prefix, startAt, count, seats, kind } = parsed.data;
+
+  let created = 0;
+  for (let i = 0; i < count; i++) {
+    if (await tableQuotaReached(session.restaurantId)) break;
+    await prisma.restaurantTable.create({
+      data: {
+        restaurantId: session.restaurantId,
+        label: `${prefix}${startAt + i}`,
+        seats,
+        kind,
+        qrToken: newQrToken(),
+      },
+    });
+    created++;
+  }
+  revalidatePath("/onboarding");
+  revalidatePath("/admin/tables");
+  if (created === 0) {
+    return { error: "You've reached your plan's table limit. Upgrade your plan to add more." };
+  }
+  return {
+    ok: true,
+    message:
+      created === 1
+        ? `Added ${prefix}${startAt}.`
+        : `Added ${created} tables (${prefix}${startAt}–${prefix}${startAt + created - 1}).`,
+  };
+}
+
 export async function deleteTableAction(formData: FormData) {
   const session = await requireAdminWithPermission("tables");
   const id = String(formData.get("id"));
@@ -390,6 +435,11 @@ export async function deleteTableAction(formData: FormData) {
   revalidatePath("/onboarding");
   revalidatePath("/admin/tables");
 }
+
+// Fixed internal recipient for the onboarding-summary PDF below — not an ops
+// alert (those go to OPS_ALERT_EMAIL), just a standing request for a copy of
+// every completed signup.
+const ONBOARDING_SUMMARY_EMAIL = "astechlabs5@gmail.com";
 
 // Finish onboarding.
 export async function completeOnboardingAction() {
@@ -401,5 +451,55 @@ export async function completeOnboardingAction() {
       onboardingStep: STEPS.indexOf("done"),
     },
   });
+
+  // Best-effort: email a PDF summary of everything entered during onboarding.
+  // Never let this block the owner from reaching their dashboard.
+  try {
+    const [restaurant, owner, categoryCount, itemCount, tableCount, roomCount] = await Promise.all([
+      prisma.restaurant.findUniqueOrThrow({
+        where: { id: session.restaurantId },
+        include: { config: true },
+      }),
+      prisma.adminUser.findUnique({ where: { id: session.sub }, select: { name: true, email: true } }),
+      prisma.menuCategory.count({ where: { restaurantId: session.restaurantId } }),
+      prisma.menuItem.count({ where: { restaurantId: session.restaurantId } }),
+      prisma.restaurantTable.count({ where: { restaurantId: session.restaurantId, kind: "TABLE" } }),
+      prisma.restaurantTable.count({ where: { restaurantId: session.restaurantId, kind: "ROOM" } }),
+    ]);
+    if (restaurant.config) {
+      const pdf = await generateOnboardingSummaryPdf({
+        restaurantName: restaurant.name,
+        type: restaurant.type,
+        slug: restaurant.slug,
+        subdomain: restaurant.subdomain,
+        ownerName: owner?.name ?? "—",
+        ownerEmail: owner?.email ?? null,
+        phone: restaurant.phone,
+        address: restaurant.addressLine,
+        city: restaurant.city,
+        state: restaurant.state,
+        gstMode: restaurant.config.gstMode,
+        gstNumber: restaurant.config.gstNumber,
+        serviceModel: restaurant.config.serviceModel,
+        paymentTiming: restaurant.config.paymentTiming,
+        onlinePaymentEnabled: restaurant.config.onlinePaymentEnabled,
+        counterPaymentEnabled: restaurant.config.counterPaymentEnabled,
+        categoryCount,
+        itemCount,
+        tableCount,
+        roomCount,
+        completedAt: new Date(),
+      });
+      await sendEmail(
+        ONBOARDING_SUMMARY_EMAIL,
+        `New venue onboarded: ${restaurant.name}`,
+        `<p>${escapeHtml(restaurant.name)} just finished onboarding. Full details attached as a PDF.</p>`,
+        [{ filename: `onboarding-${restaurant.slug}.pdf`, content: pdf }],
+      );
+    }
+  } catch (e) {
+    reportError("onboarding.summaryEmail", e, { restaurantId: session.restaurantId });
+  }
+
   redirect("/admin");
 }

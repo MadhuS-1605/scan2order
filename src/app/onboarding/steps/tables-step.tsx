@@ -1,14 +1,15 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   addTableAction,
+  addTablesBulkAction,
   deleteTableAction,
   completeOnboardingAction,
   gotoStepAction,
 } from "@/lib/onboarding/actions";
-import { Button, Input, Field, Alert, Card } from "@/components/ui";
+import { Button, Input, Field, Alert, Card, Select } from "@/components/ui";
 import type { ActionState } from "@/lib/validation";
 
 type TableView = {
@@ -85,8 +86,9 @@ export function TablesStep({
         <p className="mt-1 text-sm text-ink/55">
           Add each table. We generate a unique QR code diners scan to order.
         </p>
-        <div className="mt-6 max-w-sm">
+        <div className="mt-6 grid gap-6 sm:grid-cols-2">
           <AddTableForm />
+          <BulkTablesForm />
         </div>
       </Card>
 
@@ -182,6 +184,52 @@ function AddTableForm() {
       </div>
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Adding…" : "Add table"}
+      </Button>
+    </form>
+  );
+}
+
+function BulkTablesForm() {
+  const [state, action, pending] = useActionState<ActionState, FormData>(
+    addTablesBulkAction,
+    {},
+  );
+  const ref = useRef<HTMLFormElement>(null);
+  const [kind, setKind] = useState("TABLE");
+  useEffect(() => {
+    if (state.ok) ref.current?.reset();
+  }, [state]);
+  const isRoom = kind === "ROOM";
+
+  return (
+    <form ref={ref} action={action} className="space-y-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-ink/45">
+        Or generate a range at once
+      </p>
+      {state.error && <Alert>{state.error}</Alert>}
+      {state.ok && state.message && <Alert variant="success">{state.message}</Alert>}
+      <Field label="Type" htmlFor="bt-kind">
+        <Select id="bt-kind" name="kind" value={kind} onChange={(e) => setKind(e.target.value)}>
+          <option value="TABLE">Table</option>
+          <option value="ROOM">Hotel room</option>
+        </Select>
+      </Field>
+      <div className="grid grid-cols-3 gap-2">
+        <Field label="Prefix" htmlFor="bt-prefix">
+          <Input id="bt-prefix" name="prefix" placeholder={isRoom ? "(none)" : "T"} defaultValue={isRoom ? "" : "T"} />
+        </Field>
+        <Field label="Start #" htmlFor="bt-start">
+          <Input id="bt-start" name="startAt" type="number" min="1" defaultValue={isRoom ? "101" : "1"} required />
+        </Field>
+        <Field label="Count" htmlFor="bt-count">
+          <Input id="bt-count" name="count" type="number" min="1" max="100" placeholder="20" required />
+        </Field>
+      </div>
+      <Field label="Seats (each)" htmlFor="bt-seats">
+        <Input id="bt-seats" name="seats" type="number" min="1" defaultValue={isRoom ? "2" : "4"} required />
+      </Field>
+      <Button type="submit" variant="secondary" disabled={pending} className="w-full">
+        {pending ? "Generating…" : isRoom ? "Generate rooms" : "Generate tables"}
       </Button>
     </form>
   );
