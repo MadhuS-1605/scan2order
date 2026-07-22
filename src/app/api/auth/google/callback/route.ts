@@ -7,15 +7,17 @@ import { createSession } from "@/lib/auth/session";
 import { landingFor } from "@/lib/auth/permissions";
 import { hashPassword } from "@/lib/auth/password";
 import { flagEnabled } from "@/lib/platform/flags";
+import { getBaseUrl } from "@/lib/request";
 
-function bounce(request: Request, error: string) {
-  const res = NextResponse.redirect(new URL(`/signin?error=${error}`, request.url));
+function bounce(baseUrl: string, error: string) {
+  const res = NextResponse.redirect(new URL(`/signin?error=${error}`, baseUrl));
   res.cookies.delete("g_oauth_state");
   return res;
 }
 
 export async function GET(request: Request) {
-  if (!env.google.configured()) return bounce(request, "google_unavailable");
+  const baseUrl = await getBaseUrl();
+  if (!env.google.configured()) return bounce(baseUrl, "google_unavailable");
 
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
@@ -24,27 +26,27 @@ export async function GET(request: Request) {
 
   // CSRF: the state we set in the start route must round-trip exactly.
   if (!code || !state || !cookieState || state !== cookieState) {
-    return bounce(request, "google_state");
+    return bounce(baseUrl, "google_state");
   }
 
   let profile;
   try {
-    const idToken = await exchangeGoogleCode(code);
+    const idToken = await exchangeGoogleCode(code, baseUrl);
     profile = await verifyGoogleIdToken(idToken);
   } catch {
-    return bounce(request, "google_failed");
+    return bounce(baseUrl, "google_failed");
   }
-  if (!profile.emailVerified) return bounce(request, "google_unverified");
+  if (!profile.emailVerified) return bounce(baseUrl, "google_unverified");
 
   let user = await prisma.adminUser.findFirst({
     where: { OR: [{ googleId: profile.sub }, { email: profile.email }] },
   });
 
   if (user) {
-    if (user.disabled) return bounce(request, "disabled");
+    if (user.disabled) return bounce(baseUrl, "disabled");
     // Google sign-in skips the password + 2FA factors, so don't let it become a
     // back-door around operator 2FA — super-admins must use email + password.
-    if (user.isSuperAdmin) return bounce(request, "google_superadmin");
+    if (user.isSuperAdmin) return bounce(baseUrl, "google_superadmin");
     if (!user.googleId) {
       user = await prisma.adminUser.update({
         where: { id: user.id },
@@ -53,7 +55,7 @@ export async function GET(request: Request) {
     }
   } else {
     // New account via Google == a sign-up; honour the platform kill-switch.
-    if (!(await flagEnabled("signups_enabled"))) return bounce(request, "signups_disabled");
+    if (!(await flagEnabled("signups_enabled"))) return bounce(baseUrl, "signups_disabled");
     user = await prisma.adminUser.create({
       data: {
         name: profile.name,
@@ -76,7 +78,7 @@ export async function GET(request: Request) {
   });
 
   const dest = user.restaurantId ? landingFor(user.role) : "/onboarding";
-  const res = NextResponse.redirect(new URL(dest, request.url));
+  const res = NextResponse.redirect(new URL(dest, baseUrl));
   res.cookies.delete("g_oauth_state");
   return res;
 }

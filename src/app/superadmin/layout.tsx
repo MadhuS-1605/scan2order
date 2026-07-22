@@ -3,7 +3,7 @@ import Image from "next/image";
 import { requireSuperAdmin } from "@/lib/platform/actions";
 import { signoutAction } from "@/lib/auth/actions";
 import { platformCan, type PlatformCapability } from "@/lib/platform/roles";
-import { SuperAdminNav } from "./nav";
+import { SuperAdminSidebarNav, SuperAdminMobileNav } from "./nav";
 
 const NAV: { href: string; label: string; cap?: PlatformCapability }[] = [
   { href: "/superadmin", label: "Console" },
@@ -37,8 +37,9 @@ export default async function SuperAdminLayout({
   return (
     <div className="min-h-screen bg-grain">
       <header className="sticky top-0 z-30 border-b border-sand-200 bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/80">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-6 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-6 py-3">
           <div className="flex items-center gap-3">
+            <SuperAdminMobileNav items={navItems} />
             <Image
               src="/logo-mark.png"
               alt="Scan2Order · Platform"
@@ -46,7 +47,6 @@ export default async function SuperAdminLayout({
               height={40}
               className="hidden h-10 w-10 shrink-0 sm:block"
             />
-            <SuperAdminNav items={navItems} />
           </div>
           <div className="flex shrink-0 items-center gap-3">
             <span className="hidden rounded bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-600 sm:inline">
@@ -71,7 +71,12 @@ export default async function SuperAdminLayout({
           </div>
         </div>
       </header>
-      <div className="mx-auto max-w-6xl px-6 py-6">{children}</div>
+      <div className="mx-auto flex max-w-7xl gap-6 px-6 py-6">
+        <aside className="hidden md:block md:w-52 md:shrink-0">
+          <SuperAdminSidebarNav items={navItems} />
+        </aside>
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
     </div>
   );
 }
