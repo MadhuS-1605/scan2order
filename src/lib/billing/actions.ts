@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/request";
 import { emitEvent } from "@/lib/realtime/bus";
 import { toNumber, formatMoney, escapeHtml } from "@/lib/utils";
 import { round2 } from "@/lib/pricing";
@@ -670,7 +671,7 @@ export async function verifyBillOtpAction(args: {
 
   await ensureBill(order, "WHATSAPP", phone);
 
-  const link = `${env.appUrl.replace(/\/$/, "")}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
+  const link = `${await getBaseUrl()}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
   const cur = order.restaurant.config!.currency;
   const total = toNumber(order.totalAmount).toFixed(2);
   const freeText =
@@ -737,7 +738,7 @@ export async function emailBillAction(args: {
     return { ok: false, error: "Enter a valid email address." };
   }
   await ensureBill(order, "EMAIL");
-  const link = `${env.appUrl.replace(/\/$/, "")}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
+  const link = `${await getBaseUrl()}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
   const name = order.restaurant.name;
   const safeName = escapeHtml(name);
   const cur = order.restaurant.config!.currency;

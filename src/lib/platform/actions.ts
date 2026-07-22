@@ -14,7 +14,7 @@ import { ensureSubdomain, removeSubdomain } from "@/lib/cloudflare";
 import { generateTotpSecret, verifyTotp } from "@/lib/auth/totp";
 import { encryptSecret, decryptSecret } from "@/lib/crypto";
 import { sendEmail } from "@/lib/messaging/provider";
-import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/request";
 import { randomBytes } from "node:crypto";
 import { hashPassword } from "@/lib/auth/password";
 import { setPlanPricing } from "@/lib/plan-settings";
@@ -383,7 +383,7 @@ export async function inviteOwnerAction(_prev: ActionState, formData: FormData):
       inviteTokenExpiry: new Date(Date.now() + 7 * 86_400_000),
     },
   });
-  const url = `${env.appUrl.replace(/\/$/, "")}/set-password/${token}`;
+  const url = `${await getBaseUrl()}/set-password/${token}`;
   await sendEmail(
     email,
     "Set up your Scan2Order account",
@@ -428,7 +428,7 @@ export async function sendWinbackAction(formData: FormData): Promise<void> {
   const restaurantId = String(formData.get("restaurantId") ?? "");
   const r = await prisma.restaurant.findUnique({ where: { id: restaurantId }, select: { name: true, email: true } });
   if (!r?.email) return;
-  const url = `${env.appUrl.replace(/\/$/, "")}/admin/billing`;
+  const url = `${await getBaseUrl()}/admin/billing`;
   await sendEmail(
     r.email,
     `We'd love to have ${r.name} back`,
