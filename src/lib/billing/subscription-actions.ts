@@ -204,7 +204,7 @@ export async function verifyPlanPaymentAction(args: {
 // Dev / Razorpay-not-configured: activate without a real charge.
 export async function mockActivatePlanAction(tierInput: string): Promise<{ ok: boolean; error?: string }> {
   const session = await requireAdminWithPermission("settings");
-  if (process.env.NODE_ENV === "production") return { ok: false, error: "Not available." };
+  if (!env.isStagingOrDev) return { ok: false, error: "Not available." };
   if (platformCreds()) return { ok: false, error: "Use the live payment flow." };
   const tier = tierInput as PlanTier;
   const plan = planByTier(tier);
@@ -344,23 +344,33 @@ export async function cancelAutoRenewAction(): Promise<void> {
 }
 
 // Webhook: react to Razorpay subscription lifecycle events (no session).
+// paymentId (when Razorpay includes one, e.g. on .charged) makes this
+// idempotent against redelivery — the same payment never extends
+// planActiveUntil twice.
 export async function reconcileSubscriptionEvent(
   eventType: string,
   subscriptionId: string,
+  paymentId?: string,
 ): Promise<{ ok: boolean }> {
   const r = await prisma.restaurant.findFirst({
     where: { razorpaySubscriptionId: subscriptionId },
-    select: { id: true, planActiveUntil: true },
+    select: { id: true, planActiveUntil: true, lastSubscriptionPaymentId: true },
   });
   if (!r) return { ok: false };
   if (eventType === "subscription.charged" || eventType === "subscription.activated") {
+    if (paymentId && paymentId === r.lastSubscriptionPaymentId) return { ok: true };
     const base =
       r.planActiveUntil && r.planActiveUntil.getTime() > Date.now()
         ? r.planActiveUntil.getTime()
         : Date.now();
     await prisma.restaurant.update({
       where: { id: r.id },
-      data: { planActiveUntil: new Date(base + PERIOD_DAYS * DAY), planAutoRenew: true, planIsTrial: false },
+      data: {
+        planActiveUntil: new Date(base + PERIOD_DAYS * DAY),
+        planAutoRenew: true,
+        planIsTrial: false,
+        lastSubscriptionPaymentId: paymentId ?? r.lastSubscriptionPaymentId,
+      },
     });
   } else if (
     eventType === "subscription.cancelled" ||
@@ -439,7 +449,7 @@ export async function verifyOveragePaymentAction(args: {
 // Dev / Razorpay-not-configured: settle overage without a real charge.
 export async function mockSettleOverageAction(): Promise<{ ok: boolean; error?: string }> {
   const session = await requireAdminWithPermission("settings");
-  if (process.env.NODE_ENV === "production") return { ok: false, error: "Not available." };
+  if (!env.isStagingOrDev) return { ok: false, error: "Not available." };
   if (platformCreds()) return { ok: false, error: "Use the live payment flow." };
   const { total } = await settleOverageAsPaid(session.restaurantId);
   if (total <= 0) return { ok: false, error: "No overage to settle." };
