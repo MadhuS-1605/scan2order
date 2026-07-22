@@ -6,6 +6,7 @@ import {
   Layers,
   Trophy,
   Search,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
@@ -33,6 +34,7 @@ export default async function SuperAdminPage({
 
   const startToday = new Date();
   startToday.setHours(0, 0, 0, 0);
+  const start7d = new Date(Date.now() - 7 * 86_400_000);
 
   const where: Prisma.RestaurantWhereInput = {
     ...(q
@@ -54,7 +56,7 @@ export default async function SuperAdminPage({
         ? { orders: { _count: "desc" } }
         : { createdAt: "desc" };
 
-  const [totalCount, filteredCount, planGroups, todayAgg, gmvAgg, ordersTotal, topGroups, pageRows] =
+  const [totalCount, filteredCount, planGroups, todayAgg, gmvAgg, ordersTotal, newThisWeek, topGroups, recentSignups, pageRows] =
     await Promise.all([
       prisma.restaurant.count(),
       prisma.restaurant.count({ where }),
@@ -62,12 +64,18 @@ export default async function SuperAdminPage({
       prisma.order.aggregate({ where: { paymentStatus: "PAID", createdAt: { gte: startToday } }, _sum: { totalAmount: true }, _count: { _all: true } }),
       prisma.order.aggregate({ where: { paymentStatus: "PAID" }, _sum: { totalAmount: true } }),
       prisma.order.count(),
+      prisma.restaurant.count({ where: { createdAt: { gte: start7d } } }),
       prisma.order.groupBy({
         by: ["restaurantId"],
         where: { paymentStatus: "PAID" },
         _sum: { totalAmount: true },
         orderBy: { _sum: { totalAmount: "desc" } },
         take: 5,
+      }),
+      prisma.restaurant.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 8,
+        select: { id: true, name: true, email: true, phone: true, planTier: true, createdAt: true },
       }),
       prisma.restaurant.findMany({
         where,
@@ -119,7 +127,29 @@ export default async function SuperAdminPage({
         <StatCard label="Restaurants" value={String(totalCount)} sub={`${ordersTotal} orders all-time`} icon={Building2} />
         <StatCard label="Platform GMV" value={formatMoney(totalGmv)} sub="diner sales, all-time" icon={IndianRupee} />
         <StatCard label="Today" value={formatMoney(toNumber(todayAgg._sum.totalAmount ?? 0))} sub={`${todayAgg._count._all} orders`} icon={ShoppingBag} />
-        <StatCard label="Avg / restaurant" value={formatMoney(totalCount ? totalGmv / totalCount : 0)} sub="lifetime GMV" icon={TrendingUp} />
+        <StatCard label="New signups (7d)" value={String(newThisWeek)} sub="new restaurants" icon={Sparkles} />
+      </div>
+
+      <div className="rounded-2xl border border-sand-200 bg-surface p-5">
+        <h2 className="mb-3 flex items-center gap-2 font-medium text-ink">
+          <Sparkles className="h-4 w-4 text-brand-600" /> Recent signups
+        </h2>
+        {recentSignups.length === 0 ? (
+          <p className="text-sm text-ink/45">No signups yet.</p>
+        ) : (
+          <ul className="divide-y divide-sand-100">
+            {recentSignups.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                <Link href={`/superadmin/restaurants/${r.id}`} className="min-w-0 flex-1 font-medium text-ink hover:text-brand-600 hover:underline">
+                  {r.name}
+                </Link>
+                <span className="text-ink/55">{r.email || r.phone || "no contact on file"}</span>
+                <span className="rounded-full bg-sand-100 px-2 py-0.5 text-xs text-ink/60">{r.planTier}</span>
+                <span className="text-xs text-ink/45">{r.createdAt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
