@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { PlanDetailsDisclosure } from "@/components/plan-details";
 import { resolvePlans } from "@/lib/plan-settings";
+import { env } from "@/lib/env";
 import { cn, formatMoney } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,11 +27,13 @@ import { TiltCard } from "@/components/marketing/tilt-card";
 import { StickyMobileCta } from "@/components/marketing/sticky-mobile-cta";
 
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan2order.co.in";
-// Marketing site lives on the apex domain; the actual app (signup/signin/
-// dashboard) lives on app.<domain> — see NON_TENANT in src/proxy.ts. In local
-// dev `next dev` always sets NODE_ENV=development, so stay on relative paths
-// (same host) instead of bouncing out to the real app.<domain>.
-const APP_URL = process.env.NODE_ENV === "development" ? "" : `https://app.${PLATFORM_DOMAIN}`;
+// In production the marketing site lives on the apex domain and the actual
+// app (signup/signin/dashboard) lives on app.<domain> — see NON_TENANT in
+// src/proxy.ts. Staging is a single unified host (staging-app.<domain>, both
+// marketing and app together — see NON_TENANT there too) and local dev is a
+// bare IP/localhost, so both must stay on relative paths (same host) instead
+// of bouncing out to the real production app.<domain>.
+const APP_URL = env.appEnv === "production" ? `https://app.${PLATFORM_DOMAIN}` : "";
 
 export const dynamic = "force-dynamic";
 
