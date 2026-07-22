@@ -1,6 +1,7 @@
 import { env } from "@/lib/env";
 import { runDunning } from "@/lib/billing/dunning";
 import { reportError } from "@/lib/observability";
+import { notifyOps } from "@/lib/platform/alerts";
 import { cronAuthorized } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
@@ -19,6 +20,7 @@ async function handle(request: Request): Promise<Response> {
     return Response.json({ ok: true, notified });
   } catch (e) {
     reportError("cron.dunning", e);
+    await notifyOps("Dunning cron failed", `The dunning run itself failed (not a single owner's notice — the whole run): ${e instanceof Error ? e.message : String(e)}`);
     return new Response("Dunning failed", { status: 500 });
   }
 }
