@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireAdminWithPermission } from "@/lib/auth/guards";
 import { hasCapability } from "@/lib/capabilities";
-import { sendWhatsApp } from "@/lib/messaging/provider";
+import { sendWhatsAppFreeform } from "@/lib/messaging/provider";
 import { recordUsage } from "@/lib/usage";
 import { recordAudit } from "@/lib/audit";
 import { rateLimit } from "@/lib/ratelimit";
@@ -79,7 +79,7 @@ export async function sendCampaignAction(
 
   let sent = 0;
   for (const phone of recipients) {
-    const res = await sendWhatsApp(phone, message, cfg?.whatsappFrom);
+    const res = await sendWhatsAppFreeform(phone, message, cfg?.whatsappFrom);
     if (res.ok) {
       sent++;
       await recordUsage(restaurantId, "whatsapp");

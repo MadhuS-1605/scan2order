@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
-import { sendEmail, sendWhatsApp, sendWhatsAppTemplate } from "@/lib/messaging/provider";
+import { sendEmail, sendWhatsAppFreeform, sendWhatsAppTemplate } from "@/lib/messaging/provider";
 import { notifyRestaurant } from "@/lib/push";
 import { reportError } from "@/lib/observability";
 import { notifyOps } from "@/lib/platform/alerts";
@@ -38,7 +38,7 @@ async function notifyOwner(
         // approved template, not a body variable — no runtime param needed.
         await sendWhatsAppTemplate(r.phone, tpl, [r.name, `${subject}. ${body}`]);
       } else {
-        await sendWhatsApp(r.phone, `${subject}. ${body} ${billingUrl()}`);
+        await sendWhatsAppFreeform(r.phone, `${subject}. ${body} ${billingUrl()}`);
       }
     }
     await notifyRestaurant(r.id, { title: subject, body, url: "/admin/billing", tag: "billing-dunning" });

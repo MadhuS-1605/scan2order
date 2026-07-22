@@ -73,30 +73,18 @@ async function sendEmailInner(
   }
 }
 
-// Free-form WhatsApp text. Meta business-initiated sends require a template
-// (sendWhatsAppTemplate); in-window free-form is handled by sendWhatsAppFreeform.
-// With no non-Meta provider, this logs to the console (dev / unconfigured).
-export async function sendWhatsApp(
-  to: string,
-  body: string,
-  fromOverride?: string | null,
-): Promise<SendResult> {
-  return logged("WHATSAPP", () => sendWhatsAppInner(to, body, fromOverride));
-}
-
-async function sendWhatsAppInner(
-  to: string,
-  body: string,
-  _fromOverride?: string | null,
-): Promise<SendResult> {
-  if (!(await flagEnabled("whatsapp_enabled"))) return { ok: false, error: "WhatsApp sending is disabled." };
+async function mockWhatsApp(to: string, body: string): Promise<SendResult> {
   console.log(`\n[WhatsApp → ${to}]\n${body}\n`);
   return { ok: true, mocked: true };
 }
 
+// Staging shares Meta credentials with production (no separate WABA/test
+// number), so a misconfigured or forgotten flag there would WhatsApp real
+// customers during testing. Default staging to mock; opt in explicitly.
 const isMeta = () =>
   env.messaging.provider === "meta" &&
-  Boolean(env.messaging.meta.token && env.messaging.meta.phoneNumberId);
+  Boolean(env.messaging.meta.token && env.messaging.meta.phoneNumberId) &&
+  (!env.isStaging || process.env.MESSAGING_ALLOW_LIVE_ON_STAGING === "true");
 
 // Body parameters can be positional (Meta's classic {{1}}, {{2}}, … templates —
 // pass plain strings, filled in array order) or named (newer templates authored
@@ -215,7 +203,7 @@ async function sendWhatsAppFreeformInner(
   fromOverride?: string | null,
 ): Promise<SendResult> {
   if (!(await flagEnabled("whatsapp_enabled"))) return { ok: false, error: "WhatsApp sending is disabled." };
-  if (!isMeta()) return sendWhatsAppInner(to, body, fromOverride);
+  if (!isMeta()) return mockWhatsApp(to, body);
   const m = env.messaging.meta;
   try {
     const res = await fetch(
