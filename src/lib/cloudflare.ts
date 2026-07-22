@@ -15,8 +15,12 @@ const API = "https://api.cloudflare.com/client/v4";
 
 export type DnsResult = { ok: boolean; skipped?: boolean; error?: string };
 
+// Staging is a single unified host, not meant to mint real per-tenant
+// subdomain DNS — and if CLOUDFLARE_ZONE_ID/token were ever accidentally
+// shared with production, staging traffic would mutate prod's real zone.
+// Real DNS changes only ever happen from production, regardless of config.
 export function cloudflareConfigured(): boolean {
-  return env.cloudflare.configured();
+  return env.appEnv === "production" && env.cloudflare.configured();
 }
 
 // Fully-qualified record name for a tenant username.
