@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireSuperAdmin } from "@/lib/platform/actions";
 import { subscriptionState } from "@/lib/subscription";
 import { STEPS } from "@/lib/onboarding/steps";
+import { planLimits } from "@/lib/plans";
 import { formatMoney, toNumber } from "@/lib/utils";
 import { StatCard } from "@/components/superadmin/stat-card";
 
@@ -11,7 +13,7 @@ export default async function PlatformGrowthPage() {
   const now = new Date();
   const firstMonthStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
-  const [createdRows, configTotal, configDone, stepGroups, typeGroups, stateGroups, subRows, planPays] =
+  const [createdRows, configTotal, configDone, stepGroups, typeGroups, stateGroups, subRows, planPays, tableCounts, itemCounts] =
     await Promise.all([
       prisma.restaurant.findMany({ select: { createdAt: true } }),
       prisma.onboardingConfig.count(),
@@ -19,8 +21,10 @@ export default async function PlatformGrowthPage() {
       prisma.onboardingConfig.groupBy({ by: ["onboardingStep"], where: { onboardingCompleted: false }, _count: { _all: true } }),
       prisma.restaurant.groupBy({ by: ["type"], _count: { _all: true } }),
       prisma.restaurant.groupBy({ by: ["state"], _count: { _all: true } }),
-      prisma.restaurant.findMany({ select: { planTier: true, planActiveUntil: true, planIsTrial: true } }),
+      prisma.restaurant.findMany({ select: { id: true, name: true, planTier: true, planActiveUntil: true, planIsTrial: true } }),
       prisma.planPayment.findMany({ where: { status: "PAID", createdAt: { gte: firstMonthStart } }, select: { amount: true, createdAt: true } }),
+      prisma.restaurantTable.groupBy({ by: ["restaurantId"], where: { kind: { not: "COUNTER" } }, _count: { _all: true } }),
+      prisma.menuItem.groupBy({ by: ["restaurantId"], _count: { _all: true } }),
     ]);
 
   // Signups + plan revenue over the last 6 calendar months.
@@ -52,6 +56,25 @@ export default async function PlatformGrowthPage() {
   const paidBase = active + lapsed;
   const churnPct = paidBase ? Math.round((lapsed / paidBase) * 100) : 0;
   const convPct = configTotal ? Math.round((configDone / configTotal) * 100) : 0;
+
+  // Free-tier venues nearing their table/menu-item cap — an upgrade prompt
+  // hiding as a limit, not just a health metric. Only FREE has real limits
+  // (see src/lib/plans.ts); a lapsed paid plan soft-downgrades to FREE too.
+  const tablesByRestaurant = new Map(tableCounts.map((t) => [t.restaurantId, t._count._all]));
+  const itemsByRestaurant = new Map(itemCounts.map((i) => [i.restaurantId, i._count._all]));
+  const { maxTables, maxMenuItems } = planLimits("FREE");
+  const nearingLimit = subRows
+    .filter((r) => subscriptionState(r).effectiveTier === "FREE")
+    .map((r) => {
+      const tables = tablesByRestaurant.get(r.id) ?? 0;
+      const items = itemsByRestaurant.get(r.id) ?? 0;
+      const tablePct = maxTables ? Math.round((tables / maxTables) * 100) : 0;
+      const itemPct = maxMenuItems ? Math.round((items / maxMenuItems) * 100) : 0;
+      return { id: r.id, name: r.name, tables, items, tablePct, itemPct, worstPct: Math.max(tablePct, itemPct) };
+    })
+    .filter((r) => r.worstPct >= 80)
+    .sort((a, b) => b.worstPct - a.worstPct)
+    .slice(0, 8);
 
   const stepCount = new Map(stepGroups.map((g) => [g.onboardingStep, g._count._all]));
   const inProgress = STEPS.filter((s) => s !== "done");
@@ -153,6 +176,27 @@ export default async function PlatformGrowthPage() {
               ))}
             {stateGroups.every((g) => !g.state) && <li className="text-ink/45">No location data yet.</li>}
           </ul>
+        </div>
+
+        {/* Upgrade signal: Free-tier venues nearing their table/menu-item cap */}
+        <div className={card}>
+          <h2 className="mb-3 font-medium text-ink">Approaching plan limits</h2>
+          {nearingLimit.length === 0 ? (
+            <p className="text-sm text-ink/45">No Free-tier venue is near its table/menu-item limit.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {nearingLimit.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-3">
+                  <Link href={`/superadmin/restaurants/${r.id}`} className="min-w-0 truncate font-medium text-ink hover:text-brand-600 hover:underline">
+                    {r.name}
+                  </Link>
+                  <span className={`shrink-0 text-xs ${r.worstPct >= 100 ? "font-medium text-red-700" : "text-amber-700"}`}>
+                    {r.tables}/{maxTables} tables · {r.items}/{maxMenuItems} items
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
     </div>

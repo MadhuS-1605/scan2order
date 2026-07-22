@@ -12,13 +12,20 @@ export default async function RetentionPage() {
   const quietCutoff = new Date();
   quietCutoff.setDate(quietCutoff.getDate() - 14);
 
-  const [restaurants, lastOrders] = await Promise.all([
+  const last7Start = new Date(Date.now() - 7 * 86_400_000);
+  const prior7Start = new Date(Date.now() - 14 * 86_400_000);
+
+  const [restaurants, lastOrders, ordersLast7, ordersPrior7] = await Promise.all([
     prisma.restaurant.findMany({
       select: { id: true, name: true, planTier: true, planActiveUntil: true, planIsTrial: true },
     }),
     prisma.order.groupBy({ by: ["restaurantId"], _max: { createdAt: true } }),
+    prisma.order.groupBy({ by: ["restaurantId"], where: { createdAt: { gte: last7Start } }, _count: { _all: true } }),
+    prisma.order.groupBy({ by: ["restaurantId"], where: { createdAt: { gte: prior7Start, lt: last7Start } }, _count: { _all: true } }),
   ]);
   const lastById = new Map(lastOrders.map((o) => [o.restaurantId, o._max.createdAt]));
+  const last7ById = new Map(ordersLast7.map((o) => [o.restaurantId, o._count._all]));
+  const prior7ById = new Map(ordersPrior7.map((o) => [o.restaurantId, o._count._all]));
 
   const risks: Risk[] = [];
   for (const r of restaurants) {
@@ -31,6 +38,16 @@ export default async function RetentionPage() {
       risks.push({ id: r.id, name: r.name, reason: `Trial ends in ${sub.daysLeft}d`, severity: 2, lastOrder: last, lapsed: false });
     } else if ((sub.status === "ACTIVE" || sub.status === "TRIAL") && quiet) {
       risks.push({ id: r.id, name: r.name, reason: last ? "No orders in 14+ days" : "No orders yet", severity: 1, lastOrder: last, lapsed: false });
+    } else if (sub.status === "ACTIVE" || sub.status === "TRIAL") {
+      // Still ordering, but meaningfully down vs their own recent baseline —
+      // catches a venue quietly winding down before it goes fully silent
+      // (the "no orders in 14+ days" check above only fires after that point).
+      const prior = prior7ById.get(r.id) ?? 0;
+      const last7 = last7ById.get(r.id) ?? 0;
+      if (prior >= 5 && last7 <= prior * 0.5) {
+        const pct = Math.round((1 - last7 / prior) * 100);
+        risks.push({ id: r.id, name: r.name, reason: `Orders down ${pct}% this week`, severity: 1, lastOrder: last, lapsed: false });
+      }
     }
   }
   risks.sort((a, b) => b.severity - a.severity || (b.lastOrder?.getTime() ?? 0) - (a.lastOrder?.getTime() ?? 0));

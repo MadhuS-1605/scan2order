@@ -270,6 +270,7 @@ model FeatureFlag {
   key       String   @id
   enabled   Boolean  @default(true)
   updatedAt DateTime @updatedAt
+
   @@map("feature_flags")
 }
 
@@ -304,46 +305,46 @@ model Announcement {
 }
 
 model Restaurant {
-  id          String         @id @default(cuid())
-  name        String
-  slug        String         @unique
-  groupId     String?
-  group       PropertyGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  planTier    PlanTier       @default(FREE)
+  id                     String           @id @default(cuid())
+  name                   String
+  slug                   String           @unique
+  groupId                String?
+  group                  PropertyGroup?   @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  planTier               PlanTier         @default(FREE)
   // Paid/trial period end for the current tier. null on FREE (free forever).
   // When a paid tier's window lapses, the venue falls back to FREE-tier limits.
-  planActiveUntil DateTime?
-  planIsTrial     Boolean   @default(false)
+  planActiveUntil        DateTime?
+  planIsTrial            Boolean          @default(false)
   // Auto-renew (Razorpay subscription / eMandate). When active, subscription.charged
   // webhooks extend planActiveUntil each cycle.
-  planAutoRenew         Boolean @default(false)
+  planAutoRenew          Boolean          @default(false)
   razorpaySubscriptionId String?
   // Platform lifecycle: a super-admin can SUSPEND a venue (blocks its admin until
   // reactivated). Default ACTIVE; diner-facing behaviour is unaffected for now.
-  status          RestaurantStatus @default(ACTIVE)
-  suspendedAt     DateTime?
-  suspendedReason String?
+  status                 RestaurantStatus @default(ACTIVE)
+  suspendedAt            DateTime?
+  suspendedReason        String?
   // Last time a dunning (trial-ending / lapsed) reminder was sent — cooldown so
   // the dunning cron doesn't re-notify daily. See src/lib/billing/dunning.ts.
-  lastDunningAt   DateTime?
-  type        RestaurantType @default(RESTAURANT)
-  email       String?
-  phone       String?
-  addressLine String?
-  city        String?
-  state       String?
-  country     String         @default("India")
-  postalCode  String?
+  lastDunningAt          DateTime?
+  type                   RestaurantType   @default(RESTAURANT)
+  email                  String?
+  phone                  String?
+  addressLine            String?
+  city                   String?
+  state                  String?
+  country                String           @default("India")
+  postalCode             String?
   // FSSAI food-licence number, printed on the bill (Indian compliance).
-  fssaiNumber String?
-  logoUrl     String?
+  fssaiNumber            String?
+  logoUrl                String?
   // Restaurant-chosen username used as the public subdomain (e.g. "spicegarden"
   // -> spicegarden.scan.to). Unique across the platform.
-  subdomain   String?  @unique
+  subdomain              String?          @unique
   // monotonic per-restaurant order counter (incremented in a transaction)
-  orderSeq    Int            @default(0)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  orderSeq               Int              @default(0)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
   config            OnboardingConfig?
   admins            AdminUser[]
@@ -374,15 +375,15 @@ model Restaurant {
 // A marketing message blast a venue sends to its past guests (WhatsApp only —
 // guest email isn't stored). Counts against the venue's WhatsApp allowance.
 model Campaign {
-  id             String   @id @default(cuid())
+  id             String     @id @default(cuid())
   restaurantId   String
   restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   segment        String // "all" | "repeat" | "recent"
   message        String
-  recipientCount Int      @default(0)
-  sentCount      Int      @default(0)
+  recipientCount Int        @default(0)
+  sentCount      Int        @default(0)
   createdByName  String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime   @default(now())
 
   @@index([restaurantId, createdAt])
   @@map("campaigns")
@@ -398,17 +399,17 @@ enum UsageChannel {
 }
 
 model UsageMeter {
-  id           String       @id @default(cuid())
-  restaurantId String
-  restaurant   Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  period       String // calendar month bucket, "YYYY-MM"
-  channel      UsageChannel
-  count        Int          @default(0)
+  id                String       @id @default(cuid())
+  restaurantId      String
+  restaurant        Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  period            String // calendar month bucket, "YYYY-MM"
+  channel           UsageChannel
+  count             Int          @default(0)
   // Highest allowance threshold (e.g. 80, 100) the owner has been notified at
   // this period — prevents repeat alerts. Resets with each month's new row.
-  notifiedThreshold Int     @default(0)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  notifiedThreshold Int          @default(0)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
   @@unique([restaurantId, period, channel])
   @@index([restaurantId, period])
@@ -431,7 +432,7 @@ model OverageCharge {
   amount            Decimal       @db.Decimal(10, 2) // pre-GST ₹, snapshotted at settle
   status            PaymentStatus @default(PENDING)
   razorpayOrderId   String? // shared by all charges settled in one payment
-  razorpayPaymentId String?   @unique // captured-payment id is single-use across the platform
+  razorpayPaymentId String?       @unique // captured-payment id is single-use across the platform
   planPaymentId     String? // set when bundled into a plan-extend order
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
@@ -443,39 +444,39 @@ model OverageCharge {
 }
 
 model AdminUser {
-  id           String      @id @default(cuid())
+  id                String            @id @default(cuid())
   // Owners sign in with email (globally unique). Staff are assigned a username
   // by their restaurant and need no email — username is unique *within* a
   // restaurant (see @@unique below). Email is nullable so staff can omit it.
-  email        String?     @unique
-  username     String?
-  passwordHash String
+  email             String?           @unique
+  username          String?
+  passwordHash      String
   // Google OAuth subject id, set when an owner links/signs in with Google.
-  googleId     String?     @unique
-  name         String
-  role         AdminRole   @default(OWNER)
-  isSuperAdmin Boolean     @default(false)
+  googleId          String?           @unique
+  name              String
+  role              AdminRole         @default(OWNER)
+  isSuperAdmin      Boolean           @default(false)
   // Sub-role when isSuperAdmin — gates which platform actions are allowed.
-  platformRole PlatformRole @default(FULL)
+  platformRole      PlatformRole      @default(FULL)
   // Authenticator-app (TOTP) 2FA. Base32 secret; enabled only after the user
   // confirms a code during enrolment. Email OTP works as an alternative factor.
-  totpSecret   String? // AES-GCM encrypted when ENCRYPTION_KEY is set (else plaintext)
-  totpEnabled  Boolean      @default(false)
+  totpSecret        String? // AES-GCM encrypted when ENCRYPTION_KEY is set (else plaintext)
+  totpEnabled       Boolean           @default(false)
   // Highest TOTP time-step already consumed — prevents replay within the window.
-  lastTotpStep Int?
+  lastTotpStep      Int?
   // One-time set-password invite (operator-created owners). Token cleared on use.
-  inviteToken       String?   @unique
+  inviteToken       String?           @unique
   inviteTokenExpiry DateTime?
   // Disabled accounts keep their history/audit attribution but cannot sign in.
-  disabled     Boolean     @default(false)
-  restaurantId String?
-  restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  groupId      String?
-  group        PropertyGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  ordersCreated Order[]           @relation("OrderCreatedBy")
-  attendance    StaffAttendance[]
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  disabled          Boolean           @default(false)
+  restaurantId      String?
+  restaurant        Restaurant?       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  groupId           String?
+  group             PropertyGroup?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  ordersCreated     Order[]           @relation("OrderCreatedBy")
+  attendance        StaffAttendance[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   @@unique([restaurantId, username])
   @@index([restaurantId])
@@ -489,51 +490,51 @@ model OnboardingConfig {
   restaurantId String     @unique
   restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
 
-  serviceModel          ServiceModel          @default(TABLE_SERVICE)
+  serviceModel      ServiceModel @default(TABLE_SERVICE)
   // Pay-first: hold the order out of the kitchen until it is paid (then it
   // auto-confirms). Default on for self-service venues.
-  requirePrepayment     Boolean               @default(false)
+  requirePrepayment Boolean      @default(false)
 
   // Venue local timezone (IANA, e.g. "Asia/Kolkata"). All time-of-day logic
   // (business hours, item availability windows, happy hour) is evaluated here,
   // NOT in the server's timezone.
-  timezone       String  @default("Asia/Kolkata")
+  timezone              String                @default("Asia/Kolkata")
   // Daily ordering window in venue-local "HH:MM". null/null = open 24h. May span
   // midnight (e.g. 18:00 -> 02:00).
-  openTime       String?
-  closeTime      String?
+  openTime              String?
+  closeTime             String?
   // Manual kill-switch: stop accepting new diner orders right now (e.g. kitchen
   // swamped, closing early), independent of business hours.
-  orderingPaused Boolean @default(false)
+  orderingPaused        Boolean               @default(false)
   // Custom thank-you / footer line printed on the bill (falls back to a built-in
   // friendly quote when blank).
-  billFooterMessage String?
+  billFooterMessage     String?
   // Default kitchen prep estimate (minutes) shown to the diner as "ready in ~N".
-  defaultPrepMinutes Int @default(15)
+  defaultPrepMinutes    Int                   @default(15)
   // Email the owner an end-of-day sales summary (sent by the daily-summary cron).
-  dailyReportEmail Boolean @default(false)
+  dailyReportEmail      Boolean               @default(false)
   // Minimum order subtotal (venue currency, whole units). 0 = no minimum.
-  minOrderAmount Int @default(0)
+  minOrderAmount        Int                   @default(0)
   // Takeaway / delivery ordering (e.g. cloud kitchens). When on, the diner picks
   // a fulfilment type at checkout; delivery also captures an address.
-  pickupEnabled   Boolean @default(false)
-  deliveryEnabled Boolean @default(false)
+  pickupEnabled         Boolean               @default(false)
+  deliveryEnabled       Boolean               @default(false)
   orderConfirmation     OrderConfirmationMode @default(AUTO)
   paymentTiming         PaymentTiming         @default(PAY_AFTER)
   onlinePaymentEnabled  Boolean               @default(false)
   counterPaymentEnabled Boolean               @default(true)
 
-  gstMode       GstMode @default(NONE)
-  gstNumber     String?
+  gstMode              GstMode @default(NONE)
+  gstNumber            String?
   // Registered legal name fetched from the GSTN (via the verification provider)
   // when the GSTIN is verified — used on tax invoices. Distinct from the
   // restaurant's display name. Null until a successful verification.
-  gstLegalName  String?
-  gstVerified   Boolean @default(false)
-  gstPercentage Decimal @default(5) @db.Decimal(5, 2)
+  gstLegalName         String?
+  gstVerified          Boolean @default(false)
+  gstPercentage        Decimal @default(5) @db.Decimal(5, 2)
   // Optional service charge added to the bill (percent of subtotal). 0 = none.
   serviceChargePercent Decimal @default(0) @db.Decimal(5, 2)
-  currency      String  @default("INR")
+  currency             String  @default("INR")
 
   // Optional per-restaurant Razorpay account (falls back to platform env if null)
   razorpayKeyId     String?
@@ -555,7 +556,7 @@ model OnboardingConfig {
   // only allowed within geofenceRadiusM metres of these coordinates.
   latitude        Float?
   longitude       Float?
-  geofenceRadiusM Int     @default(150)
+  geofenceRadiusM Int    @default(150)
 
   // Anti-fake-order: require diners to be at the venue to place an order.
   // orderRadiusM is a more lenient radius than the staff geofence above.
@@ -623,17 +624,17 @@ model MenuItem {
   categoryId   String?
   category     MenuCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  name        String
-  description String?
-  price       Decimal @db.Decimal(10, 2)
-  imageUrl    String?
-  isVeg       Boolean @default(true)
+  name         String
+  description  String?
+  price        Decimal @db.Decimal(10, 2)
+  imageUrl     String?
+  isVeg        Boolean @default(true)
   // Dietary attributes for diner filters / badges.
-  isVegan       Boolean @default(false)
-  isJain        Boolean @default(false)
-  isSpicy       Boolean @default(false)
-  isGlutenFree  Boolean @default(false)
-  isAvailable Boolean @default(true) // in-stock toggle
+  isVegan      Boolean @default(false)
+  isJain       Boolean @default(false)
+  isSpicy      Boolean @default(false)
+  isGlutenFree Boolean @default(false)
+  isAvailable  Boolean @default(true) // in-stock toggle
 
   // Optional daily availability window ("HH:mm", 24h). Null => always available.
   availableFrom String?
@@ -667,14 +668,14 @@ model MenuItem {
 // is just a required single-select group (minSelect=1, maxSelect=1); add-ons are
 // optional multi-select groups.
 model ModifierGroup {
-  id         String   @id @default(cuid())
-  menuItemId String
-  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
-  name       String
-  required   Boolean  @default(false)
-  minSelect  Int      @default(0)
-  maxSelect  Int      @default(1)
-  sortOrder  Int      @default(0)
+  id           String   @id @default(cuid())
+  menuItemId   String
+  menuItem     MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  name         String
+  required     Boolean  @default(false)
+  minSelect    Int      @default(0)
+  maxSelect    Int      @default(1)
+  sortOrder    Int      @default(0)
   // Per-language name overrides: { hi: { name }, kn: { name } } — mirrors MenuItem.
   translations Json?
 
@@ -685,13 +686,13 @@ model ModifierGroup {
 }
 
 model ModifierOption {
-  id          String        @id @default(cuid())
-  groupId     String
-  group       ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  name        String
-  priceDelta  Decimal       @default(0) @db.Decimal(10, 2)
-  sortOrder   Int           @default(0)
-  isAvailable Boolean       @default(true)
+  id           String        @id @default(cuid())
+  groupId      String
+  group        ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name         String
+  priceDelta   Decimal       @default(0) @db.Decimal(10, 2)
+  sortOrder    Int           @default(0)
+  isAvailable  Boolean       @default(true)
   // Per-language name overrides: { hi: { name }, kn: { name } }.
   translations Json?
 
@@ -727,17 +728,17 @@ model RestaurantTable {
 // ---------------------------------------------------------------------------
 
 model Customer {
-  id            String   @id @default(cuid())
-  phone         String   @unique
-  name          String?
-  loyaltyPoints Int      @default(0)
+  id                  String    @id @default(cuid())
+  phone               String    @unique
+  name                String?
+  loyaltyPoints       Int       @default(0)
   // When the diner's 24h WhatsApp customer-service window closes (set from the
   // inbound webhook whenever they message the business). While open, bills can
   // be delivered as free-form session messages for free — see
   // src/lib/billing/actions.ts (verifyBillOtpAction).
   whatsappWindowUntil DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   orders   Order[]
   feedback Feedback[]
@@ -759,7 +760,7 @@ model Order {
   customer     Customer?        @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   orderNumber Int // per-restaurant sequence (see Restaurant.orderSeq)
-  status      OrderStatus   @default(PLACED)
+  status      OrderStatus @default(PLACED)
 
   // Groups all orders placed in one dining visit (same table, before the bill is
   // settled). Rounds accumulate into a single consolidated bill. Tip/coupon are
@@ -779,18 +780,18 @@ model Order {
   paymentMethod PaymentMethod?
 
   // Money snapshots (so historical bills don't change if config/prices change)
-  subtotal    Decimal @default(0) @db.Decimal(10, 2)
-  taxAmount   Decimal @default(0) @db.Decimal(10, 2)
-  totalAmount Decimal @default(0) @db.Decimal(10, 2)
-  tipAmount   Decimal @default(0) @db.Decimal(10, 2)
+  subtotal       Decimal @default(0) @db.Decimal(10, 2)
+  taxAmount      Decimal @default(0) @db.Decimal(10, 2)
+  totalAmount    Decimal @default(0) @db.Decimal(10, 2)
+  tipAmount      Decimal @default(0) @db.Decimal(10, 2)
   // Coupon discount applied at the bill. Payable = total - discount + tip.
   discountAmount Decimal @default(0) @db.Decimal(10, 2)
   couponCode     String?
   // Amount paid so far (supports split / partial payments).
-  amountPaid  Decimal @default(0) @db.Decimal(10, 2)
+  amountPaid     Decimal @default(0) @db.Decimal(10, 2)
   // Loyalty points already credited for this order (guards double-award).
-  pointsAwarded Boolean @default(false)
-  gstMode     GstMode @default(NONE)
+  pointsAwarded  Boolean @default(false)
+  gstMode        GstMode @default(NONE)
 
   // Who placed the order, and through which channel. CUSTOMER = self-ordered via
   // QR; STAFF = taken by a waiter/cashier at the POS. createdByName is a snapshot
@@ -833,16 +834,16 @@ model Order {
 }
 
 model OrderItem {
-  id            String   @id @default(cuid())
+  id            String    @id @default(cuid())
   orderId       String
-  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order         Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   menuItemId    String?
   menuItem      MenuItem? @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
   nameSnapshot  String
-  priceSnapshot Decimal  @db.Decimal(10, 2)
-  quantity      Int      @default(1)
+  priceSnapshot Decimal   @db.Decimal(10, 2)
+  quantity      Int       @default(1)
   notes         String?
-  lineTotal     Decimal  @db.Decimal(10, 2)
+  lineTotal     Decimal   @db.Decimal(10, 2)
   // Snapshot of chosen modifiers: [{ group, name, priceDelta }]
   modifiers     Json?
   // Manual override for "split the bill by person" — defaults to the parent
@@ -871,7 +872,7 @@ model PlanPayment {
   periodDays        Int           @default(30)
   status            PaymentStatus @default(PENDING)
   razorpayOrderId   String?
-  razorpayPaymentId String?   @unique // captured-payment id is single-use across the platform
+  razorpayPaymentId String?       @unique // captured-payment id is single-use across the platform
   // Promo code applied at checkout (PlanCoupon.code), if any.
   couponCode        String?
   createdAt         DateTime      @default(now())
@@ -890,18 +891,18 @@ enum RefundStatus {
 // A refund issued against a paid order. Online refunds carry the gateway refund
 // id; counter/cash refunds are recorded as a manual note (no gateway call).
 model Refund {
-  id              String       @id @default(cuid())
+  id              String        @id @default(cuid())
   restaurantId    String
-  restaurant      Restaurant   @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurant      Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orderId         String
-  order           Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  amount          Decimal      @db.Decimal(10, 2)
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  amount          Decimal       @db.Decimal(10, 2)
   reason          String?
   method          PaymentMethod
   gatewayRefundId String? // Razorpay refund id, when refunded online
-  status          RefundStatus @default(DONE)
+  status          RefundStatus  @default(DONE)
   createdByName   String?
-  createdAt       DateTime     @default(now())
+  createdAt       DateTime      @default(now())
 
   @@index([orderId])
   @@index([restaurantId])
@@ -918,7 +919,7 @@ model Payment {
   status   PaymentStatus   @default(PENDING)
 
   razorpayOrderId   String?
-  razorpayPaymentId String?   @unique // captured-payment id is single-use across the platform
+  razorpayPaymentId String? @unique // captured-payment id is single-use across the platform
   razorpaySignature String?
 
   createdAt DateTime @default(now())
@@ -929,9 +930,9 @@ model Payment {
 }
 
 model Bill {
-  id        String @id @default(cuid())
-  orderId   String @unique
-  order     Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id         String @id @default(cuid())
+  orderId    String @unique
+  order      Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
   billNumber String @unique
 
   subtotal  Decimal @db.Decimal(10, 2)
@@ -950,14 +951,14 @@ model Bill {
 }
 
 model OtpVerification {
-  id        String     @id @default(cuid())
-  phone     String
-  codeHash  String
-  purpose   OtpPurpose @default(WHATSAPP_BILL)
-  expiresAt DateTime
+  id         String     @id @default(cuid())
+  phone      String
+  codeHash   String
+  purpose    OtpPurpose @default(WHATSAPP_BILL)
+  expiresAt  DateTime
   consumedAt DateTime?
-  attempts  Int        @default(0)
-  createdAt DateTime   @default(now())
+  attempts   Int        @default(0)
+  createdAt  DateTime   @default(now())
 
   @@index([phone, purpose])
   @@map("otp_verifications")
@@ -982,13 +983,13 @@ model AuditLog {
 // tenant-scoped: the actor here is a super-admin and the action may target a
 // specific tenant (targetRestaurantId) or be platform-wide.
 model PlatformAuditLog {
-  id                String   @id @default(cuid())
-  actorId           String?
-  actorName         String?
-  action            String // e.g. "tenant.suspended", "tenant.impersonated", "plan.granted"
+  id                 String   @id @default(cuid())
+  actorId            String?
+  actorName          String?
+  action             String // e.g. "tenant.suspended", "tenant.impersonated", "plan.granted"
   targetRestaurantId String?
-  detail            String?
-  createdAt         DateTime @default(now())
+  detail             String?
+  createdAt          DateTime @default(now())
 
   @@index([createdAt])
   @@index([targetRestaurantId])
@@ -998,25 +999,25 @@ model PlatformAuditLog {
 // Staff clock-in / clock-out records. Self punches are geofenced (coords stored
 // as proof); managers can mark or correct times (source = MANAGER).
 model StaffAttendance {
-  id           String           @id @default(cuid())
+  id           String     @id @default(cuid())
   restaurantId String
-  restaurant   Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   adminUserId  String
-  adminUser    AdminUser        @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  adminUser    AdminUser  @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
 
-  clockInAt    DateTime
-  clockOutAt   DateTime?
-  clockInLat   Float?
-  clockInLng   Float?
-  clockOutLat  Float?
-  clockOutLng  Float?
+  clockInAt   DateTime
+  clockOutAt  DateTime?
+  clockInLat  Float?
+  clockInLng  Float?
+  clockOutLat Float?
+  clockOutLng Float?
 
   source       AttendanceSource @default(SELF)
   markedById   String? // the manager who marked/corrected this, when source = MANAGER
   markedByName String?
 
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([restaurantId, clockInAt])
   @@index([adminUserId, clockInAt])
@@ -1026,11 +1027,11 @@ model StaffAttendance {
 // Web Push subscriptions. Restaurant-scoped (admin/kitchen) or order-scoped
 // (a diner's device for their own order).
 model PushSubscription {
-  id        String   @id @default(cuid())
-  endpoint  String   @unique
-  p256dh    String
-  auth      String
-  role      PushRole
+  id       String   @id @default(cuid())
+  endpoint String   @unique
+  p256dh   String
+  auth     String
+  role     PushRole
 
   restaurantId String?
   restaurant   Restaurant? @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
@@ -1109,24 +1110,24 @@ enum BanquetStatus {
 // A banquet / event booking (function hall, party, corporate event) with a
 // pre-agreed menu and an optional advance deposit.
 model BanquetBooking {
-  id            String        @id @default(cuid())
-  restaurantId  String
-  restaurant    Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  customerName  String
-  customerPhone String
-  eventType     String // Wedding, Birthday, Corporate, etc.
-  eventDate     DateTime
-  guestCount    Int           @default(20)
-  hall          String? // hall / space name
-  status        BanquetStatus @default(ENQUIRY)
-  advanceAmount Decimal       @default(0) @db.Decimal(10, 2)
-  notes         String?
+  id               String        @id @default(cuid())
+  restaurantId     String
+  restaurant       Restaurant    @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  customerName     String
+  customerPhone    String
+  eventType        String // Wedding, Birthday, Corporate, etc.
+  eventDate        DateTime
+  guestCount       Int           @default(20)
+  hall             String? // hall / space name
+  status           BanquetStatus @default(ENQUIRY)
+  advanceAmount    Decimal       @default(0) @db.Decimal(10, 2)
+  notes            String?
   // Set once the booking's pre-order has been fired to the kitchen as a real
   // Order — links to it and prevents converting twice.
   convertedOrderId String?
-  items         BanquetItem[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  items            BanquetItem[]
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   @@index([restaurantId, eventDate])
   @@map("banquet_bookings")
@@ -1161,4 +1162,127 @@ model Feedback {
 
   @@index([restaurantId])
   @@map("feedback")
+}
+
+// ---------------------------------------------------------------------------
+// Platform's own vendor bills (Razorpay, Resend, WhatsApp Cloud API, hosting,
+// etc.) — NOT tenant billing. Manually entered so the operator can see what's
+// coming due and never miss a renewal. See src/app/superadmin/vendor-bills.
+// ---------------------------------------------------------------------------
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  ONE_TIME
+}
+
+model PlatformSubscription {
+  id            String       @id @default(cuid())
+  vendor        String // e.g. "Razorpay", "Resend", "Railway"
+  description   String? // what it's for
+  amount        Decimal      @db.Decimal(10, 2)
+  currency      String       @default("INR")
+  billingCycle  BillingCycle @default(MONTHLY)
+  nextRenewalAt DateTime
+  autoRenews    Boolean      @default(true)
+  paymentNote   String? // e.g. "auto-debit, company card ending 4242"
+  isActive      Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@map("platform_subscriptions")
+}
+
+// ---------------------------------------------------------------------------
+// Messaging delivery log — every send attempt through src/lib/messaging/
+// provider.ts, so failure rate per channel is visible instead of only living
+// in each caller's local error handling. Global (not per-tenant) for now — see
+// src/app/superadmin/health. ponytail: unbounded growth, add a retention cron
+// (e.g. prune >90d) if this table ever becomes a real size concern.
+// ---------------------------------------------------------------------------
+
+enum MessageChannel {
+  EMAIL
+  WHATSAPP
+  SMS
+}
+
+model MessageDeliveryLog {
+  id        String         @id @default(cuid())
+  channel   MessageChannel
+  ok        Boolean
+  mocked    Boolean        @default(false) // sent to console, not a real provider
+  error     String?
+  createdAt DateTime       @default(now())
+
+  @@index([channel, createdAt])
+  @@map("message_delivery_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Payment reconciliation events — persisted alongside the one-off notifyOps
+// alerts in src/lib/orders/sweep.ts and src/app/api/webhook/razorpay/route.ts,
+// so "how often does this happen" is visible in src/app/superadmin/health
+// instead of only ever existing as a Slack/email that scrolls away.
+// ---------------------------------------------------------------------------
+
+enum ReconciliationEventType {
+  LATE_WEBHOOK_RECOVERED // sweep found a captured payment the webhook missed
+  UNMATCHED_PAYMENT // Razorpay confirmed a payment matching no order/plan/overage
+  UNMATCHED_SUBSCRIPTION // Razorpay confirmed a subscription event matching no restaurant
+}
+
+model PaymentReconciliationEvent {
+  id           String                  @id @default(cuid())
+  type         ReconciliationEventType
+  restaurantId String? // no relation (cross-cutting platform log — see PlatformAuditLog)
+  reference    String? // razorpay order/payment/subscription id
+  detail       String?
+  createdAt    DateTime                @default(now())
+
+  @@index([type, createdAt])
+  @@map("payment_reconciliation_events")
+}
+
+// ---------------------------------------------------------------------------
+// Application error log — every reportError() call (src/lib/observability.ts)
+// also persists here, so real error volume/trend is visible in superadmin
+// health instead of only reaching Sentry (which most of this app's operators
+// don't have credentials configured for) or stderr.
+// ponytail: unbounded growth, same as MessageDeliveryLog — prune if it matters.
+// ---------------------------------------------------------------------------
+
+model ErrorLogEntry {
+  id        String   @id @default(cuid())
+  context   String // e.g. "cron.sweep", "onboarding.summaryEmail"
+  message   String
+  createdAt DateTime @default(now())
+
+  @@index([context, createdAt])
+  @@map("error_log_entries")
+}
+
+// ---------------------------------------------------------------------------
+// Simple manual support-issue log (superadmin-only). Not a full ticketing
+// system — no email/WhatsApp integration, just a place to note a tenant issue
+// and mark it resolved. See src/app/superadmin/support.
+// ---------------------------------------------------------------------------
+
+enum SupportTicketStatus {
+  OPEN
+  RESOLVED
+}
+
+model SupportTicket {
+  id           String              @id @default(cuid())
+  restaurantId String? // no relation — optional, may be a general/platform issue
+  subject      String
+  description  String?
+  status       SupportTicketStatus @default(OPEN)
+  createdAt    DateTime            @default(now())
+  resolvedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@map("support_tickets")
 }

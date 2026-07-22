@@ -67,6 +67,27 @@ export async function fetchRazorpayPayment(
   }
 }
 
+// Fetch every payment attempt against a Razorpay order — used to check for a
+// captured payment when our own PENDING order has gone stale (e.g. the
+// webhook was delayed or dropped), so a slow webhook never gets mistaken for
+// a failed payment and re-charges the diner. Returns null on lookup failure
+// (caller treats that the same as "nothing found" and falls back to reverting).
+export async function fetchCapturedPaymentForOrder(
+  creds: RazorpayCreds,
+  razorpayOrderId: string,
+): Promise<{ id: string; amountPaise: number } | null> {
+  try {
+    const { default: Razorpay } = await import("razorpay");
+    const rzp = new Razorpay({ key_id: creds.keyId, key_secret: creds.keySecret });
+    const { items } = await rzp.orders.fetchPayments(razorpayOrderId);
+    const captured = items.find((p) => p.status === "captured");
+    if (!captured) return null;
+    return { id: String(captured.id), amountPaise: Number(captured.amount) };
+  } catch {
+    return null;
+  }
+}
+
 // Refunds a captured payment (full or partial). amountRupees -> paise. Returns
 // the gateway refund id. Throws if Razorpay rejects (caller records FAILED).
 export async function refundRazorpayPayment(

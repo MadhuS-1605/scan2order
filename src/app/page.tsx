@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import {
   ChevronDown,
   ArrowRight,
@@ -25,6 +26,11 @@ import { TiltCard } from "@/components/marketing/tilt-card";
 import { StickyMobileCta } from "@/components/marketing/sticky-mobile-cta";
 
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan2order.co.in";
+// Marketing site lives on the apex domain; the actual app (signup/signin/
+// dashboard) lives on app.<domain> — see NON_TENANT in src/proxy.ts. In local
+// dev `next dev` always sets NODE_ENV=development, so stay on relative paths
+// (same host) instead of bouncing out to the real app.<domain>.
+const APP_URL = process.env.NODE_ENV === "development" ? "" : `https://app.${PLATFORM_DOMAIN}`;
 
 export const dynamic = "force-dynamic";
 
@@ -94,14 +100,14 @@ export default async function Home() {
             <Reveal delay={240}>
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <Link
-                  href="/signup"
+                  href={`${APP_URL}/signup`}
                   className={cn(buttonVariants({ size: "lg" }), "h-11 gap-2 px-6 text-base")}
                 >
                   Open your restaurant
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
-                  href="/signin"
+                  href={`${APP_URL}/signin`}
                   className="text-sm font-medium text-ink/70 underline-offset-4 hover:text-ink hover:underline"
                 >
                   Sign in to your dashboard
@@ -304,7 +310,7 @@ export default async function Home() {
                           </a>
                         ) : (
                           <Link
-                            href="/signup"
+                            href={`${APP_URL}/signup`}
                             className={cn(
                               buttonVariants({ variant: p.highlight ? "default" : "outline" }),
                               "w-full",
@@ -360,7 +366,7 @@ export default async function Home() {
         <div className="mx-auto max-w-6xl px-6 py-8">
           <Separator className="mb-8 bg-sand-200" />
           <div className="flex flex-col items-center justify-between gap-3 text-sm text-ink/50 sm:flex-row">
-            <span className="font-display text-base text-ink">Scan2Order</span>
+            <Image src="/logo-mark.png" alt="Scan2Order" width={64} height={64} className="h-16 w-16" />
             <div className="flex items-center gap-4">
               <Link href="/privacy" className="hover:text-ink">
                 Privacy
@@ -386,14 +392,14 @@ function Header() {
     <header className="sticky top-0 z-10 border-b border-sand-200/70 bg-paper/80 backdrop-blur">
       <div aria-hidden className="scroll-progress" />
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link href="/" className="font-display text-xl font-medium text-ink">
-          Scan&nbsp;to&nbsp;Order
+        <Link href="/" className="flex items-center">
+          <Image src="/logo-mark.png" alt="Scan2Order" width={40} height={40} priority className="h-10 w-10" />
         </Link>
         <nav className="flex items-center gap-5 text-sm">
-          <Link href="/signin" className="text-ink/70 hover:text-ink">
+          <Link href={`${APP_URL}/signin`} className="text-ink/70 hover:text-ink">
             Sign in
           </Link>
-          <Link href="/signup" className={buttonVariants()}>
+          <Link href={`${APP_URL}/signup`} className={buttonVariants()}>
             Get started
           </Link>
         </nav>

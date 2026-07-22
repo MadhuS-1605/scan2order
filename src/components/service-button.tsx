@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Bell, GlassWater, ReceiptText, Sparkles, Check, X } from "lucide-react";
+import { Bell, GlassWater, ReceiptText, Sparkles, Check, X, AlertCircle } from "lucide-react";
 import { createServiceRequestAction } from "@/lib/service/actions";
 import type { ServiceRequestType } from "@prisma/client";
 
@@ -19,14 +19,23 @@ const OPTIONS: {
 export function ServiceButton({ qrToken }: { qrToken: string }) {
   const [open, setOpen] = useState(false);
   const [sent, setSent] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   function send(type: ServiceRequestType, label: string) {
+    setError(null);
     start(async () => {
-      await createServiceRequestAction({ qrToken, type });
-      setOpen(false);
-      setSent(label);
-      setTimeout(() => setSent(null), 3500);
+      // A dropped connection here throws rather than returning — without this
+      // catch it's an unhandled rejection that resets the whole ordering page
+      // (same failure mode fixed in checkout-form.tsx).
+      try {
+        await createServiceRequestAction({ qrToken, type });
+        setOpen(false);
+        setSent(label);
+        setTimeout(() => setSent(null), 3500);
+      } catch {
+        setError("Couldn't send — check your connection and try again.");
+      }
     });
   }
 
@@ -69,6 +78,12 @@ export function ServiceButton({ qrToken }: { qrToken: string }) {
                 <X className="h-4 w-4" />
               </button>
             </div>
+            {error && (
+              <div className="flex items-center gap-2 border-b border-sand-100 px-3 py-2 text-xs text-red-600">
+                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                {error}
+              </div>
+            )}
             {OPTIONS.map((o) => (
               <button
                 key={o.type}

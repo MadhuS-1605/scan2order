@@ -282,7 +282,14 @@ export function BillClient({
 
   async function handleDownload() {
     window.open(pdfUrl, "_blank");
-    await markBillDownloadedAction({ orderId, qrToken });
+    // Best-effort analytics ping — the diner already has their PDF regardless
+    // of whether this succeeds, so swallow a network failure instead of
+    // leaving an unhandled rejection in the console.
+    try {
+      await markBillDownloadedAction({ orderId, qrToken });
+    } catch {
+      /* non-critical tracking call */
+    }
   }
 
   async function sendOtp() {

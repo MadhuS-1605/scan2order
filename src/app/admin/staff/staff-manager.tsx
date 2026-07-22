@@ -3,12 +3,13 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import {
   createStaffAction,
+  bulkCreateStaffAction,
   updateStaffRoleAction,
   deleteStaffAction,
   resetStaffPasswordAction,
   setStaffDisabledAction,
 } from "@/lib/staff/actions";
-import { Button, Input, Select, Field, Alert, Card } from "@/components/ui";
+import { Button, Input, Select, Field, Alert, Card, Textarea } from "@/components/ui";
 import { ROLE_LABELS, ASSIGNABLE_ROLES } from "@/lib/auth/permissions";
 import { useT } from "@/components/admin/i18n-provider";
 import type { ActionState } from "@/lib/validation";
@@ -38,7 +39,10 @@ export function StaffManager({
   const tr = useT();
   return (
     <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-      <AddStaffForm />
+      <div className="space-y-6">
+        <AddStaffForm />
+        <BulkAddStaffForm />
+      </div>
 
       <Card>
         <h2 className="mb-3 font-semibold text-ink">{`${tr("staff.team")} (${staff.length})`}</h2>
@@ -225,6 +229,49 @@ function AddStaffForm() {
           {pending ? tr("staff.adding") : tr("staff.addMemberButton")}
         </Button>
       </form>
+    </Card>
+  );
+}
+
+// Plain English (not routed through the i18n dict) — same reasoning as the
+// other bulk admin forms in this pass: mistranslating credential-handling
+// copy is worse than leaving it in English.
+function BulkAddStaffForm() {
+  const [state, action, pending] = useActionState<ActionState, FormData>(
+    bulkCreateStaffAction,
+    {},
+  );
+
+  return (
+    <Card className="h-fit">
+      <details className="group">
+        <summary className="cursor-pointer list-none font-semibold text-ink">
+          Add multiple staff at once
+        </summary>
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-ink/55">
+            One per line: name, username, role (manager/cashier/waiter/kitchen — defaults to waiter).
+            A password is generated for each and shown once below — write them down.
+          </p>
+          {state.error && <Alert>{state.error}</Alert>}
+          {state.ok && state.message && (
+            <Alert variant="success">
+              <span className="whitespace-pre-wrap">{state.message}</span>
+            </Alert>
+          )}
+          <form action={action} className="space-y-2">
+            <Textarea
+              name="csv"
+              rows={5}
+              placeholder={"Asha Kumar, asha, waiter\nRavi Shah, ravi, kitchen"}
+              className="font-mono text-xs"
+            />
+            <Button type="submit" size="sm" disabled={pending} className="w-full">
+              {pending ? "Creating…" : "Create accounts"}
+            </Button>
+          </form>
+        </div>
+      </details>
     </Card>
   );
 }

@@ -62,7 +62,7 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
 
   // Line item table
   let y = Math.max(doc.y, blockTop + 90);
-  const rule = (yy: number) => doc.moveTo(left, yy).lineTo(right, yy).strokeColor("#ddd").lineWidth(1).stroke();
+  const rule = (yy: number) => doc.moveTo(left, yy).lineTo(right, yy).strokeColor("#bbb").lineWidth(1).stroke();
   const amtX = right - 110;
   doc.font("Helvetica-Bold").fontSize(9).fillColor("#1c1917");
   doc.text("Description", left, y);
@@ -89,7 +89,7 @@ export async function generateInvoicePdf(data: InvoiceData): Promise<Buffer> {
   totalRow(`GST @ ${Math.round(GST_RATE * 100)}%`, money(gst));
   totalRow("Total paid", money(data.grossAmount), true);
 
-  doc.font("Helvetica").fontSize(8).fillColor("#999");
+  doc.font("Helvetica").fontSize(8).fillColor("#666");
   doc.text(
     "Amount is inclusive of GST. This is a computer-generated invoice and does not require a signature.",
     left,

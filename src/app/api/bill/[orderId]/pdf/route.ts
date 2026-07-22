@@ -125,7 +125,7 @@ export async function GET(
   return new Response(new Uint8Array(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="bill-${primary.orderNumber}.pdf"`,
+      "Content-Disposition": `inline; filename="${entry.restaurant.slug}-bill-${primary.orderNumber}.pdf"`,
     },
   });
 }

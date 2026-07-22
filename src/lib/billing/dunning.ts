@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { sendEmail, sendWhatsApp, sendWhatsAppTemplate } from "@/lib/messaging/provider";
 import { notifyRestaurant } from "@/lib/push";
 import { reportError } from "@/lib/observability";
+import { notifyOps } from "@/lib/platform/alerts";
 import { subscriptionState } from "@/lib/subscription";
 import { escapeHtml } from "@/lib/utils";
 
@@ -43,6 +44,13 @@ async function notifyOwner(
     await notifyRestaurant(r.id, { title: subject, body, url: "/admin/billing", tag: "billing-dunning" });
   } catch (e) {
     reportError("dunning.notify", e, { restaurantId: r.id });
+    // reportError only reaches Sentry/stderr — this is a billing-critical
+    // owner notice (trial ending / plan lapsed), so ping ops directly too
+    // rather than relying on someone watching logs.
+    await notifyOps(
+      "Dunning notice failed to send",
+      `Restaurant ${r.id} (${r.name}) — "${subject}" failed to send: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 }
 

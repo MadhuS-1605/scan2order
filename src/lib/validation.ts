@@ -103,6 +103,16 @@ export const tableSchema = z.object({
   kind: z.enum(["TABLE", "ROOM"]).default("TABLE"),
 });
 
+// Generates <prefix><startAt>..<prefix><startAt+count-1>, e.g. T1..T20 or
+// (for a hotel) 101..150.
+export const bulkTableSchema = z.object({
+  prefix: z.string().trim().max(10).transform((v) => v || "T"),
+  startAt: z.coerce.number().int().min(1).max(9999),
+  count: z.coerce.number().int().min(1).max(100),
+  seats: z.coerce.number().int().min(1).max(50),
+  kind: z.enum(["TABLE", "ROOM"]).default("TABLE"),
+});
+
 export const placeOrderSchema = z.object({
   qrToken: z.string().min(1),
   items: z

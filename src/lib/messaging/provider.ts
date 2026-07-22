@@ -1,6 +1,7 @@
 import "server-only";
 import { env } from "@/lib/env";
 import { flagEnabled } from "@/lib/platform/flags";
+import { prisma } from "@/lib/db";
 
 // Messaging abstraction. WhatsApp goes through Meta's Cloud API (templates +
 // in-window free-form); SMS OTP fallback uses 2Factor. Anything unconfigured
@@ -8,12 +9,40 @@ import { flagEnabled } from "@/lib/platform/flags";
 
 type SendResult = { ok: boolean; error?: string; mocked?: boolean };
 
+// Every public send function below wraps its "Inner" implementation with this
+// so every attempt is logged exactly once regardless of which internal return
+// path fired — see src/app/superadmin/health for the aggregate failure rate.
+async function logged(
+  channel: "EMAIL" | "WHATSAPP" | "SMS",
+  send: () => Promise<SendResult>,
+): Promise<SendResult> {
+  const result = await send();
+  try {
+    await prisma.messageDeliveryLog.create({
+      data: { channel, ok: result.ok, mocked: Boolean(result.mocked), error: result.error ?? null },
+    });
+  } catch {
+    // Never let logging break a send.
+  }
+  return result;
+}
+
 // Transactional email via Resend's REST API (no SDK dependency). Logs to the
 // console when no key is set, so the flow works in dev without credentials.
 export async function sendEmail(
   to: string,
   subject: string,
   html: string,
+  attachments?: { filename: string; content: Buffer }[],
+): Promise<SendResult> {
+  return logged("EMAIL", () => sendEmailInner(to, subject, html, attachments));
+}
+
+async function sendEmailInner(
+  to: string,
+  subject: string,
+  html: string,
+  attachments?: { filename: string; content: Buffer }[],
 ): Promise<SendResult> {
   if (!(await flagEnabled("email_enabled"))) return { ok: false, error: "Email sending is disabled." };
   if (!env.email.configured()) {
@@ -27,7 +56,15 @@ export async function sendEmail(
         Authorization: `Bearer ${env.email.resendApiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from: env.email.from, to, subject, html }),
+      body: JSON.stringify({
+        from: env.email.from,
+        to,
+        subject,
+        html,
+        ...(attachments?.length
+          ? { attachments: attachments.map((a) => ({ filename: a.filename, content: a.content.toString("base64") })) }
+          : {}),
+      }),
     });
     if (!res.ok) return { ok: false, error: `Email failed (${res.status})` };
     return { ok: true };
@@ -40,6 +77,14 @@ export async function sendEmail(
 // (sendWhatsAppTemplate); in-window free-form is handled by sendWhatsAppFreeform.
 // With no non-Meta provider, this logs to the console (dev / unconfigured).
 export async function sendWhatsApp(
+  to: string,
+  body: string,
+  fromOverride?: string | null,
+): Promise<SendResult> {
+  return logged("WHATSAPP", () => sendWhatsAppInner(to, body, fromOverride));
+}
+
+async function sendWhatsAppInner(
   to: string,
   body: string,
   _fromOverride?: string | null,
@@ -78,6 +123,16 @@ export async function sendWhatsAppTemplate(
   template: string,
   params: TemplateParam[],
   lang: string = env.messaging.meta.lang,
+  headerDocument?: { link: string; filename: string },
+): Promise<SendResult> {
+  return logged("WHATSAPP", () => sendWhatsAppTemplateInner(to, template, params, lang, headerDocument));
+}
+
+async function sendWhatsAppTemplateInner(
+  to: string,
+  template: string,
+  params: TemplateParam[],
+  lang: string,
   headerDocument?: { link: string; filename: string },
 ): Promise<SendResult> {
   if (!(await flagEnabled("whatsapp_enabled"))) return { ok: false, error: "WhatsApp sending is disabled." };
@@ -151,8 +206,16 @@ export async function sendWhatsAppFreeform(
   body: string,
   fromOverride?: string | null,
 ): Promise<SendResult> {
+  return logged("WHATSAPP", () => sendWhatsAppFreeformInner(to, body, fromOverride));
+}
+
+async function sendWhatsAppFreeformInner(
+  to: string,
+  body: string,
+  fromOverride?: string | null,
+): Promise<SendResult> {
   if (!(await flagEnabled("whatsapp_enabled"))) return { ok: false, error: "WhatsApp sending is disabled." };
-  if (!isMeta()) return sendWhatsApp(to, body, fromOverride);
+  if (!isMeta()) return sendWhatsAppInner(to, body, fromOverride);
   const m = env.messaging.meta;
   try {
     const res = await fetch(
@@ -186,6 +249,10 @@ export async function sendWhatsAppFreeform(
 // 2Factor.in's transactional SMS route (cheapest for India). Logs to the
 // console (mocked) when no fallback provider is configured.
 export async function sendOtpSms(to: string, code: string): Promise<SendResult> {
+  return logged("SMS", () => sendOtpSmsInner(to, code));
+}
+
+async function sendOtpSmsInner(to: string, code: string): Promise<SendResult> {
   const fb = env.messaging.smsFallback;
   const phone = to.replace(/[^\d]/g, "");
   if (fb.provider === "twofactor" && fb.twoFactorApiKey) {

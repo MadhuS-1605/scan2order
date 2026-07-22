@@ -20,6 +20,10 @@ type Config = {
   gstVerified: boolean;
   gstPercentage: string | number;
   serviceModel?: string;
+  // Whether Razorpay keys already resolve (per-tenant or platform fallback) —
+  // lets us warn if the owner enables online payment without anything wired
+  // up yet, instead of it silently having nothing behind it.
+  razorpayConfigured: boolean;
 };
 
 export function SettingsStep({ config }: { config: Config }) {
@@ -37,6 +41,7 @@ export function SettingsStep({ config }: { config: Config }) {
   const [gstNote, setGstNote] = useState<string | null>(null);
   const [gstError, setGstError] = useState<string | null>(null);
   const [verifying, startVerify] = useTransition();
+  const [onlinePayment, setOnlinePayment] = useState(config.onlinePaymentEnabled);
 
   function onGstinChange(value: string) {
     // Editing the number invalidates any prior verification.
@@ -144,7 +149,8 @@ export function SettingsStep({ config }: { config: Config }) {
               <input
                 type="checkbox"
                 name="onlinePaymentEnabled"
-                defaultChecked={config.onlinePaymentEnabled}
+                checked={onlinePayment}
+                onChange={(e) => setOnlinePayment(e.target.checked)}
               />
               Online payment (Razorpay)
             </label>
@@ -157,6 +163,11 @@ export function SettingsStep({ config }: { config: Config }) {
               Pay at counter
             </label>
           </div>
+          {onlinePayment && !config.razorpayConfigured && (
+            <p className="mt-2 text-xs text-amber-700">
+              No Razorpay keys configured yet — diners won&apos;t be able to pay online until you add them in Settings → Payments after setup.
+            </p>
+          )}
         </fieldset>
 
         <fieldset className="space-y-3">

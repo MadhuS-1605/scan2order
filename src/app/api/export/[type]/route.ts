@@ -16,6 +16,10 @@ export async function GET(
     return new Response("Unauthorized", { status: 401 });
   }
   const rid = session.restaurantId;
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { id: rid },
+    select: { slug: true },
+  });
   let csv: string;
 
   if (type === "orders") {
@@ -102,10 +106,12 @@ export async function GET(
     return new Response("Unknown export type", { status: 404 });
   }
 
+  const date = new Date().toISOString().slice(0, 10);
+  const filename = `${restaurant?.slug ?? rid}-${type}-${date}.csv`;
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${type}-export.csv"`,
+      "Content-Disposition": `attachment; filename="${filename}"`,
     },
   });
 }

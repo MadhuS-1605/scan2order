@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth/guards";
 import { qrDataUrl, tableMenuUrl } from "@/lib/qr";
 import { getBaseUrl } from "@/lib/request";
+import { resolveRazorpayCreds } from "@/lib/payments/razorpay";
 import { STEPS } from "@/lib/onboarding/steps";
 import { Stepper } from "./stepper";
 import { ProfileStep } from "./steps/profile-step";
@@ -78,6 +79,12 @@ export default async function OnboardingPage() {
             gstVerified: restaurant.config.gstVerified,
             gstPercentage: restaurant.config.gstPercentage.toString(),
             serviceModel: restaurant.config.serviceModel,
+            razorpayConfigured: Boolean(
+              resolveRazorpayCreds({
+                razorpayKeyId: restaurant.config.razorpayKeyId,
+                razorpayKeySecret: restaurant.config.razorpayKeySecret,
+              }),
+            ),
           }}
         />
       )}

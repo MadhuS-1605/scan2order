@@ -41,15 +41,19 @@ export function ClockWidget({ openSince }: { openSince: string | null }) {
   function punch() {
     setErr(null);
     start(async () => {
-      const coords = await getCoords();
-      const res = openSince
-        ? await clockOutAction(coords)
-        : await clockInAction(coords);
-      if (res.error) {
-        setErr(res.error);
-        return;
+      try {
+        const coords = await getCoords();
+        const res = openSince
+          ? await clockOutAction(coords)
+          : await clockInAction(coords);
+        if (res.error) {
+          setErr(res.error);
+          return;
+        }
+        router.refresh();
+      } catch {
+        setErr("Couldn't reach the server — check your connection and try again.");
       }
-      router.refresh();
     });
   }
 

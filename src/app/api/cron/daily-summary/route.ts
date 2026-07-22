@@ -1,6 +1,7 @@
 import { env } from "@/lib/env";
 import { runDailySummaries } from "@/lib/reports/daily";
 import { reportError } from "@/lib/observability";
+import { notifyOps } from "@/lib/platform/alerts";
 import { cronAuthorized } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
@@ -18,6 +19,7 @@ async function handle(request: Request): Promise<Response> {
     return Response.json({ ok: true, sent });
   } catch (e) {
     reportError("cron.dailySummary", e);
+    await notifyOps("Daily summary cron failed", `Owner daily sales summaries failed to send: ${e instanceof Error ? e.message : String(e)}`);
     return new Response("Daily summary failed", { status: 500 });
   }
 }

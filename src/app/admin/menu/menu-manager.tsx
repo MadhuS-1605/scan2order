@@ -22,6 +22,7 @@ import {
   deleteModifierGroupAction,
   addModifierOptionAction,
   deleteModifierOptionAction,
+  copyModifierGroupToItemsAction,
 } from "@/lib/menu/modifiers";
 import {
   Button,
@@ -204,6 +205,9 @@ export function MenuManager({
       {selected.size > 0 && (
         <BulkActionBar
           ids={[...selected]}
+          groupOptions={items.flatMap((it) =>
+            it.modifierGroups.map((g) => ({ id: g.id, label: `${it.name} — ${g.name}` })),
+          )}
           onClear={() => setSelected(new Set())}
         />
       )}
@@ -211,7 +215,15 @@ export function MenuManager({
   );
 }
 
-function BulkActionBar({ ids, onClear }: { ids: string[]; onClear: () => void }) {
+function BulkActionBar({
+  ids,
+  groupOptions,
+  onClear,
+}: {
+  ids: string[];
+  groupOptions: { id: string; label: string }[];
+  onClear: () => void;
+}) {
   const tr = useT();
   const [pct, setPct] = useState("");
   const idsValue = ids.join(",");
@@ -253,6 +265,9 @@ function BulkActionBar({ ids, onClear }: { ids: string[]; onClear: () => void })
             {tr("menu.adjustPrice")}
           </Button>
         </form>
+        {groupOptions.length > 0 && (
+          <CopyModifierGroupControl ids={ids} groupOptions={groupOptions} />
+        )}
         <button
           type="button"
           onClick={onClear}
@@ -262,6 +277,48 @@ function BulkActionBar({ ids, onClear }: { ids: string[]; onClear: () => void })
         </button>
       </div>
     </div>
+  );
+}
+
+// Plain English, not routed through tr() like the rest of this bar — same
+// reasoning as the admin bulk-table form: the i18n dict needs a real
+// per-locale translation for every key, and guessing one here isn't worth
+// the risk for one admin-only control.
+function CopyModifierGroupControl({
+  ids,
+  groupOptions,
+}: {
+  ids: string[];
+  groupOptions: { id: string; label: string }[];
+}) {
+  const [state, action, pending] = useActionState<ActionState, FormData>(
+    copyModifierGroupToItemsAction,
+    {},
+  );
+  const [sourceGroupId, setSourceGroupId] = useState(groupOptions[0]?.id ?? "");
+
+  return (
+    <form action={action} className="flex items-center gap-1.5">
+      <input type="hidden" name="targetItemIds" value={ids.join(",")} />
+      <Select
+        name="sourceGroupId"
+        value={sourceGroupId}
+        onChange={(e) => setSourceGroupId(e.target.value)}
+        className="max-w-[180px]"
+        aria-label="Modifier group to apply"
+      >
+        {groupOptions.map((g) => (
+          <option key={g.id} value={g.id}>
+            {g.label}
+          </option>
+        ))}
+      </Select>
+      <Button size="sm" variant="secondary" type="submit" disabled={pending || !sourceGroupId}>
+        {pending ? "Applying…" : "Apply to selected"}
+      </Button>
+      {state.error && <span className="text-xs text-red-600">{state.error}</span>}
+      {state.ok && state.message && <span className="text-xs text-olive-700">{state.message}</span>}
+    </form>
   );
 }
 

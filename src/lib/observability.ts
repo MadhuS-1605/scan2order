@@ -1,6 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { env } from "@/lib/env";
+import { prisma } from "@/lib/db";
 
 // Minimal structured error reporting. Always writes a JSON line to stderr (which
 // Railway/most hosts capture). When SENTRY_DSN is set, it ALSO forwards the
@@ -23,6 +24,17 @@ export function reportError(
   }
   // Fire-and-forget Sentry forward; never throws into the caller.
   if (env.sentryDsn) void forwardToSentry(context, e, extra);
+  // Fire-and-forget local persistence — gives real error volume/trend in
+  // superadmin health regardless of whether Sentry is configured.
+  void persistError(context, e.message);
+}
+
+async function persistError(context: string, message: string): Promise<void> {
+  try {
+    await prisma.errorLogEntry.create({ data: { context, message: message.slice(0, 500) } });
+  } catch {
+    // never let logging break the caller
+  }
 }
 
 // Parse a Sentry DSN: https://<publicKey>@<host>/<projectId>

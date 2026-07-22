@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireOnboardedAdmin } from "@/lib/auth/guards";
@@ -7,6 +8,19 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { hashPassword } from "@/lib/auth/password";
 import { recordAudit } from "@/lib/audit";
 import { staffSchema, resetPasswordSchema, type ActionState } from "@/lib/validation";
+
+const STAFF_ROLES = new Set(["MANAGER", "CASHIER", "WAITER", "KITCHEN"]);
+type StaffRole = "MANAGER" | "CASHIER" | "WAITER" | "KITCHEN";
+
+// Readable random password — no 0/O/1/l/I so it's unambiguous when handed to
+// a waiter to type in, and never shown again after creation.
+function randomStaffPassword(): string {
+  const alphabet = "abcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = randomBytes(10);
+  let out = "";
+  for (let i = 0; i < bytes.length; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
 
 async function requireStaffManager() {
   const session = await requireOnboardedAdmin();
@@ -50,6 +64,78 @@ export async function createStaffAction(
   await recordAudit(session.restaurantId, session, "staff.created", `${name} (${role})`);
   revalidatePath("/admin/staff");
   return { ok: true, message: `${name} added as ${role.toLowerCase()} · @${uname}` };
+}
+
+// Bulk-create staff from pasted rows ("name, username, role" per line) with an
+// auto-generated password per account — so onboarding 10-20 waiters/cooks
+// doesn't mean typing the one-at-a-time form that many times. Passwords are
+// shown once in the result message; there's no other way to recover them
+// (same as any freshly-created account — use "Reset password" afterward).
+export async function bulkCreateStaffAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const session = await requireStaffManager();
+  const rows = String(formData.get("csv") ?? "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 100);
+  if (rows.length === 0) {
+    return { error: "Paste one staff member per line: name, username, role." };
+  }
+
+  const existing = await prisma.adminUser.findMany({
+    where: { restaurantId: session.restaurantId },
+    select: { username: true },
+  });
+  const taken = new Set(existing.map((u) => u.username).filter(Boolean));
+
+  const created: { name: string; username: string; role: StaffRole; password: string }[] = [];
+  const skipped: string[] = [];
+  for (const row of rows) {
+    const [rawName, rawUsername, rawRole] = row.split(",").map((s) => s.trim());
+    const name = rawName?.slice(0, 80);
+    const username = rawUsername?.toLowerCase();
+    const role = (rawRole || "WAITER").toUpperCase();
+    if (
+      !name ||
+      !username ||
+      !/^[a-zA-Z0-9_]{3,30}$/.test(username) ||
+      !STAFF_ROLES.has(role) ||
+      taken.has(username)
+    ) {
+      skipped.push(rawUsername || rawName || row);
+      continue;
+    }
+    taken.add(username);
+    created.push({ name, username, role: role as StaffRole, password: randomStaffPassword() });
+  }
+
+  if (created.length === 0) {
+    return { error: "No staff created — check for duplicate usernames or invalid roles (manager/cashier/waiter/kitchen)." };
+  }
+
+  for (const c of created) {
+    await prisma.adminUser.create({
+      data: {
+        name: c.name,
+        username: c.username,
+        passwordHash: await hashPassword(c.password),
+        role: c.role,
+        restaurantId: session.restaurantId,
+      },
+    });
+    await recordAudit(session.restaurantId, session, "staff.created", `${c.name} (${c.role})`);
+  }
+  revalidatePath("/admin/staff");
+
+  const lines = created.map((c) => `@${c.username} / ${c.password}`).join("\n");
+  const skippedNote = skipped.length ? `\nSkipped: ${skipped.join(", ")}` : "";
+  return {
+    ok: true,
+    message: `Created ${created.length} staff account${created.length === 1 ? "" : "s"}. Save these now — passwords won't be shown again:\n${lines}${skippedNote}`,
+  };
 }
 
 export async function updateStaffRoleAction(
