@@ -4,6 +4,7 @@ import { env } from "@/lib/env";
 import { sendEmail, sendWhatsApp, sendWhatsAppTemplate } from "@/lib/messaging/provider";
 import { notifyRestaurant } from "@/lib/push";
 import { reportError } from "@/lib/observability";
+import { notifyOps } from "@/lib/platform/alerts";
 import { formatMoney, escapeHtml } from "@/lib/utils";
 import type { UsageChannel } from "@/lib/plans";
 
@@ -96,6 +97,10 @@ export async function notifyOverageThreshold(
     });
   } catch (e) {
     reportError("overage.notifyThreshold", e, { restaurantId, channel, pct });
+    await notifyOps(
+      "Overage threshold notice failed to send",
+      `Restaurant ${restaurantId} — ${pct}% ${CHANNEL_LABEL[channel]} threshold notice failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 }
 
@@ -130,5 +135,9 @@ export async function notifyOverageSettled(
     });
   } catch (e) {
     reportError("overage.notifySettled", e, { restaurantId, amount });
+    await notifyOps(
+      "Overage payment-received notice failed to send",
+      `Restaurant ${restaurantId} — payment-received notice for ${formatMoney(amount)} failed: ${e instanceof Error ? e.message : String(e)}`,
+    );
   }
 }

@@ -33,6 +33,20 @@ export async function setStockAction(formData: FormData): Promise<void> {
   revalidate();
 }
 
+// Turns on stock tracking for every item that doesn't have it yet — so
+// enabling inventory for a 50-SKU menu isn't 50 individual form submits.
+// Quantities still need per-item input (there's no "correct" default), so
+// this just flips the switch; owners fill in real counts via the row below
+// or the +10/+50 restock buttons.
+export async function bulkEnableTrackingAction(): Promise<void> {
+  const session = await requireMenuManager();
+  await prisma.menuItem.updateMany({
+    where: { restaurantId: session.restaurantId, trackStock: false },
+    data: { trackStock: true },
+  });
+  revalidate();
+}
+
 // Quick "+N" restock.
 export async function restockAction(formData: FormData): Promise<void> {
   const session = await requireMenuManager();

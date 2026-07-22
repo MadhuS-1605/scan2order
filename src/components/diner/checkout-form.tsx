@@ -130,47 +130,56 @@ export function CheckoutForm({
     }));
     if (lineItems.length === 0) return;
     startTransition(async () => {
-      const coords = config.requireDinerLocation ? await getCoords() : {};
-      const res = await placeOrderAction({
-        qrToken,
-        items: lineItems,
-        customerName: name || undefined,
-        customerPhone: phone || undefined,
-        notes: notes || undefined,
-        paymentMethod: payBefore ? method : undefined,
-        fulfillment: offersFulfillment ? fulfillment : undefined,
-        deliveryAddress: fulfillment === "DELIVERY" ? address.trim() : undefined,
-        sessionId: dine?.id,
-        latitude: coords.lat,
-        longitude: coords.lng,
-      });
-      if (!res.ok) {
-        setError(res.error);
-        return;
-      }
-      placed.current = true;
-      // Remember the dining session so later rounds reuse name/phone and the
-      // bill consolidates. Cleared once the bill is paid (on the bill screen).
+      // A dropped connection here is a transport failure, not a validation
+      // error — placeOrderAction never gets to return its {ok:false} shape,
+      // it just throws. Without this catch that's an unhandled rejection that
+      // trips the app's top-level error boundary and resets the whole page,
+      // losing the diner's cart/checkout state over a flaky wifi hiccup.
       try {
-        localStorage.removeItem(cartKey);
-        localStorage.setItem(
-          dineKey,
-          JSON.stringify({
-            id: res.sessionId,
-            name: dine?.name || name,
-            phone: dine?.phone || phone,
-          }),
+        const coords = config.requireDinerLocation ? await getCoords() : {};
+        const res = await placeOrderAction({
+          qrToken,
+          items: lineItems,
+          customerName: name || undefined,
+          customerPhone: phone || undefined,
+          notes: notes || undefined,
+          paymentMethod: payBefore ? method : undefined,
+          fulfillment: offersFulfillment ? fulfillment : undefined,
+          deliveryAddress: fulfillment === "DELIVERY" ? address.trim() : undefined,
+          sessionId: dine?.id,
+          latitude: coords.lat,
+          longitude: coords.lng,
+        });
+        if (!res.ok) {
+          setError(res.error);
+          return;
+        }
+        placed.current = true;
+        // Remember the dining session so later rounds reuse name/phone and the
+        // bill consolidates. Cleared once the bill is paid (on the bill screen).
+        try {
+          localStorage.removeItem(cartKey);
+          localStorage.setItem(
+            dineKey,
+            JSON.stringify({
+              id: res.sessionId,
+              name: dine?.name || name,
+              phone: dine?.phone || phone,
+            }),
+          );
+        } catch {
+          /* ignore */
+        }
+        clear();
+        // Pay-first online → go straight to payment; otherwise to the status page.
+        router.push(
+          res.needsOnlinePayment
+            ? `/payment?order=${res.orderId}`
+            : `/order/${res.orderId}`,
         );
       } catch {
-        /* ignore */
+        setError("Couldn't reach the server — check your connection and try again.");
       }
-      clear();
-      // Pay-first online → go straight to payment; otherwise to the status page.
-      router.push(
-        res.needsOnlinePayment
-          ? `/payment?order=${res.orderId}`
-          : `/order/${res.orderId}`,
-      );
     });
   }
 

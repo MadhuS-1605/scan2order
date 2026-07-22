@@ -22,6 +22,15 @@ if (!process.env.DATABASE_URL) {
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
-const { count } = await prisma.restaurant.deleteMany({ where: { slug: DEMO_SLUG } });
-console.log(count ? `Deleted "${DEMO_SLUG}".` : `No restaurant with slug "${DEMO_SLUG}" found — nothing to do.`);
-await prisma.$disconnect();
+async function main() {
+  const { count } = await prisma.restaurant.deleteMany({ where: { slug: DEMO_SLUG } });
+  console.log(count ? `Deleted "${DEMO_SLUG}".` : `No restaurant with slug "${DEMO_SLUG}" found — nothing to do.`);
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

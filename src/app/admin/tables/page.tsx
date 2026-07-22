@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { cookies } from "next/headers";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
@@ -7,7 +6,8 @@ import { getBaseUrl } from "@/lib/request";
 import { deleteTableAction } from "@/lib/onboarding/actions";
 import { ADMIN_LOCALE_COOKIE, dictFor, t } from "@/lib/i18n";
 import { Card } from "@/components/ui";
-import { AddTableForm, PrintButton } from "./tables-manager";
+import { QrPoster } from "@/components/admin/qr-poster";
+import { AddTableForm, BulkAddTableForm, PrintButton } from "./tables-manager";
 
 export default async function TablesPage() {
   const { restaurant, config } = await getCurrentRestaurant("tables");
@@ -58,22 +58,13 @@ export default async function TablesPage() {
         </p>
         {qr ? (
           <Card id="qr-print-area" className="max-w-xs text-center">
-            <Image
-              src={qr.qr}
-              alt={t(d, "tables.venueOrderingQr")}
-              width={200}
-              height={200}
-              unoptimized
-              className="mx-auto h-52 w-52"
+            <QrPoster
+              qr={qr.qr}
+              restaurantName={restaurant.name}
+              downloadFileName={`${restaurant.slug}-ordering-qr.png`}
+              downloadLabel={t(d, "tables.downloadQr")}
             />
             <p className="mt-3 break-all text-[10px] text-ink/45">{qr.url}</p>
-            <a
-              href={qr.qr}
-              download="ordering-qr.png"
-              className="mt-2 inline-block text-sm font-medium text-brand-600 print:hidden"
-            >
-              {t(d, "tables.downloadQr")}
-            </a>
           </Card>
         ) : (
           <p className="text-sm text-ink/55">{t(d, "tables.qrBeingSetUp")}</p>
@@ -96,9 +87,12 @@ export default async function TablesPage() {
         {withQr.length > 0 && <PrintButton />}
       </div>
 
-      <Card className="max-w-md">
+      <Card className="max-w-2xl">
         <h2 className="mb-3 font-semibold text-ink">{t(d, "tables.addTableOrRoom")}</h2>
-        <AddTableForm />
+        <div className="grid gap-6 sm:grid-cols-2">
+          <AddTableForm />
+          <BulkAddTableForm />
+        </div>
       </Card>
 
       {withQr.length === 0 ? (
@@ -113,17 +107,13 @@ export default async function TablesPage() {
               key={t.id}
               className="rounded-2xl border border-sand-200 bg-surface p-4 text-center"
             >
-              <Image
-                src={t.qr}
-                alt={`${d["tables.qrForAlt"] ?? "QR for"} ${t.label}`}
-                width={180}
-                height={180}
-                unoptimized
-                className="mx-auto h-44 w-44"
+              <QrPoster
+                qr={t.qr}
+                restaurantName={restaurant.name}
+                tableLabel={t.kind === "ROOM" ? `${dRoom} ${t.label}` : t.label}
+                downloadFileName={`${restaurant.slug}-qr-${t.label}.png`}
+                downloadLabel={dDownload}
               />
-              <p className="mt-2 font-semibold text-ink">
-                {t.kind === "ROOM" ? `${dRoom} ${t.label}` : t.label}
-              </p>
               <p className="text-xs text-ink/55">
                 {t.kind === "ROOM" && (
                   <span className="mr-1 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-brand-600">
@@ -135,14 +125,7 @@ export default async function TablesPage() {
               <p className="mt-1 break-all text-[10px] text-ink/45">
                 {t.url}
               </p>
-              <div className="mt-2 flex justify-center gap-3 text-xs print:hidden">
-                <a
-                  href={t.qr}
-                  download={`qr-${t.label}.png`}
-                  className="font-medium text-brand-600"
-                >
-                  {dDownload}
-                </a>
+              <div className="mt-2 flex justify-center print:hidden">
                 <form action={deleteTableAction}>
                   <input type="hidden" name="id" value={t.id} />
                   <button className="text-red-600" type="submit">

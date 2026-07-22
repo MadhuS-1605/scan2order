@@ -59,6 +59,19 @@ export function proxy(request: NextRequest) {
     return res;
   }
 
+  // The apex (and www) domain is marketing-only: just the homepage. Every
+  // other path — signin, signup, admin, superadmin, privacy, etc. — lives on
+  // app.<domain> (see NON_TENANT above and src/app/page.tsx's APP_URL links).
+  const isMarketingHost = host === PLATFORM_DOMAIN || host === `www.${PLATFORM_DOMAIN}`;
+  if (isMarketingHost && url.pathname !== "/") {
+    // A pathname starting with "//" is parsed by URL() as a scheme-relative
+    // authority, replacing the destination's host — collapse leading slashes
+    // to one first or "scan2order.co.in//evil.com" open-redirects off-domain.
+    const safePath = "/" + url.pathname.replace(/^\/+/, "");
+    const dest = new URL(safePath + url.search, `https://app.${PLATFORM_DOMAIN}`);
+    return NextResponse.redirect(dest, 308);
+  }
+
   if (host.endsWith("." + PLATFORM_DOMAIN)) {
     const sub = host.slice(0, host.length - PLATFORM_DOMAIN.length - 1);
     if (sub && !NON_TENANT.has(sub)) {

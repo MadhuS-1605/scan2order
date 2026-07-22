@@ -2,6 +2,7 @@ import { env } from "@/lib/env";
 import { prisma } from "@/lib/db";
 import { sweepStaleOrders } from "@/lib/orders/sweep";
 import { reportError } from "@/lib/observability";
+import { notifyOps } from "@/lib/platform/alerts";
 import { cronAuthorized } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
@@ -17,13 +18,23 @@ async function handle(request: Request): Promise<Response> {
 
   const restaurants = await prisma.restaurant.findMany({ select: { id: true } });
   let ok = 0;
+  const failed: string[] = [];
   for (const r of restaurants) {
     try {
       await sweepStaleOrders(r.id);
       ok++;
     } catch (e) {
       reportError("cron.sweep", e, { restaurantId: r.id });
+      failed.push(r.id);
     }
+  }
+  // One summary alert rather than one per restaurant — a sweep failure means
+  // this tenant's stuck payment intents/abandoned orders won't self-heal.
+  if (failed.length) {
+    await notifyOps(
+      "Order sweep failed for some restaurants",
+      `${failed.length}/${restaurants.length} restaurant sweeps threw: ${failed.join(", ")}`,
+    );
   }
   return Response.json({ ok: true, swept: ok, total: restaurants.length });
 }

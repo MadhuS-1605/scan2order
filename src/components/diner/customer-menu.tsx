@@ -54,6 +54,7 @@ export function CustomerMenu({
   const [gfOnly, setGfOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [customizing, setCustomizing] = useState<Item | null>(null);
+  const [logoFailed, setLogoFailed] = useState(false);
   const { cart, count, addLine } = useCart(restaurantId, { prefill });
 
   // Auto table-move: if this device has an active dining session and has just
@@ -159,7 +160,7 @@ export function CustomerMenu({
       <header className="sticky top-0 z-10 border-b border-sand-200 bg-surface px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex min-w-0 items-center gap-2.5">
-            {restaurant.logoUrl && (
+            {restaurant.logoUrl && !logoFailed && (
               <Image
                 src={restaurant.logoUrl}
                 alt=""
@@ -167,6 +168,7 @@ export function CustomerMenu({
                 height={40}
                 unoptimized
                 className="h-10 w-10 shrink-0 rounded-lg object-contain"
+                onError={() => setLogoFailed(true)}
               />
             )}
             <div className="min-w-0">
@@ -614,13 +616,14 @@ function ItemRow({
   const { name, description } = localize(item, item.translations, lang);
   // Off the menu right now (outside its time window) — shown but not orderable.
   const offWindow = !item.availableNow;
+  const [imgFailed, setImgFailed] = useState(false);
   return (
     <div
       className={`flex items-start gap-3 rounded-xl border border-sand-200 bg-surface p-3 ${
         offWindow ? "opacity-60" : ""
       }`}
     >
-      {item.imageUrl ? (
+      {item.imageUrl && !imgFailed ? (
         <Image
           src={item.imageUrl}
           alt={name}
@@ -628,6 +631,7 @@ function ItemRow({
           height={72}
           className="shrink-0 rounded-lg object-cover"
           style={{ width: 72, height: 72 }}
+          onError={() => setImgFailed(true)}
         />
       ) : (
         <div

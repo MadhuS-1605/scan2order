@@ -2,6 +2,7 @@ import { env } from "@/lib/env";
 import { prisma } from "@/lib/db";
 import { seedDemoRestaurant } from "@/lib/demo/seed-demo";
 import { reportError } from "@/lib/observability";
+import { notifyOps } from "@/lib/platform/alerts";
 import { cronAuthorized } from "@/lib/cron-auth";
 
 export const runtime = "nodejs";
@@ -21,6 +22,7 @@ async function handle(request: Request): Promise<Response> {
     return Response.json({ ok: true, reset: "spice-garden-demo", ...result });
   } catch (e) {
     reportError("cron.resetDemo", e);
+    await notifyOps("Demo reset cron failed", `The nightly demo-restaurant reset failed: ${e instanceof Error ? e.message : String(e)}`);
     return Response.json({ ok: false, error: "reset failed" }, { status: 500 });
   }
 }

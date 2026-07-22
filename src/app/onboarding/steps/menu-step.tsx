@@ -7,6 +7,7 @@ import {
   deleteMenuItemAction,
   gotoStepAction,
 } from "@/lib/onboarding/actions";
+import { importMenuCsvAction } from "@/lib/menu/actions";
 import { Button, Input, Textarea, Select, Field, Alert, Card, VegMark } from "@/components/ui";
 import { ImageUpload } from "@/components/admin/image-upload";
 import { formatMoney } from "@/lib/utils";
@@ -46,6 +47,8 @@ export function MenuStep({
           <AddItemForm categories={categories} />
         </div>
       </Card>
+
+      <ImportCsv />
 
       <Card>
         <h3 className="font-semibold text-ink">
@@ -115,6 +118,40 @@ export function MenuStep({
         </form>
       </div>
     </div>
+  );
+}
+
+function ImportCsv() {
+  const [state, action, pending] = useActionState<ActionState, FormData>(
+    importMenuCsvAction,
+    {},
+  );
+  return (
+    <Card>
+      <details className="group">
+        <summary className="cursor-pointer list-none font-medium text-ink">
+          Already have a menu? Paste it in bulk instead
+        </summary>
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-ink/55">
+            CSV with a header row: name, price, category, description, veg (yes/no). One row per dish.
+          </p>
+          {state.error && <Alert>{state.error}</Alert>}
+          {state.ok && state.message && <Alert variant="success">{state.message}</Alert>}
+          <form action={action} className="space-y-2">
+            <Textarea
+              name="csv"
+              rows={6}
+              placeholder={"name,price,category,description,veg\nMargherita,250,Pizza,Classic cheese,yes"}
+              className="font-mono text-xs"
+            />
+            <Button type="submit" size="sm" disabled={pending}>
+              {pending ? "Importing…" : "Import"}
+            </Button>
+          </form>
+        </div>
+      </details>
+    </Card>
   );
 }
 
