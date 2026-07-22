@@ -10,14 +10,20 @@ const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";
 const JWKS = createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"));
 
-export function googleRedirectUri(): string {
-  return `${env.appUrl}/api/auth/google/callback`;
+// baseUrl must be the actual host the browser is on (from getBaseUrl(),
+// which honours x-forwarded-host) — NOT env.appUrl. Behind certain
+// proxies/containers, request.url and the static NEXT_PUBLIC_APP_URL can
+// disagree with the host Google actually round-trips to, which either
+// mismatches Google's registered redirect URI or (if it happens to match)
+// lands the callback on a host the state cookie was never set on.
+export function googleRedirectUri(baseUrl: string): string {
+  return `${baseUrl.replace(/\/$/, "")}/api/auth/google/callback`;
 }
 
-export function googleAuthUrl(state: string): string {
+export function googleAuthUrl(state: string, baseUrl: string): string {
   const params = new URLSearchParams({
     client_id: env.google.clientId,
-    redirect_uri: googleRedirectUri(),
+    redirect_uri: googleRedirectUri(baseUrl),
     response_type: "code",
     scope: "openid email profile",
     state,
@@ -27,7 +33,7 @@ export function googleAuthUrl(state: string): string {
   return `${GOOGLE_AUTH}?${params.toString()}`;
 }
 
-export async function exchangeGoogleCode(code: string): Promise<string> {
+export async function exchangeGoogleCode(code: string, baseUrl: string): Promise<string> {
   const res = await fetch(GOOGLE_TOKEN, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -35,7 +41,7 @@ export async function exchangeGoogleCode(code: string): Promise<string> {
       code,
       client_id: env.google.clientId,
       client_secret: env.google.clientSecret,
-      redirect_uri: googleRedirectUri(),
+      redirect_uri: googleRedirectUri(baseUrl),
       grant_type: "authorization_code",
     }),
   });
