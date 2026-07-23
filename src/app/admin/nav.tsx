@@ -30,6 +30,12 @@ import {
   Plug,
   CreditCard,
   Settings,
+  Undo2,
+  MonitorSmartphone,
+  Smartphone,
+  Wallet,
+  Banknote,
+  Bike,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
@@ -59,10 +65,15 @@ const GROUPS: { heading: string; links: NavLink[] }[] = [
       { href: "/admin", label: "Overview", perm: "overview", icon: LayoutDashboard, exact: true },
       { href: "/admin/notifications", label: "Notifications", perm: "overview", icon: Bell },
       { href: "/admin/orders", label: "Orders", perm: "orders", icon: ShoppingBag },
+      { href: "/admin/cash-shifts", label: "Cash register", perm: "orders", icon: Banknote },
+      { href: "/admin/delivery", label: "Delivery", perm: "orders", icon: Bike },
+      { href: "/admin/refunds", label: "Refunds", perm: "refunds", icon: Undo2 },
       { href: "/admin/floor", label: "Floor", perm: "orders", icon: LayoutGrid },
       { href: "/admin/kitchen", label: "Kitchen", perm: "kitchen", icon: ChefHat },
       { href: "/admin/bar", label: "Bar", perm: "kitchen", icon: Wine, feature: "featureBar" },
       { href: "/admin/monitor", label: "Monitor", perm: "monitor", icon: MonitorPlay },
+      { href: "/admin/display", label: "Customer display", perm: "orders", icon: MonitorSmartphone },
+      { href: "/captain", label: "Captain (mobile order-taking)", perm: "orders", icon: Smartphone },
     ],
   },
   {
@@ -82,6 +93,7 @@ const GROUPS: { heading: string; links: NavLink[] }[] = [
     links: [
       { href: "/admin/analytics", label: "Analytics", perm: "analytics", icon: BarChart3 },
       { href: "/admin/reports", label: "Reports", perm: "analytics", icon: Receipt },
+      { href: "/admin/expenses", label: "Expenses", perm: "settings", icon: Wallet },
       { href: "/admin/customers", label: "Guests", perm: "analytics", icon: Contact },
       { href: "/admin/feedback", label: "Feedback", perm: "analytics", icon: Star },
       { href: "/admin/export", label: "Export", perm: "analytics", icon: Download },

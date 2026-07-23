@@ -1,0 +1,133 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
+import { requireAdminWithPermission } from "@/lib/auth/guards";
+import { toNumber } from "@/lib/utils";
+
+function revalidate() {
+  revalidatePath("/admin/cash-shifts");
+}
+
+export async function createRegisterAction(formData: FormData): Promise<void> {
+  const session = await requireAdminWithPermission("settings");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return;
+  await prisma.register.create({ data: { restaurantId: session.restaurantId, name } });
+  revalidate();
+}
+
+export async function deleteRegisterAction(formData: FormData): Promise<void> {
+  const session = await requireAdminWithPermission("settings");
+  const id = String(formData.get("id"));
+  await prisma.register.deleteMany({ where: { id, restaurantId: session.restaurantId } });
+  revalidate();
+}
+
+export async function openCashShiftAction(formData: FormData): Promise<void> {
+  const session = await requireAdminWithPermission("orders");
+  const openingFloat = Math.max(0, Number(formData.get("openingFloat") ?? 0) || 0);
+  const registerIdRaw = String(formData.get("registerId") ?? "") || null;
+  // Registers are picked from a <select> of the venue's own options, but a
+  // Server Action is invocable with arbitrary FormData — re-verify the id
+  // actually belongs to this restaurant before attaching it to the shift,
+  // same as every other cross-entity reference in this file.
+  const register = registerIdRaw
+    ? await prisma.register.findFirst({ where: { id: registerIdRaw, restaurantId: session.restaurantId } })
+    : null;
+  if (registerIdRaw && !register) return;
+
+  // Scoped by restaurantId, not just adminUserId: switchPropertyAction reuses
+  // the same adminUserId across every property in a group (only restaurantId
+  // changes in the session), so an unscoped check here would block an owner
+  // with an open shift at Property A from ever opening one at Property B.
+  const open = await prisma.cashShift.findFirst({
+    where: { adminUserId: session.sub, restaurantId: session.restaurantId, closedAt: null },
+  });
+  if (open) return; // one open shift per staff member per restaurant at a time
+
+  await prisma.cashShift.create({
+    data: {
+      restaurantId: session.restaurantId,
+      adminUserId: session.sub,
+      openingFloat,
+      registerId: register?.id ?? null,
+    },
+  });
+  revalidate();
+}
+
+// Counts up the denomination breakdown from form fields named "denom_<value>".
+function parseDenomination(formData: FormData): { total: number; breakdown: Record<string, number> } {
+  const breakdown: Record<string, number> = {};
+  let total = 0;
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith("denom_")) continue;
+    const denom = Number(key.slice("denom_".length));
+    const count = Math.max(0, Math.floor(Number(value) || 0));
+    if (denom > 0 && count > 0) {
+      breakdown[denom] = count;
+      total += denom * count;
+    }
+  }
+  return { total, breakdown };
+}
+
+// Closes the staff member's own open shift. Expected cash = opening float +
+// paid COUNTER orders explicitly attributed to this shift (Order.cashShiftId,
+// set by markPaidAction) − COUNTER refunds during the shift window.
+//
+// The refund side still infers by time window rather than exact attribution
+// (Refund has no cashShiftId) — a lower-priority gap than the orders side
+// was: refunds are far lower-volume than payments, and double-counting one
+// only makes expectedCash *more conservative* (a smaller expected total),
+// not profit-inflating, unlike the bug this replaced.
+export async function closeCashShiftAction(formData: FormData): Promise<void> {
+  const session = await requireAdminWithPermission("orders");
+  const id = String(formData.get("id"));
+  const shift = await prisma.cashShift.findFirst({
+    where: { id, restaurantId: session.restaurantId, adminUserId: session.sub, closedAt: null },
+  });
+  if (!shift) return;
+
+  const closedAt = new Date();
+  const paidCounter = await prisma.order.aggregate({
+    where: {
+      restaurantId: session.restaurantId,
+      paymentMethod: "COUNTER",
+      paymentStatus: "PAID",
+      cashShiftId: shift.id,
+    },
+    _sum: { amountPaid: true },
+  });
+  // Cash handed back during the shift reduces what should be in the drawer —
+  // a COUNTER refund otherwise showed up nowhere, so every cash refund
+  // during a shift created a phantom "shortage" against the cashier at close.
+  const counterRefunds = await prisma.refund.aggregate({
+    where: {
+      restaurantId: session.restaurantId,
+      method: "COUNTER",
+      status: "DONE",
+      createdAt: { gte: shift.openedAt, lte: closedAt },
+    },
+    _sum: { amount: true },
+  });
+  const expectedCash =
+    toNumber(shift.openingFloat) +
+    toNumber(paidCounter._sum.amountPaid ?? 0) -
+    toNumber(counterRefunds._sum.amount ?? 0);
+  const { total: closingCounted, breakdown } = parseDenomination(formData);
+  const variance = closingCounted - expectedCash;
+
+  await prisma.cashShift.update({
+    where: { id },
+    data: {
+      closedAt,
+      closingCounted,
+      expectedCash,
+      variance,
+      denomination: breakdown,
+    },
+  });
+  revalidate();
+}

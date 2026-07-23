@@ -26,6 +26,7 @@ export default async function SettingsPage() {
           postalCode: restaurant.postalCode,
           fssaiNumber: restaurant.fssaiNumber,
           logoUrl: restaurant.logoUrl,
+          brandColor: restaurant.brandColor,
         }}
         config={{
           orderConfirmation: config.orderConfirmation,
@@ -35,6 +36,7 @@ export default async function SettingsPage() {
           gstMode: config.gstMode,
           gstNumber: config.gstNumber,
           gstPercentage: config.gstPercentage.toString(),
+          currency: config.currency,
           serviceChargePercent: config.serviceChargePercent.toString(),
           reviewUrl: config.reviewUrl,
           happyHourEnabled: config.happyHourEnabled,
@@ -49,6 +51,8 @@ export default async function SettingsPage() {
           whatsappFrom: config.whatsappFrom,
           upiId: config.upiId,
           upiName: config.upiName,
+          wifiSsid: config.wifiSsid,
+          wifiPassword: config.wifiPassword,
           featureReservations: config.featureReservations,
           featureRooms: config.featureRooms,
           featureBanquets: config.featureBanquets,

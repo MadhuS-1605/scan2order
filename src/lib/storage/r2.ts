@@ -66,7 +66,11 @@ export async function uploadTenantImage(opts: {
   if (!sniffed) return { ok: false, error: "Use a real PNG, JPG, WebP or GIF image." };
   const ext = EXT_BY_TYPE[sniffed];
 
-  const key = `${opts.folder}/${opts.kind}/${randomUUID()}.${ext}`;
+  // Staging shares the production bucket (no separate bucket configured) —
+  // prefix so staging test uploads are logically separated and easy to spot
+  // in bucket listings, since keys otherwise collide in the same namespace.
+  const prefix = env.isStaging ? "staging/" : "";
+  const key = `${prefix}${opts.folder}/${opts.kind}/${randomUUID()}.${ext}`;
   try {
     const res = await r2().fetch(`${env.r2.endpoint}/${env.r2.bucket}/${key}`, {
       method: "PUT",

@@ -107,17 +107,27 @@ Sets `onboardingCompleted = true` and redirects to `/admin`.
 At the profile step, modules are seeded from the chosen `RestaurantType` (then
 editable in Settings). Logic from `src/lib/onboarding/actions.ts`:
 
-| Venue type | `featureReservations` | `featureRooms` | `featureBanquets` | `featureBar` |
-|------------|:--:|:--:|:--:|:--:|
-| **RESTAURANT** | ✓ | — | — | — |
-| **CAFE** | ✓ | — | — | — |
-| **HOTEL** | ✓ | ✓ | ✓ | — |
-| **BAR** | ✓ | — | — | ✓ |
-| **CLOUD_KITCHEN** | — | — | — | — |
+| Venue type | `featureReservations` | `featureRooms` | `featureBanquets` | `featureBar` | `pickupEnabled` / `deliveryEnabled` | `requireDinerLocation` |
+|------------|:--:|:--:|:--:|:--:|:--:|:--:|
+| **RESTAURANT** | ✓ | — | — | — | — | ✓ |
+| **CAFE** | ✓ | — | — | — | — | ✓ |
+| **HOTEL** | ✓ | ✓ | ✓ | — | — | ✓ |
+| **BAR** | ✓ | — | — | ✓ | — | ✓ |
+| **QSR** | — | — | — | — | — | ✓ |
+| **CLOUD_KITCHEN** | — | — | — | — | ✓ | — |
+| **BAKERY** | — | — | — | — | ✓ | ✓ |
+| **PIZZERIA** | ✓ | — | — | — | — | ✓ |
+| **BURGER_JOINT** | ✓ | — | — | — | — | ✓ |
+| **OTHER** | ✓ | — | — | — | — | ✓ |
 
-Rule: `featureReservations` defaults on for every type **except** CLOUD_KITCHEN;
-`featureRooms` and `featureBanquets` default on for **HOTEL**; `featureBar`
-defaults on for **BAR**.
+Rule: `featureReservations` defaults on for every type **except** CLOUD_KITCHEN,
+QSR and BAKERY (all three are counter/takeaway-first by nature); `featureRooms`
+and `featureBanquets` default on for **HOTEL**; `featureBar` defaults on for
+**BAR**. `pickupEnabled`/`deliveryEnabled` default on for CLOUD_KITCHEN and
+BAKERY (takeaway-first venues); `requireDinerLocation` (the anti-fake-order
+on-site check) defaults on for every type **except** CLOUD_KITCHEN — a bakery
+is still a physical venue diners walk into, so unlike a cloud kitchen it keeps
+the location check even though it shares the same pickup/delivery defaults.
 
 These flags gate the admin navigation (Reservations / Rooms / Banquets entries)
 — see the [nav permission/feature table in ARCHITECTURE.md](ARCHITECTURE.md#rbac--permission-model).

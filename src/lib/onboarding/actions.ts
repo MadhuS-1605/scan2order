@@ -112,17 +112,21 @@ export async function saveProfileAction(
   // Seed sensible module defaults from the venue type; the owner refines these
   // on the onboarding "Features" step and in Settings.
   const t = data.type;
+  // Bakeries are counter/takeaway-first by nature, same as cloud kitchens for
+  // pickup/delivery defaults — but (unlike cloud kitchens) still a physical
+  // venue diners visit, so requireDinerLocation stays on.
+  const counterFirst = t === "CLOUD_KITCHEN" || t === "BAKERY";
   const featureDefaults = {
-    featureReservations: t !== "CLOUD_KITCHEN" && t !== "QSR",
+    featureReservations: t !== "CLOUD_KITCHEN" && t !== "QSR" && t !== "BAKERY",
     featureRooms: t === "HOTEL",
     featureBanquets: t === "HOTEL",
     featureBar: t === "BAR",
     // Dine-in venues require diners to be on-site to order (anti-fake-order);
     // cloud kitchens take remote orders, so it's off there.
     requireDinerLocation: t !== "CLOUD_KITCHEN",
-    // Cloud kitchens are takeaway/delivery by default.
-    pickupEnabled: t === "CLOUD_KITCHEN",
-    deliveryEnabled: t === "CLOUD_KITCHEN",
+    // Cloud kitchens and bakeries are takeaway/delivery by default.
+    pickupEnabled: counterFirst,
+    deliveryEnabled: counterFirst,
   };
 
   const restaurant = await prisma.restaurant.create({

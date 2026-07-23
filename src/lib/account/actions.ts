@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { createOtp, verifyOtp } from "@/lib/messaging/otp";
-import { sendWhatsApp, sendWhatsAppTemplate, sendOtpSms } from "@/lib/messaging/provider";
+import { sendWhatsAppFreeform, sendWhatsAppTemplate, sendOtpSms } from "@/lib/messaging/provider";
 import { env } from "@/lib/env";
 import {
   createCustomerSession,
@@ -27,7 +27,7 @@ export async function requestLoginOtpAction(args: {
   const res =
     env.messaging.provider === "meta"
       ? await sendWhatsAppTemplate(phone, env.messaging.meta.otpTemplate, [code])
-      : await sendWhatsApp(
+      : await sendWhatsAppFreeform(
           phone,
           `Your Scan2Order login code is ${code}. It expires in 5 minutes.`,
         );

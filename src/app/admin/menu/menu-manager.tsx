@@ -24,6 +24,7 @@ import {
   deleteModifierOptionAction,
   copyModifierGroupToItemsAction,
 } from "@/lib/menu/modifiers";
+import { setIsComboAction, addComboLineAction, deleteComboLineAction } from "@/lib/menu/combos";
 import {
   Button,
   Input,
@@ -60,7 +61,10 @@ type Item = {
   imageUrl: string | null;
   translations: Record<string, { name?: string; description?: string }>;
   modifierGroups: ModGroup[];
+  isCombo: boolean;
+  comboLines: ComboLine[];
 };
+type ComboLine = { id: string; includedItemId: string; includedItemName: string; quantity: number };
 type ModOption = { id: string; name: string; priceDelta: string };
 type ModGroup = {
   id: string;
@@ -179,6 +183,7 @@ export function MenuManager({
           </div>
           <ItemList
             items={catItems}
+            allItems={items}
             categories={categories}
             currency={currency}
             languages={languages}
@@ -193,6 +198,7 @@ export function MenuManager({
           <h3 className="mb-3 font-semibold text-ink">{tr("menu.uncategorised")}</h3>
           <ItemList
             items={uncategorised}
+            allItems={items}
             categories={categories}
             currency={currency}
             languages={languages}
@@ -367,6 +373,7 @@ function ImportExport() {
 
 function ItemList({
   items,
+  allItems,
   categories,
   currency,
   languages,
@@ -374,6 +381,7 @@ function ItemList({
   onToggleSelected,
 }: {
   items: Item[];
+  allItems: Item[];
   categories: Category[];
   currency: string;
   languages: string[];
@@ -389,6 +397,7 @@ function ItemList({
         <ItemRow
           key={item.id}
           item={item}
+          allItems={allItems}
           index={i}
           total={items.length}
           categories={categories}
@@ -404,6 +413,7 @@ function ItemList({
 
 function ItemRow({
   item,
+  allItems,
   index,
   total,
   categories,
@@ -413,6 +423,7 @@ function ItemRow({
   onToggleSelected,
 }: {
   item: Item;
+  allItems: Item[];
   index: number;
   total: number;
   categories: Category[];
@@ -668,9 +679,76 @@ function ItemRow({
             </div>
           </form>
           <ModifierEditor item={item} currency={currency} languages={languages} />
+          <ComboEditor item={item} allItems={allItems} />
         </details>
       </div>
     </li>
+  );
+}
+
+function ComboEditor({ item, allItems }: { item: Item; allItems: Item[] }) {
+  const tr = useT();
+  const pickable = allItems.filter((i) => i.id !== item.id && !i.isCombo);
+  return (
+    <div className="mt-4 border-t border-sand-200 pt-3">
+      <label className="flex items-center gap-2 text-sm font-medium text-ink">
+        <form action={setIsComboAction} className="contents">
+          <input type="hidden" name="menuItemId" value={item.id} />
+          <input
+            type="checkbox"
+            name="isCombo"
+            defaultChecked={item.isCombo}
+            onChange={(e) => e.currentTarget.form?.requestSubmit()}
+          />
+          This is a combo / meal bundle
+        </form>
+      </label>
+
+      {item.isCombo && (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-ink/45">
+            List what&apos;s included — shown to guests on the menu. The combo&apos;s
+            own price above is what&apos;s charged.
+          </p>
+          {item.comboLines.length > 0 && (
+            <ul className="space-y-1">
+              {item.comboLines.map((l) => (
+                <li key={l.id} className="flex items-center justify-between text-sm text-ink/80">
+                  <span>
+                    {l.quantity}× {l.includedItemName}
+                  </span>
+                  <form action={deleteComboLineAction}>
+                    <input type="hidden" name="id" value={l.id} />
+                    <button className="text-xs text-ink/40 hover:text-red-600" type="submit">
+                      {tr("common.remove")}
+                    </button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          )}
+          {pickable.length > 0 && (
+            <form action={addComboLineAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="comboId" value={item.id} />
+              <Select name="includedItemId" className="w-48" required defaultValue="">
+                <option value="" disabled>
+                  Choose an item…
+                </option>
+                {pickable.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.name}
+                  </option>
+                ))}
+              </Select>
+              <Input name="quantity" type="number" min="1" defaultValue={1} className="w-16" />
+              <Button type="submit" size="sm" variant="secondary">
+                {tr("common.add")}
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 

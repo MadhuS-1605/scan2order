@@ -17,6 +17,7 @@ import { recordAudit } from "@/lib/audit";
 import { rateLimit } from "@/lib/ratelimit";
 import { flagEnabled } from "@/lib/platform/flags";
 import { placeOrderSchema, type PlaceOrderInput } from "@/lib/validation";
+import { aggregateRecipeConsumption } from "@/lib/inventory/recipe";
 
 export type PlaceOrderResult =
   | {
@@ -200,7 +201,10 @@ export async function placeOrderAction(
   const ids = data.items.map((i) => i.menuItemId);
   const menuItems = await prisma.menuItem.findMany({
     where: { id: { in: ids }, restaurantId: restaurant.id },
-    include: { modifierGroups: { include: { options: true } } },
+    include: {
+      modifierGroups: { include: { options: true } },
+      recipeLines: { include: { ingredient: { select: { costPerUnit: true } } } },
+    },
   });
   const byId = new Map(menuItems.map((m) => [m.id, m]));
 
@@ -325,6 +329,23 @@ export async function placeOrderAction(
       trackedQty.set(l.menuItemId, (trackedQty.get(l.menuItemId) ?? 0) + l.quantity);
   }
 
+  // Recipe-based ingredient consumption. Unlike trackedQty above, this never
+  // blocks the order — ingredient stock is for cost/wastage visibility, not
+  // an oversell guard (that's what a menu item's own trackStock is for).
+  const recipesByItem = new Map(
+    menuItems.map((m) => [m.id, m.recipeLines.map((r) => ({ ingredientId: r.ingredientId, qtyPerServing: toNumber(r.qtyPerServing) }))]),
+  );
+  const ingredientConsumption = aggregateRecipeConsumption(
+    lines.map((l) => ({ menuItemId: l.menuItemId, quantity: l.quantity })),
+    recipesByItem,
+  );
+  // Snapshot each ingredient's current cost for the ledger entry below (see
+  // IngredientLedgerEntry.costPerUnit) — a later price change shouldn't
+  // retroactively re-price this order's cost in the usage report.
+  const costByIngredient = new Map(
+    menuItems.flatMap((m) => m.recipeLines.map((r) => [r.ingredientId, toNumber(r.ingredient.costPerUnit)] as const)),
+  );
+
   let order: Awaited<ReturnType<typeof prisma.order.create>>;
   try {
     order = await prisma.$transaction(async (tx) => {
@@ -337,6 +358,21 @@ export async function placeOrderAction(
         if (res.count === 0) {
           throw new OutOfStockError(byId.get(itemId)?.name ?? "An item");
         }
+      }
+      for (const [ingredientId, qty] of ingredientConsumption) {
+        await tx.ingredient.update({
+          where: { id: ingredientId },
+          data: { stockQty: { decrement: qty } },
+        });
+        await tx.ingredientLedgerEntry.create({
+          data: {
+            restaurantId: restaurant.id,
+            ingredientId,
+            delta: -qty,
+            reason: "ORDER_CONSUMPTION",
+            costPerUnit: costByIngredient.get(ingredientId) ?? null,
+          },
+        });
       }
       const r = await tx.restaurant.update({
         where: { id: restaurant.id },
@@ -362,6 +398,7 @@ export async function placeOrderAction(
         notes: data.notes ?? null,
         fulfillment,
         deliveryAddress: deliveryAddress || null,
+        deliveryStatus: fulfillment === "DELIVERY" ? "UNASSIGNED" : null,
         presence,
         distanceM,
         confirmedAt: autoConfirm ? new Date() : null,
@@ -404,6 +441,27 @@ export async function placeOrderAction(
           body: `${mi.stockQty} left`,
           url: "/admin/inventory",
           tag: `stock-${mi.id}`,
+        });
+      }
+    }
+  }
+
+  // Same low-stock alert, for ingredients consumed via a recipe.
+  if (ingredientConsumption.size > 0) {
+    const after = await prisma.ingredient.findMany({
+      where: { id: { in: [...ingredientConsumption.keys()] } },
+      select: { id: true, name: true, unit: true, stockQty: true, lowStockThreshold: true },
+    });
+    for (const ing of after) {
+      const stockQty = toNumber(ing.stockQty);
+      const lowStockThreshold = toNumber(ing.lowStockThreshold);
+      const before = stockQty + (ingredientConsumption.get(ing.id) ?? 0);
+      if (stockQty <= lowStockThreshold && before > lowStockThreshold) {
+        await notifyRestaurant(restaurant.id, {
+          title: stockQty <= 0 ? `${ing.name} sold out` : `Low stock: ${ing.name}`,
+          body: `${stockQty} ${ing.unit} left`,
+          url: "/admin/inventory/recipes",
+          tag: `ingredient-${ing.id}`,
         });
       }
     }

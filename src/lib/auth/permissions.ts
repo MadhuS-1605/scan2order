@@ -13,6 +13,9 @@ export type Permission =
   | "staff"
   | "attendance"
   | "refunds"
+  // Roles without full refund authority can still request one (a manager
+  // must approve before money moves) — see refundOrderAction.
+  | "requestRefunds"
   | "properties";
 
 const ALL: Permission[] = [
@@ -27,14 +30,15 @@ const ALL: Permission[] = [
   "staff",
   "attendance",
   "refunds",
+  "requestRefunds",
   "properties",
 ];
 
 export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   OWNER: ALL,
   MANAGER: ALL.filter((p) => p !== "staff" && p !== "properties"),
-  CASHIER: ["overview", "orders", "monitor"],
-  WAITER: ["overview", "orders", "monitor"],
+  CASHIER: ["overview", "orders", "monitor", "requestRefunds"],
+  WAITER: ["overview", "orders", "monitor", "requestRefunds"],
   KITCHEN: ["kitchen", "monitor"],
   STAFF: ["overview", "orders", "monitor"],
 };

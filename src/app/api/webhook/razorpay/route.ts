@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     // Auto-renew lifecycle: charged/activated extend the plan; cancelled/halted stop it.
     const subId = event.payload?.subscription?.entity?.id;
     if (subId) {
-      const result = await reconcileSubscriptionEvent(type, subId);
+      const result = await reconcileSubscriptionEvent(type, subId, event.payload?.payment?.entity?.id);
       if (!result.ok) {
         // Same shape as the unrecognized-payment case above: Razorpay confirms
         // a real subscription event, but no restaurant has this subscription

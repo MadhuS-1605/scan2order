@@ -25,6 +25,10 @@ export const restaurantTypeEnum = z.enum([
   "CLOUD_KITCHEN",
   "BAR",
   "QSR",
+  "BAKERY",
+  "PIZZERIA",
+  "BURGER_JOINT",
+  "OTHER",
 ]);
 
 export const profileSchema = z.object({
@@ -45,6 +49,11 @@ export const profileSchema = z.object({
     .refine((u) => /^https?:\/\//i.test(u), "Use an http(s) URL")
     .optional()
     .or(z.literal("")),
+  brandColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Use a hex color like #2a6f4b")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const settingsSchema = z.object({
@@ -59,6 +68,11 @@ export const settingsSchema = z.object({
   gstLegalName: z.string().max(200).optional().or(z.literal("")),
   gstVerified: z.boolean().optional(),
   gstPercentage: z.coerce.number().min(0).max(28),
+  currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/, "Use a 3-letter ISO currency code, e.g. INR")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const categorySchema = z.object({

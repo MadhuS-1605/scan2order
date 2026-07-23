@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { getMenuContext } from "@/lib/customer/menu-context";
 import { CustomerMenu } from "@/components/diner/customer-menu";
 import { ScanPrompt } from "@/components/diner/scan-prompt";
+import { BrandTheme } from "@/components/diner/brand-theme";
 
 export default async function MenuPage({
   searchParams,
@@ -30,17 +31,20 @@ export default async function MenuPage({
   }
 
   return (
-    <CustomerMenu
-      qrToken={ctx.qrToken}
-      restaurantId={ctx.restaurantId}
-      prefill={prefill}
-      happyHourPercent={ctx.happyHourPercent}
-      ordering={ctx.ordering}
-      languages={ctx.languages}
-      restaurant={ctx.restaurant}
-      table={ctx.table}
-      categories={ctx.categories}
-      items={ctx.items}
-    />
+    <BrandTheme color={ctx.restaurant.brandColor}>
+      <CustomerMenu
+        qrToken={ctx.qrToken}
+        restaurantId={ctx.restaurantId}
+        prefill={prefill}
+        happyHourPercent={ctx.happyHourPercent}
+        ordering={ctx.ordering}
+        languages={ctx.languages}
+        restaurant={ctx.restaurant}
+        wifi={{ ssid: ctx.config.wifiSsid, password: ctx.config.wifiPassword }}
+        table={ctx.table}
+        categories={ctx.categories}
+        items={ctx.items}
+      />
+    </BrandTheme>
   );
 }

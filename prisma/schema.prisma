@@ -20,6 +20,10 @@ enum RestaurantType {
   CLOUD_KITCHEN
   BAR
   QSR // fast food / self-serve restaurant (order at counter, pay first, pick up)
+  BAKERY
+  PIZZERIA
+  BURGER_JOINT
+  OTHER
 }
 
 enum AdminRole {
@@ -131,6 +135,30 @@ enum Fulfillment {
   DINE_IN
   PICKUP
   DELIVERY
+}
+
+enum DeliveryStatus {
+  UNASSIGNED
+  ASSIGNED
+  OUT_FOR_DELIVERY
+  DELIVERED
+}
+
+// A delivery rider/executive — closes the "Delivery Executive" gap vs.
+// competitors. Assigned to DELIVERY-fulfillment orders for tracking.
+model DeliveryRider {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String?
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+
+  orders Order[]
+
+  @@index([restaurantId])
+  @@map("delivery_riders")
 }
 
 enum PushRole {
@@ -319,6 +347,10 @@ model Restaurant {
   // webhooks extend planActiveUntil each cycle.
   planAutoRenew          Boolean          @default(false)
   razorpaySubscriptionId String?
+  // Payment id from the last subscription.charged/activated webhook we acted
+  // on — Razorpay can redeliver the same event, so this makes extending
+  // planActiveUntil idempotent per payment instead of per delivery.
+  lastSubscriptionPaymentId String?
   // Platform lifecycle: a super-admin can SUSPEND a venue (blocks its admin until
   // reactivated). Default ACTIVE; diner-facing behaviour is unaffected for now.
   status                 RestaurantStatus @default(ACTIVE)
@@ -338,6 +370,10 @@ model Restaurant {
   // FSSAI food-licence number, printed on the bill (Indian compliance).
   fssaiNumber            String?
   logoUrl                String?
+  // Hex accent color (e.g. "#2a6f4b") applied to the diner-facing menu/bill —
+  // "Powered by Scan2Order" branding stays, but the accent color is the
+  // venue's own. Null falls back to Scan2Order's default brand color.
+  brandColor             String?
   // Restaurant-chosen username used as the public subdomain (e.g. "spicegarden"
   // -> spicegarden.scan.to). Unique across the platform.
   subdomain              String?          @unique
@@ -350,7 +386,16 @@ model Restaurant {
   admins            AdminUser[]
   categories        MenuCategory[]
   menuItems         MenuItem[]
+  ingredients       Ingredient[]
+  ingredientLedger  IngredientLedgerEntry[]
+  expenses          Expense[]
+  suppliers         Supplier[]
+  purchaseOrders    PurchaseOrder[]
+  cashShifts        CashShift[]
+  registers         Register[]
+  deliveryRiders    DeliveryRider[]
   tables            RestaurantTable[]
+  tableAreas        TableArea[]
   orders            Order[]
   refunds           Refund[]
   planPayments      PlanPayment[]
@@ -475,6 +520,7 @@ model AdminUser {
   group             PropertyGroup?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
   ordersCreated     Order[]           @relation("OrderCreatedBy")
   attendance        StaffAttendance[]
+  cashShifts        CashShift[]
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -544,6 +590,10 @@ model OnboardingConfig {
   upiId   String?
   upiName String?
 
+  // Guest Wi-Fi shown on the diner menu page. Both null = no Wi-Fi card shown.
+  wifiSsid     String?
+  wifiPassword String?
+
   // Which optional modules this venue uses — chosen at onboarding, drive which
   // admin sections show. Defaults are seeded from the venue type.
   featureReservations Boolean @default(true)
@@ -551,6 +601,13 @@ model OnboardingConfig {
   featureBanquets     Boolean @default(false) // events / function halls
   featureBar          Boolean @default(false) // separate bar counter / KDS
   featureAttendance   Boolean @default(false) // staff clock-in/out tracking
+
+  // Reservation slot capacity: reservedFor is bucketed into
+  // reservationSlotMinutes-wide slots (e.g. 19:00-19:29), and the sum of
+  // partySize already booked in a slot can't exceed reservationCapacityPerSlot.
+  // Null = uncapped (default; opt-in per venue).
+  reservationSlotMinutes     Int  @default(30)
+  reservationCapacityPerSlot Int?
 
   // Venue location for attendance geofencing. When set, self clock-in/out is
   // only allowed within geofenceRadiusM metres of these coordinates.
@@ -642,6 +699,13 @@ model MenuItem {
 
   isSpecialOfDay Boolean @default(false)
   isChefSpecial  Boolean @default(false) // chef's signature pick
+  // A combo/meal bundle: sold as one orderable item at its own `price` (set
+  // like any other item — typically a discount vs. buying the parts
+  // separately), with comboLines listing what it includes for display/KOT
+  // clarity. Deliberately NOT a "choose 1 of N" builder (e.g. "pick a side")
+  // — each combo is a fixed set of items; add per-line choice groups later
+  // if a fixed bundle turns out not to be enough.
+  isCombo        Boolean @default(false)
   sortOrder      Int     @default(0)
 
   // Per-language overrides: { "hi": { "name": "...", "description": "..." } }
@@ -658,10 +722,86 @@ model MenuItem {
 
   orderItems     OrderItem[]
   modifierGroups ModifierGroup[]
+  recipeLines    RecipeLine[]
+  comboLines     ComboLine[]      @relation("ComboParent")
+  includedInLines ComboLine[]     @relation("ComboIncludedItem")
 
   @@index([restaurantId])
   @@index([categoryId])
   @@map("menu_items")
+}
+
+// Raw material tracked for recipe-based costing (distinct from MenuItem's own
+// trackStock, which gates a dish's own availability). Ingredient stock is
+// decremented on order placement per RecipeLine, but never blocks a sale — it's
+// for cost/wastage visibility, not an oversell guard.
+model Ingredient {
+  id                String   @id @default(cuid())
+  restaurantId      String
+  restaurant        Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name              String
+  unit              String // free text, e.g. "g", "ml", "pcs"
+  stockQty          Decimal  @default(0) @db.Decimal(10, 2)
+  lowStockThreshold Decimal  @default(0) @db.Decimal(10, 2)
+  costPerUnit       Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  recipeLines RecipeLine[]
+  ledger      IngredientLedgerEntry[]
+  poLines     PurchaseOrderLine[]
+
+  @@unique([restaurantId, name])
+  @@map("ingredients")
+}
+
+enum IngredientLedgerReason {
+  ORDER_CONSUMPTION // deducted automatically for a placed/edited order
+  WASTAGE // manually logged spillage/spoilage
+  RESTOCK // manual restock or a received purchase order
+  TRANSFER_OUT // moved to a sibling outlet in the same property group
+  TRANSFER_IN // received from a sibling outlet
+}
+
+// Movement log for ingredient stock — the basis for the usage/wastage/cost
+// report (/admin/inventory/reports). Ingredient.stockQty is the current
+// balance; this is the ledger of how it got there.
+model IngredientLedgerEntry {
+  id           String                 @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient             @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  delta        Decimal                @db.Decimal(10, 3) // negative = consumed/wasted, positive = restocked
+  reason       IngredientLedgerReason
+  note         String?
+  createdByName String?
+  // Snapshot of Ingredient.costPerUnit at write time, so the usage/wastage
+  // cost report reflects what the ingredient cost when actually consumed —
+  // not whatever costPerUnit happens to be today (which is editable anytime).
+  // Null on entries written before this field existed; the report falls back
+  // to the ingredient's current cost for those, same as it always did.
+  costPerUnit  Decimal?               @db.Decimal(10, 2)
+  createdAt    DateTime               @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@index([ingredientId])
+  @@map("ingredient_ledger_entries")
+}
+
+// How much of an ingredient one serving of a menu item consumes.
+model RecipeLine {
+  id            String     @id @default(cuid())
+  menuItemId    String
+  menuItem      MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  ingredientId  String
+  ingredient    Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  qtyPerServing Decimal    @db.Decimal(10, 3)
+
+  @@unique([menuItemId, ingredientId])
+  @@index([menuItemId])
+  @@index([ingredientId])
+  @@map("recipe_lines")
 }
 
 // A set of choices attached to a menu item. A "variant" (e.g. Size: Half/Full)
@@ -700,6 +840,23 @@ model ModifierOption {
   @@map("modifier_options")
 }
 
+// One item included in a combo MenuItem (MenuItem.isCombo). Display/KOT-only
+// — the combo's own price is what's actually charged; this just lists what's
+// in it (e.g. a "Burger Combo" listing 1x Burger, 1x Fries, 1x Coke).
+model ComboLine {
+  id            String   @id @default(cuid())
+  comboId       String
+  combo         MenuItem @relation("ComboParent", fields: [comboId], references: [id], onDelete: Cascade)
+  includedItemId String
+  includedItem  MenuItem @relation("ComboIncludedItem", fields: [includedItemId], references: [id], onDelete: Cascade)
+  quantity      Int      @default(1)
+  sortOrder     Int      @default(0)
+
+  @@index([comboId])
+  @@index([includedItemId])
+  @@map("combo_lines")
+}
+
 // ---------------------------------------------------------------------------
 // Tables & QR
 // ---------------------------------------------------------------------------
@@ -713,6 +870,12 @@ model RestaurantTable {
   seats        Int        @default(4)
   qrToken      String     @unique // CSPRNG token encoded in the QR — set explicitly via newQrToken() (src/lib/qr.ts), never DB-defaulted
   isActive     Boolean    @default(true)
+  areaId       String?
+  area         TableArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  // Position on the visual floor-plan canvas, as a 0-100 percentage of the
+  // canvas width/height. Null = not yet placed (falls back to the grid view).
+  posX         Float?
+  posY         Float?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -720,7 +883,24 @@ model RestaurantTable {
   serviceRequests ServiceRequest[]
 
   @@index([restaurantId])
+  @@index([areaId])
   @@map("restaurant_tables")
+}
+
+// A zone/section grouping tables — e.g. "Patio", "Indoor", "Rooftop" — for
+// organizing the tables list. Purely organizational; doesn't affect ordering.
+model TableArea {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  tables RestaurantTable[]
+
+  @@index([restaurantId])
+  @@map("table_areas")
 }
 
 // ---------------------------------------------------------------------------
@@ -775,9 +955,21 @@ model Order {
   // Fulfilment. DINE_IN by default; DELIVERY carries the address.
   fulfillment     Fulfillment @default(DINE_IN)
   deliveryAddress String?
+  // Rider assignment/tracking for DELIVERY orders — null for DINE_IN/PICKUP.
+  deliveryRiderId String?
+  deliveryRider   DeliveryRider?  @relation(fields: [deliveryRiderId], references: [id], onDelete: SetNull)
+  deliveryStatus  DeliveryStatus?
 
   paymentStatus PaymentStatus  @default(UNPAID)
   paymentMethod PaymentMethod?
+  // Which cash-register shift this COUNTER payment was collected under (set
+  // by markPaidAction when the settling staff member has one open) — lets a
+  // shift's expectedCash sum exactly the orders paid under it, instead of
+  // inferring by time window, which double-counts across concurrently open
+  // shifts on different registers. Null when settled with no shift open
+  // (venue not using the cash-register feature) or for non-COUNTER payments.
+  cashShiftId   String?
+  cashShift     CashShift?     @relation(fields: [cashShiftId], references: [id], onDelete: SetNull)
 
   // Money snapshots (so historical bills don't change if config/prices change)
   subtotal       Decimal @default(0) @db.Decimal(10, 2)
@@ -886,6 +1078,8 @@ model PlanPayment {
 enum RefundStatus {
   DONE // money returned (gateway refund created, or manual cash/counter refund)
   FAILED // gateway refused — staff must retry / handle manually
+  PENDING // requested by staff without refund authority — awaiting manager approval, no money moved yet
+  REJECTED // a manager declined the request — no money moved
 }
 
 // A refund issued against a paid order. Online refunds carry the gateway refund
@@ -901,7 +1095,8 @@ model Refund {
   method          PaymentMethod
   gatewayRefundId String? // Razorpay refund id, when refunded online
   status          RefundStatus  @default(DONE)
-  createdByName   String?
+  createdByName   String? // who requested/executed it
+  approvedByName  String? // who approved/rejected a PENDING request
   createdAt       DateTime      @default(now())
 
   @@index([orderId])
@@ -1243,6 +1438,126 @@ model PaymentReconciliationEvent {
 
   @@index([type, createdAt])
   @@map("payment_reconciliation_events")
+}
+
+// A raw-material supplier — closes the "Supplier Management" gap vs.
+// competitors. Purchase orders reference a supplier and, once received, top
+// up Ingredient.stockQty (logged as a RESTOCK IngredientLedgerEntry).
+model Supplier {
+  id           String   @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String?
+  email        String?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  purchaseOrders PurchaseOrder[]
+
+  @@index([restaurantId])
+  @@map("suppliers")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  RECEIVED
+}
+
+model PurchaseOrder {
+  id           String              @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplierId   String
+  supplier     Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  status       PurchaseOrderStatus @default(DRAFT)
+  createdByName String?
+  createdAt    DateTime            @default(now())
+  receivedAt   DateTime?
+
+  lines PurchaseOrderLine[]
+
+  @@index([restaurantId, status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  ingredientId    String
+  ingredient      Ingredient    @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  qty             Decimal       @db.Decimal(10, 2)
+  unitCost        Decimal       @db.Decimal(10, 2)
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_lines")
+}
+
+// A physical billing counter/register — closes the "Multi POS Setup" gap vs.
+// competitors (handle volume across multiple simultaneous billing counters).
+// Purely a label CashShift can attach to; multiple staff can already run
+// independent concurrent shifts (one open shift per adminUserId), this just
+// gives each one a named station instead of an anonymous shared drawer.
+model Register {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  createdAt    DateTime   @default(now())
+
+  cashShifts CashShift[]
+
+  @@index([restaurantId])
+  @@map("registers")
+}
+
+// A staff member's cash-register session — closes the "Cash Register/Till"
+// gap vs. competitors. Cash collected during the shift is the sum of paid
+// COUNTER orders explicitly attributed to it via Order.cashShiftId (set by
+// markPaidAction when the settling staff member has this shift open) — not
+// inferred by time window, which would double-count a payment across every
+// concurrently open shift on a different register.
+model CashShift {
+  id             String     @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  adminUserId    String
+  adminUser      AdminUser  @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  registerId     String?
+  register       Register?  @relation(fields: [registerId], references: [id], onDelete: SetNull)
+  openingFloat   Decimal    @db.Decimal(10, 2)
+  openedAt       DateTime   @default(now())
+  closingCounted Decimal?   @db.Decimal(10, 2)
+  expectedCash   Decimal?   @db.Decimal(10, 2)
+  variance       Decimal?   @db.Decimal(10, 2)
+  denomination   Json? // {"500": 2, "100": 5, ...} note/coin counts at close
+  closedAt       DateTime?
+
+  orders Order[]
+
+  @@index([restaurantId, openedAt])
+  @@index([registerId])
+  @@map("cash_shifts")
+}
+
+// Tenant operating expenses (rent, utilities, supplies, salaries, ...) —
+// closes the "Expenses Management" gap vs. competitors. Independent of
+// billing/invoicing; purely for the venue's own cost tracking.
+model Expense {
+  id            String     @id @default(cuid())
+  restaurantId  String
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category      String
+  amount        Decimal    @db.Decimal(10, 2)
+  note          String?
+  incurredAt    DateTime
+  createdByName String?
+  createdAt     DateTime   @default(now())
+
+  @@index([restaurantId, incurredAt])
+  @@map("expenses")
 }
 
 // ---------------------------------------------------------------------------

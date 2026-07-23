@@ -21,6 +21,7 @@ import { FeedbackCard } from "@/components/feedback-card";
 import { CustomerHeader, PoweredBy } from "@/components/customer-header";
 import { CustomerTabBar } from "@/components/diner/tab-bar";
 import { StatusBadge } from "@/components/ui";
+import { BrandTheme } from "@/components/diner/brand-theme";
 
 const STEP_ICONS = [ClipboardList, CheckCircle2, ChefHat, BellRing, UtensilsCrossed];
 
@@ -101,6 +102,7 @@ export default async function OrderStatusPage({
   const multiRound = sessionOrders.length > 1;
 
   return (
+    <BrandTheme color={order.restaurant.brandColor}>
     <div className="min-h-screen bg-grain">
       {!completed && !cancelled && <LiveRefresh intervalMs={4000} />}
       <CustomerHeader
@@ -312,5 +314,6 @@ export default async function OrderStatusPage({
       </div>
       <CustomerTabBar />
     </div>
+    </BrandTheme>
   );
 }

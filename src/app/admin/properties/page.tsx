@@ -14,6 +14,11 @@ const TYPE_LABEL_KEYS: Record<string, string> = {
   HOTEL: "properties.typeHotel",
   CLOUD_KITCHEN: "properties.typeCloudKitchen",
   BAR: "properties.typeBar",
+  QSR: "properties.typeQsr",
+  BAKERY: "properties.typeBakery",
+  PIZZERIA: "properties.typePizzeria",
+  BURGER_JOINT: "properties.typeBurgerJoint",
+  OTHER: "properties.typeOther",
 };
 
 export default async function PropertiesPage() {

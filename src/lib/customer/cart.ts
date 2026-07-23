@@ -40,6 +40,10 @@ export type Item = {
   imageUrl: string | null;
   translations: Record<string, { name?: string; description?: string }> | null;
   modifierGroups: ModGroup[];
+  // Display-only "what's included" for a combo/meal-bundle item — the combo
+  // is priced and ordered as a single item, this is just shown to the guest
+  // (and printed on the KOT) so they know what they're getting.
+  comboItems: { name: string; quantity: number }[];
 };
 
 export type CartLine = {

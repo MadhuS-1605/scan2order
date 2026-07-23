@@ -9,6 +9,7 @@ import { recordAudit } from "@/lib/audit";
 import type { Prisma } from "@prisma/client";
 import { computeTotals, type GstMode } from "@/lib/pricing";
 import { toNumber, happyHourPercentNow } from "@/lib/utils";
+import { aggregateRecipeConsumption } from "@/lib/inventory/recipe";
 
 // Effective unit price = base × current happy-hour factor.
 function effectivePrice(
@@ -33,9 +34,12 @@ function effectivePrice(
   return Math.round(base * (1 - pct / 100) * 100) / 100;
 }
 
-// Re-sum an order's money from its current line items (after an edit).
-async function recompute(orderId: string) {
-  const order = await prisma.order.findUnique({
+// Re-sum an order's money from its current line items (after an edit). Takes
+// a transaction client so the write can't land separately from the item
+// edit/stock adjustment it's summing — see addOrderItemAction/
+// setOrderItemQtyAction, which wrap all three in one $transaction.
+async function recompute(tx: Prisma.TransactionClient, orderId: string) {
+  const order = await tx.order.findUnique({
     where: { id: orderId },
     include: { items: true, restaurant: { include: { config: true } } },
   });
@@ -45,23 +49,53 @@ async function recompute(orderId: string) {
     order.gstMode as GstMode,
     toNumber(order.restaurant.config.gstPercentage),
   );
-  await prisma.order.update({
+  await tx.order.update({
     where: { id: orderId },
     data: { subtotal: totals.subtotal, taxAmount: totals.taxAmount, totalAmount: totals.total },
   });
 }
 
-async function adjustStock(menuItemId: string | null, delta: number) {
+async function adjustStock(
+  tx: Prisma.TransactionClient,
+  restaurantId: string,
+  menuItemId: string | null,
+  delta: number,
+) {
   if (!menuItemId || delta === 0) return;
-  const mi = await prisma.menuItem.findUnique({
+  const mi = await tx.menuItem.findUnique({
     where: { id: menuItemId },
-    select: { trackStock: true },
+    select: {
+      trackStock: true,
+      recipeLines: {
+        select: { ingredientId: true, qtyPerServing: true, ingredient: { select: { costPerUnit: true } } },
+      },
+    },
   });
-  if (!mi?.trackStock) return;
-  await prisma.menuItem.update({
-    where: { id: menuItemId },
-    data: { stockQty: { increment: -delta } }, // +delta items ordered => stock down
-  });
+  if (!mi) return;
+  if (mi.trackStock) {
+    await tx.menuItem.update({
+      where: { id: menuItemId },
+      data: { stockQty: { increment: -delta } }, // +delta items ordered => stock down
+    });
+  }
+  // Recipe ingredients follow the same delta — never blocks the edit, just
+  // keeps ingredient stock consistent with what's actually been ordered.
+  for (const r of mi.recipeLines) {
+    const qty = delta * toNumber(r.qtyPerServing);
+    await tx.ingredient.update({
+      where: { id: r.ingredientId },
+      data: { stockQty: { decrement: qty } },
+    });
+    await tx.ingredientLedgerEntry.create({
+      data: {
+        restaurantId,
+        ingredientId: r.ingredientId,
+        delta: -qty,
+        reason: "ORDER_CONSUMPTION",
+        costPerUnit: toNumber(r.ingredient.costPerUnit),
+      },
+    });
+  }
 }
 
 // Waiter places an order on a guest's behalf.
@@ -88,6 +122,7 @@ export async function createStaffOrderAction(formData: FormData): Promise<void> 
 
   const items = await prisma.menuItem.findMany({
     where: { id: { in: lines.map((l) => l.menuItemId) }, restaurantId: session.restaurantId },
+    include: { recipeLines: { include: { ingredient: { select: { costPerUnit: true } } } } },
   });
   const byId = new Map(items.map((m) => [m.id, m]));
 
@@ -122,6 +157,17 @@ export async function createStaffOrderAction(formData: FormData): Promise<void> 
     toNumber(config.gstPercentage),
   );
 
+  const recipesByItem = new Map(
+    items.map((m) => [m.id, m.recipeLines.map((r) => ({ ingredientId: r.ingredientId, qtyPerServing: toNumber(r.qtyPerServing) }))]),
+  );
+  const ingredientConsumption = aggregateRecipeConsumption(
+    built.map((b) => ({ menuItemId: b.menuItemId, quantity: b.quantity })),
+    recipesByItem,
+  );
+  const costByIngredient = new Map(
+    items.flatMap((m) => m.recipeLines.map((r) => [r.ingredientId, toNumber(r.ingredient.costPerUnit)] as const)),
+  );
+
   const order = await prisma.$transaction(async (tx) => {
     for (const b of built) {
       if (b.trackStock) {
@@ -130,6 +176,18 @@ export async function createStaffOrderAction(formData: FormData): Promise<void> 
           data: { stockQty: { decrement: b.quantity } },
         });
       }
+    }
+    for (const [ingredientId, qty] of ingredientConsumption) {
+      await tx.ingredient.update({ where: { id: ingredientId }, data: { stockQty: { decrement: qty } } });
+      await tx.ingredientLedgerEntry.create({
+        data: {
+          restaurantId: session.restaurantId,
+          ingredientId,
+          delta: -qty,
+          reason: "ORDER_CONSUMPTION",
+          costPerUnit: costByIngredient.get(ingredientId) ?? null,
+        },
+      });
     }
     const r = await tx.restaurant.update({
       where: { id: session.restaurantId },
@@ -196,18 +254,24 @@ export async function addOrderItemAction(formData: FormData): Promise<void> {
   if (!order || !order.restaurant.config || !mi) return;
 
   const unit = effectivePrice(toNumber(mi.price), order.restaurant.config);
-  await prisma.orderItem.create({
-    data: {
-      orderId: order.id,
-      menuItemId: mi.id,
-      nameSnapshot: mi.name,
-      priceSnapshot: unit,
-      quantity,
-      lineTotal: Math.round(unit * quantity * 100) / 100,
-    },
+  // Item write + stock/ingredient-ledger adjustment + totals recompute as one
+  // unit: a failure partway through (e.g. an ingredient deleted by another
+  // admin mid-request) must not leave the order's line items out of sync
+  // with its own subtotal/tax/total.
+  await prisma.$transaction(async (tx) => {
+    await tx.orderItem.create({
+      data: {
+        orderId: order.id,
+        menuItemId: mi.id,
+        nameSnapshot: mi.name,
+        priceSnapshot: unit,
+        quantity,
+        lineTotal: Math.round(unit * quantity * 100) / 100,
+      },
+    });
+    await adjustStock(tx, session.restaurantId, mi.id, quantity);
+    await recompute(tx, order.id);
   });
-  await adjustStock(mi.id, quantity);
-  await recompute(order.id);
   emitEvent({ type: "order.updated", restaurantId: session.restaurantId, orderId: order.id });
   await recordAudit(
     session.restaurantId,
@@ -233,17 +297,19 @@ export async function setOrderItemQtyAction(formData: FormData): Promise<void> {
   if (!order) return;
 
   const delta = quantity - item.quantity;
-  if (quantity <= 0) {
-    await prisma.orderItem.delete({ where: { id: item.id } });
-  } else {
-    const unit = toNumber(item.priceSnapshot);
-    await prisma.orderItem.update({
-      where: { id: item.id },
-      data: { quantity, lineTotal: Math.round(unit * quantity * 100) / 100 },
-    });
-  }
-  await adjustStock(item.menuItemId, delta);
-  await recompute(order.id);
+  await prisma.$transaction(async (tx) => {
+    if (quantity <= 0) {
+      await tx.orderItem.delete({ where: { id: item.id } });
+    } else {
+      const unit = toNumber(item.priceSnapshot);
+      await tx.orderItem.update({
+        where: { id: item.id },
+        data: { quantity, lineTotal: Math.round(unit * quantity * 100) / 100 },
+      });
+    }
+    await adjustStock(tx, session.restaurantId, item.menuItemId, delta);
+    await recompute(tx, order.id);
+  });
   emitEvent({ type: "order.updated", restaurantId: session.restaurantId, orderId: order.id });
   await recordAudit(
     session.restaurantId,

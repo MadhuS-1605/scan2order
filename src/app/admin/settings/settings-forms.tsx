@@ -31,6 +31,7 @@ type Profile = {
   postalCode: string | null;
   fssaiNumber: string | null;
   logoUrl: string | null;
+  brandColor: string | null;
 };
 
 type Config = {
@@ -41,6 +42,7 @@ type Config = {
   gstMode: string;
   gstNumber: string | null;
   gstPercentage: string;
+  currency: string;
   serviceChargePercent: string;
   reviewUrl: string | null;
   happyHourEnabled: boolean;
@@ -75,6 +77,8 @@ type Config = {
   whatsappFrom: string | null;
   upiId: string | null;
   upiName: string | null;
+  wifiSsid: string | null;
+  wifiPassword: string | null;
 };
 
 function Status({ state }: { state: ActionState }) {
@@ -156,6 +160,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
     updateProfileAction,
     {},
   );
+  const [customColor, setCustomColor] = useState(Boolean(profile.brandColor));
   return (
     <Card>
       <h2 className="font-semibold text-ink">{tr("settings.businessProfile")}</h2>
@@ -172,6 +177,11 @@ function ProfileForm({ profile }: { profile: Profile }) {
               <option value="HOTEL">{tr("settings.typeHotel")}</option>
               <option value="CLOUD_KITCHEN">{tr("settings.typeCloudKitchen")}</option>
               <option value="BAR">{tr("settings.typeBar")}</option>
+              <option value="QSR">{tr("settings.typeQsr")}</option>
+              <option value="BAKERY">{tr("settings.typeBakery")}</option>
+              <option value="PIZZERIA">{tr("settings.typePizzeria")}</option>
+              <option value="BURGER_JOINT">{tr("settings.typeBurgerJoint")}</option>
+              <option value="OTHER">{tr("settings.typeOther")}</option>
             </Select>
           </Field>
           <Field label={tr("settings.phone")} htmlFor="s-phone">
@@ -218,6 +228,27 @@ function ProfileForm({ profile }: { profile: Profile }) {
         </Field>
         <Field label={tr("settings.logoUrl")} htmlFor="s-logo" hint={tr("settings.logoUrlHint")}>
           <ImageUpload name="logoUrl" kind="logo" defaultValue={profile.logoUrl ?? ""} />
+        </Field>
+        <Field label="Brand color" htmlFor="s-brand-color" hint="Accent color for your guest-facing menu & bill.">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-ink/70">
+              <input
+                type="checkbox"
+                checked={customColor}
+                onChange={(e) => setCustomColor(e.target.checked)}
+              />
+              Use a custom color
+            </label>
+            {customColor && (
+              <input
+                id="s-brand-color"
+                type="color"
+                name="brandColor"
+                defaultValue={profile.brandColor ?? "#d93d0b"}
+                className="h-10 w-14 cursor-pointer rounded border border-sand-300 bg-surface p-1"
+              />
+            )}
+          </div>
         </Field>
         <div className="flex justify-end">
           <Button type="submit" disabled={pending}>
@@ -409,6 +440,19 @@ function OperationsForm({ config }: { config: Config }) {
               defaultValue={config.gstPercentage}
               disabled={gstMode === "NONE"}
             />
+          </Field>
+          <Field
+            label="Currency"
+            htmlFor="o-currency"
+            hint="Display only — online payments (Razorpay/UPI) always settle in INR regardless of this."
+          >
+            <Select id="o-currency" name="currency" defaultValue={config.currency}>
+              {["INR", "USD", "GBP", "EUR", "AED", "SGD", "AUD"].map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Field label={tr("settings.serviceCharge")} htmlFor="o-sc" hint={tr("settings.serviceChargeHint")}>
             <Input
@@ -647,6 +691,19 @@ function PaymentForm({ config }: { config: Config }) {
               name="upiName"
               defaultValue={config.upiName ?? ""}
               placeholder="Your Café"
+            />
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Guest Wi-Fi name" htmlFor="wifi-ssid" hint="Shown on the guest menu page.">
+            <Input id="wifi-ssid" name="wifiSsid" defaultValue={config.wifiSsid ?? ""} placeholder="CafeGuest" />
+          </Field>
+          <Field label="Guest Wi-Fi password" htmlFor="wifi-password">
+            <Input
+              id="wifi-password"
+              name="wifiPassword"
+              defaultValue={config.wifiPassword ?? ""}
+              placeholder="Leave blank if open network"
             />
           </Field>
         </div>

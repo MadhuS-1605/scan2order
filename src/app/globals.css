@@ -53,6 +53,22 @@ body {
   color: var(--foreground);
 }
 
+/* Per-tenant diner-facing accent color (Restaurant.brandColor). Applied via
+   <BrandTheme> only when a venue has set one — derives the rest of the
+   brand color scale from their single chosen shade with color-mix(), so every
+   existing bg-brand and text-brand utility restyles for free. */
+.s2o-tenant-theme {
+  --color-brand-500: color-mix(in srgb, var(--color-brand-600) 90%, white);
+  --color-brand-400: color-mix(in srgb, var(--color-brand-600) 70%, white);
+  --color-brand-300: color-mix(in srgb, var(--color-brand-600) 55%, white);
+  --color-brand-200: color-mix(in srgb, var(--color-brand-600) 35%, white);
+  --color-brand-100: color-mix(in srgb, var(--color-brand-600) 20%, white);
+  --color-brand-50: color-mix(in srgb, var(--color-brand-600) 8%, white);
+  --color-brand-700: color-mix(in srgb, var(--color-brand-600) 85%, black);
+  --color-brand-800: color-mix(in srgb, var(--color-brand-600) 70%, black);
+  --color-brand-900: color-mix(in srgb, var(--color-brand-600) 55%, black);
+}
+
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

@@ -2,6 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { env } from "@/lib/env";
+import { getBaseUrl } from "@/lib/request";
 import { emitEvent } from "@/lib/realtime/bus";
 import { toNumber, formatMoney, escapeHtml } from "@/lib/utils";
 import { round2 } from "@/lib/pricing";
@@ -13,7 +14,6 @@ import {
 } from "@/lib/payments/razorpay";
 import { createOtp, verifyOtp } from "@/lib/messaging/otp";
 import {
-  sendWhatsApp,
   sendEmail,
   sendWhatsAppTemplate,
   sendWhatsAppFreeform,
@@ -389,13 +389,12 @@ export async function createPaymentIntentAction(args: {
   const amount = r2(Math.min(Math.max(args.amount ?? remaining, 1), remaining));
 
   const creds = resolveRazorpayCreds(config);
-  // No keys configured -> mock path (dev only) so the flow stays demoable.
-  // E2E_ALLOW_MOCK_PAYMENTS is a narrow CI-only escape hatch: the e2e suite
-  // exercises a production build (npm run build && next start, which forces
-  // NODE_ENV=production) but never has real Razorpay credentials. It's set
-  // only in the CI workflow's e2e job env — never in a real deployment.
+  // No keys configured -> mock path (dev/staging only) so the flow stays
+  // demoable. E2E_ALLOW_MOCK_PAYMENTS is a narrow CI-only escape hatch: the
+  // e2e suite exercises a production build (NODE_ENV=production either way)
+  // against real production, but never has real Razorpay credentials there.
   if (!creds) {
-    if (process.env.NODE_ENV === "production" && process.env.E2E_ALLOW_MOCK_PAYMENTS !== "true") {
+    if (!env.isStagingOrDev && process.env.E2E_ALLOW_MOCK_PAYMENTS !== "true") {
       return { ok: false, error: "Online payment is not configured." };
     }
     return { ok: true, mock: true, amount };
@@ -575,7 +574,7 @@ export async function mockMarkPaidAction(args: {
   qrToken: string;
   amount?: number;
 }): Promise<{ ok: boolean; error?: string }> {
-  if (process.env.NODE_ENV === "production" && process.env.E2E_ALLOW_MOCK_PAYMENTS !== "true") {
+  if (!env.isStagingOrDev && process.env.E2E_ALLOW_MOCK_PAYMENTS !== "true") {
     return { ok: false, error: "Disabled." };
   }
   const session = await getCustomerSession(args.orderId, args.qrToken);
@@ -623,7 +622,7 @@ export async function requestBillOtpAction(args: {
   const res =
     env.messaging.provider === "meta"
       ? await sendWhatsAppTemplate(phone, env.messaging.meta.otpTemplate, [code])
-      : await sendWhatsApp(
+      : await sendWhatsAppFreeform(
           phone,
           `Your verification code for the ${order.restaurant.name} bill is ${code}. It expires in 5 minutes.`,
           order.restaurant.config!.whatsappFrom,
@@ -670,7 +669,7 @@ export async function verifyBillOtpAction(args: {
 
   await ensureBill(order, "WHATSAPP", phone);
 
-  const link = `${env.appUrl.replace(/\/$/, "")}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
+  const link = `${await getBaseUrl()}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
   const cur = order.restaurant.config!.currency;
   const total = toNumber(order.totalAmount).toFixed(2);
   const freeText =
@@ -717,7 +716,7 @@ export async function verifyBillOtpAction(args: {
       billHeaderDoc,
     );
   } else {
-    send = await sendWhatsApp(phone, freeText, order.restaurant.config!.whatsappFrom);
+    send = await sendWhatsAppFreeform(phone, freeText, order.restaurant.config!.whatsappFrom);
   }
   if (!send.ok) return { ok: false, error: send.error ?? "Could not send bill." };
   if (billable) await recordUsage(order.restaurantId, "whatsapp");
@@ -737,7 +736,7 @@ export async function emailBillAction(args: {
     return { ok: false, error: "Enter a valid email address." };
   }
   await ensureBill(order, "EMAIL");
-  const link = `${env.appUrl.replace(/\/$/, "")}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
+  const link = `${await getBaseUrl()}/api/bill/${order.id}/pdf?t=${args.qrToken}`;
   const name = order.restaurant.name;
   const safeName = escapeHtml(name);
   const cur = order.restaurant.config!.currency;

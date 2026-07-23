@@ -15,7 +15,13 @@ import type { Item } from "@/lib/customer/cart";
 export type MenuContext = {
   qrToken: string;
   restaurantId: string;
-  restaurant: { name: string; currency: string; groupName: string | null; logoUrl: string | null };
+  restaurant: {
+    name: string;
+    currency: string;
+    groupName: string | null;
+    logoUrl: string | null;
+    brandColor: string | null;
+  };
   table: { label: string; kind: string };
   config: {
     paymentTiming: string;
@@ -27,6 +33,8 @@ export type MenuContext = {
     minOrderAmount: number;
     pickupEnabled: boolean;
     deliveryEnabled: boolean;
+    wifiSsid: string | null;
+    wifiPassword: string | null;
   };
   happyHourPercent: number;
   // Whether the venue is currently accepting orders (business hours + manual
@@ -65,6 +73,10 @@ export async function getMenuContext(): Promise<MenuContext | null> {
                     orderBy: { sortOrder: "asc" },
                   },
                 },
+              },
+              comboLines: {
+                orderBy: { sortOrder: "asc" },
+                include: { includedItem: { select: { name: true } } },
               },
             },
           },
@@ -148,6 +160,7 @@ export async function getMenuContext(): Promise<MenuContext | null> {
           translations: o.translations as Record<string, { name?: string }> | null,
         })),
       })),
+    comboItems: i.comboLines.map((l) => ({ name: l.includedItem.name, quantity: l.quantity })),
   }));
 
   return {
@@ -158,6 +171,7 @@ export async function getMenuContext(): Promise<MenuContext | null> {
       currency: config.currency,
       groupName: restaurant.group?.name ?? null,
       logoUrl: restaurant.logoUrl,
+      brandColor: restaurant.brandColor,
     },
     table: { label: table.label, kind: table.kind },
     config: {
@@ -173,6 +187,8 @@ export async function getMenuContext(): Promise<MenuContext | null> {
       minOrderAmount: config.minOrderAmount,
       pickupEnabled: config.pickupEnabled,
       deliveryEnabled: config.deliveryEnabled,
+      wifiSsid: config.wifiSsid,
+      wifiPassword: config.wifiPassword,
     },
     happyHourPercent,
     // Ordering availability: a platform suspension or the global maintenance

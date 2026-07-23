@@ -24,6 +24,7 @@ export const env = {
   appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
   appEnv: APP_ENV,
   isStaging: APP_ENV === "staging",
+  isStagingOrDev,
   authSecret: () => {
     const s = required("AUTH_SECRET", process.env.AUTH_SECRET);
     // A weak secret makes session JWTs forgeable — require ≥32 chars.
@@ -74,14 +75,9 @@ export const env = {
     const keyId = (useTest && process.env.RAZORPAY_TEST_KEY_ID) || process.env.RAZORPAY_KEY_ID || "";
     const keySecret =
       (useTest && process.env.RAZORPAY_TEST_KEY_SECRET) || process.env.RAZORPAY_KEY_SECRET || "";
-    const publicKeyId =
-      (useTest && process.env.NEXT_PUBLIC_RAZORPAY_TEST_KEY_ID) ||
-      process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
-      "";
     return {
       keyId,
       keySecret,
-      publicKeyId,
       webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
       // Razorpay Subscription Plan IDs per tier (for auto-renew / eMandate).
       // Create these in the Razorpay dashboard; leave blank to keep
