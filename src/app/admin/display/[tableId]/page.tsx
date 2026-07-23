@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { formatMoney, toNumber, modifierSummary, seatLabel } from "@/lib/utils";
+import { round2 } from "@/lib/pricing";
 import { LiveStream } from "@/components/live-stream";
 
 // Customer-facing second screen for a table/counter: shows the running order
@@ -21,7 +22,7 @@ export default async function CustomerDisplayPage({
   });
   if (!table) notFound();
 
-  const order = await prisma.order.findFirst({
+  const latest = await prisma.order.findFirst({
     where: {
       restaurantId: restaurant.id,
       tableId,
@@ -29,10 +30,31 @@ export default async function CustomerDisplayPage({
       paymentStatus: { not: "PAID" },
     },
     orderBy: { createdAt: "desc" },
-    include: { items: true },
   });
 
+  // Same session-based consolidation as /payment: a table's bill is every
+  // unpaid round in the dining session, not just the most recent one — a
+  // second round ordered before the first is paid must still show the full
+  // running total here, not just its own subtotal.
+  const orders = latest
+    ? latest.diningSessionId
+      ? await prisma.order.findMany({
+          where: {
+            restaurantId: restaurant.id,
+            diningSessionId: latest.diningSessionId,
+            status: { not: "CANCELLED" },
+          },
+          orderBy: { createdAt: "asc" },
+          include: { items: true },
+        })
+      : [await prisma.order.findUniqueOrThrow({ where: { id: latest.id }, include: { items: true } })]
+    : [];
+
   const cur = config.currency;
+  const items = orders.flatMap((o) => o.items);
+  const subtotal = round2(orders.reduce((s, o) => s + toNumber(o.subtotal), 0));
+  const tax = round2(orders.reduce((s, o) => s + toNumber(o.taxAmount), 0));
+  const total = round2(orders.reduce((s, o) => s + toNumber(o.totalAmount), 0));
 
   return (
     <div className="flex min-h-[80vh] flex-col items-center justify-center bg-ink px-6 py-10 text-center text-white">
@@ -40,12 +62,12 @@ export default async function CustomerDisplayPage({
       <p className="text-sm uppercase tracking-[0.3em] text-white/50">{restaurant.name}</p>
       <h1 className="mt-1 font-display text-2xl">{seatLabel(table)}</h1>
 
-      {!order || order.items.length === 0 ? (
+      {items.length === 0 ? (
         <p className="mt-16 font-display text-3xl text-white/60">Welcome!</p>
       ) : (
         <div className="mt-8 w-full max-w-md space-y-4">
           <ul className="space-y-2 text-left">
-            {order.items.map((it) => (
+            {items.map((it) => (
               <li key={it.id} className="flex justify-between text-lg">
                 <span>
                   {it.quantity}× {it.nameSnapshot}
@@ -62,15 +84,15 @@ export default async function CustomerDisplayPage({
           <div className="border-t border-white/20 pt-4">
             <div className="flex justify-between text-sm text-white/60">
               <span>Subtotal</span>
-              <span>{formatMoney(toNumber(order.subtotal), cur)}</span>
+              <span>{formatMoney(subtotal, cur)}</span>
             </div>
             <div className="flex justify-between text-sm text-white/60">
               <span>Tax</span>
-              <span>{formatMoney(toNumber(order.taxAmount), cur)}</span>
+              <span>{formatMoney(tax, cur)}</span>
             </div>
             <div className="mt-2 flex justify-between font-display text-3xl">
               <span>Total</span>
-              <span>{formatMoney(toNumber(order.totalAmount), cur)}</span>
+              <span>{formatMoney(total, cur)}</span>
             </div>
           </div>
         </div>
