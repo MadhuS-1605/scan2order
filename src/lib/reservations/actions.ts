@@ -9,7 +9,19 @@ import { notifyRestaurant } from "@/lib/push";
 import { sendWhatsAppFreeform } from "@/lib/messaging/provider";
 import { recordUsage } from "@/lib/usage";
 import { slotBucketMs, capacityExceeded } from "@/lib/reservations/slots";
-import type { ReservationStatus } from "@prisma/client";
+import { Prisma, type ReservationStatus } from "@prisma/client";
+
+// Thrown inside the transaction below to abort the write without Prisma
+// treating it as a DB-level error — caught by the caller and mapped to the
+// same user-facing message as a real capacity conflict.
+class SlotFullError extends Error {}
+
+// Postgres SERIALIZATION FAILURE (SQLSTATE 40001), surfaced by Prisma as
+// P2034 — "Transaction failed due to a write conflict." Two concurrent
+// bookings racing for the same slot land here instead of both succeeding.
+function isSerializationConflict(e: unknown): boolean {
+  return e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2034";
+}
 
 export async function createReservationAction(args: {
   slug: string;
@@ -44,35 +56,53 @@ export async function createReservationAction(args: {
   if (!restaurant) return { ok: false, error: "Restaurant not found." };
 
   const capacityPerSlot = restaurant.config?.reservationCapacityPerSlot ?? null;
-  if (reservedFor && capacityPerSlot !== null) {
-    const slotMinutes = restaurant.config?.reservationSlotMinutes ?? 30;
-    const bucketStart = slotBucketMs(reservedFor, slotMinutes);
-    const bucketEnd = bucketStart + slotMinutes * 60_000;
-    const inSlot = await prisma.reservation.findMany({
-      where: {
-        restaurantId: restaurant.id,
-        type: "RESERVATION",
-        status: { in: ["PENDING", "CONFIRMED"] },
-        reservedFor: { gte: new Date(bucketStart), lt: new Date(bucketEnd) },
+
+  // Capacity check + insert run in one Serializable transaction — two guests
+  // booking the same near-full slot at the same instant would otherwise both
+  // read "capacity available" before either write lands (TOCTOU), jointly
+  // overbooking it. Serializable makes Postgres abort one side with a
+  // conflict instead; we treat that the same as "slot full."
+  let reservation: Awaited<ReturnType<typeof prisma.reservation.create>>;
+  try {
+    reservation = await prisma.$transaction(
+      async (tx) => {
+        if (reservedFor && capacityPerSlot !== null) {
+          const slotMinutes = restaurant.config?.reservationSlotMinutes ?? 30;
+          const bucketStart = slotBucketMs(reservedFor, slotMinutes);
+          const bucketEnd = bucketStart + slotMinutes * 60_000;
+          const inSlot = await tx.reservation.findMany({
+            where: {
+              restaurantId: restaurant.id,
+              type: "RESERVATION",
+              status: { in: ["PENDING", "CONFIRMED"] },
+              reservedFor: { gte: new Date(bucketStart), lt: new Date(bucketEnd) },
+            },
+            select: { partySize: true },
+          });
+          if (capacityExceeded(inSlot.map((r) => r.partySize), partySize, capacityPerSlot)) {
+            throw new SlotFullError();
+          }
+        }
+        return tx.reservation.create({
+          data: {
+            restaurantId: restaurant.id,
+            type: args.type,
+            customerName: name,
+            customerPhone: phone,
+            partySize,
+            reservedFor,
+            notes: args.notes?.slice(0, 300) || null,
+          },
+        });
       },
-      select: { partySize: true },
-    });
-    if (capacityExceeded(inSlot.map((r) => r.partySize), partySize, capacityPerSlot)) {
+      { isolationLevel: "Serializable" },
+    );
+  } catch (e) {
+    if (e instanceof SlotFullError || isSerializationConflict(e)) {
       return { ok: false, error: "That time is fully booked — please pick another slot." };
     }
+    throw e;
   }
-
-  const reservation = await prisma.reservation.create({
-    data: {
-      restaurantId: restaurant.id,
-      type: args.type,
-      customerName: name,
-      customerPhone: phone,
-      partySize,
-      reservedFor,
-      notes: args.notes?.slice(0, 300) || null,
-    },
-  });
 
   emitEvent({ type: "reservation", restaurantId: restaurant.id });
   await notifyRestaurant(restaurant.id, {

@@ -37,10 +37,14 @@ export async function openCashShiftAction(formData: FormData): Promise<void> {
     : null;
   if (registerIdRaw && !register) return;
 
+  // Scoped by restaurantId, not just adminUserId: switchPropertyAction reuses
+  // the same adminUserId across every property in a group (only restaurantId
+  // changes in the session), so an unscoped check here would block an owner
+  // with an open shift at Property A from ever opening one at Property B.
   const open = await prisma.cashShift.findFirst({
-    where: { adminUserId: session.sub, closedAt: null },
+    where: { adminUserId: session.sub, restaurantId: session.restaurantId, closedAt: null },
   });
-  if (open) return; // one open shift per staff member at a time
+  if (open) return; // one open shift per staff member per restaurant at a time
 
   await prisma.cashShift.create({
     data: {
