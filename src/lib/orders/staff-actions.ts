@@ -34,9 +34,12 @@ function effectivePrice(
   return Math.round(base * (1 - pct / 100) * 100) / 100;
 }
 
-// Re-sum an order's money from its current line items (after an edit).
-async function recompute(orderId: string) {
-  const order = await prisma.order.findUnique({
+// Re-sum an order's money from its current line items (after an edit). Takes
+// a transaction client so the write can't land separately from the item
+// edit/stock adjustment it's summing — see addOrderItemAction/
+// setOrderItemQtyAction, which wrap all three in one $transaction.
+async function recompute(tx: Prisma.TransactionClient, orderId: string) {
+  const order = await tx.order.findUnique({
     where: { id: orderId },
     include: { items: true, restaurant: { include: { config: true } } },
   });
@@ -46,15 +49,20 @@ async function recompute(orderId: string) {
     order.gstMode as GstMode,
     toNumber(order.restaurant.config.gstPercentage),
   );
-  await prisma.order.update({
+  await tx.order.update({
     where: { id: orderId },
     data: { subtotal: totals.subtotal, taxAmount: totals.taxAmount, totalAmount: totals.total },
   });
 }
 
-async function adjustStock(restaurantId: string, menuItemId: string | null, delta: number) {
+async function adjustStock(
+  tx: Prisma.TransactionClient,
+  restaurantId: string,
+  menuItemId: string | null,
+  delta: number,
+) {
   if (!menuItemId || delta === 0) return;
-  const mi = await prisma.menuItem.findUnique({
+  const mi = await tx.menuItem.findUnique({
     where: { id: menuItemId },
     select: {
       trackStock: true,
@@ -63,7 +71,7 @@ async function adjustStock(restaurantId: string, menuItemId: string | null, delt
   });
   if (!mi) return;
   if (mi.trackStock) {
-    await prisma.menuItem.update({
+    await tx.menuItem.update({
       where: { id: menuItemId },
       data: { stockQty: { increment: -delta } }, // +delta items ordered => stock down
     });
@@ -72,11 +80,11 @@ async function adjustStock(restaurantId: string, menuItemId: string | null, delt
   // keeps ingredient stock consistent with what's actually been ordered.
   for (const r of mi.recipeLines) {
     const qty = delta * toNumber(r.qtyPerServing);
-    await prisma.ingredient.update({
+    await tx.ingredient.update({
       where: { id: r.ingredientId },
       data: { stockQty: { decrement: qty } },
     });
-    await prisma.ingredientLedgerEntry.create({
+    await tx.ingredientLedgerEntry.create({
       data: { restaurantId, ingredientId: r.ingredientId, delta: -qty, reason: "ORDER_CONSUMPTION" },
     });
   }
@@ -229,18 +237,24 @@ export async function addOrderItemAction(formData: FormData): Promise<void> {
   if (!order || !order.restaurant.config || !mi) return;
 
   const unit = effectivePrice(toNumber(mi.price), order.restaurant.config);
-  await prisma.orderItem.create({
-    data: {
-      orderId: order.id,
-      menuItemId: mi.id,
-      nameSnapshot: mi.name,
-      priceSnapshot: unit,
-      quantity,
-      lineTotal: Math.round(unit * quantity * 100) / 100,
-    },
+  // Item write + stock/ingredient-ledger adjustment + totals recompute as one
+  // unit: a failure partway through (e.g. an ingredient deleted by another
+  // admin mid-request) must not leave the order's line items out of sync
+  // with its own subtotal/tax/total.
+  await prisma.$transaction(async (tx) => {
+    await tx.orderItem.create({
+      data: {
+        orderId: order.id,
+        menuItemId: mi.id,
+        nameSnapshot: mi.name,
+        priceSnapshot: unit,
+        quantity,
+        lineTotal: Math.round(unit * quantity * 100) / 100,
+      },
+    });
+    await adjustStock(tx, session.restaurantId, mi.id, quantity);
+    await recompute(tx, order.id);
   });
-  await adjustStock(session.restaurantId, mi.id, quantity);
-  await recompute(order.id);
   emitEvent({ type: "order.updated", restaurantId: session.restaurantId, orderId: order.id });
   await recordAudit(
     session.restaurantId,
@@ -266,17 +280,19 @@ export async function setOrderItemQtyAction(formData: FormData): Promise<void> {
   if (!order) return;
 
   const delta = quantity - item.quantity;
-  if (quantity <= 0) {
-    await prisma.orderItem.delete({ where: { id: item.id } });
-  } else {
-    const unit = toNumber(item.priceSnapshot);
-    await prisma.orderItem.update({
-      where: { id: item.id },
-      data: { quantity, lineTotal: Math.round(unit * quantity * 100) / 100 },
-    });
-  }
-  await adjustStock(session.restaurantId, item.menuItemId, delta);
-  await recompute(order.id);
+  await prisma.$transaction(async (tx) => {
+    if (quantity <= 0) {
+      await tx.orderItem.delete({ where: { id: item.id } });
+    } else {
+      const unit = toNumber(item.priceSnapshot);
+      await tx.orderItem.update({
+        where: { id: item.id },
+        data: { quantity, lineTotal: Math.round(unit * quantity * 100) / 100 },
+      });
+    }
+    await adjustStock(tx, session.restaurantId, item.menuItemId, delta);
+    await recompute(tx, order.id);
+  });
   emitEvent({ type: "order.updated", restaurantId: session.restaurantId, orderId: order.id });
   await recordAudit(
     session.restaurantId,
