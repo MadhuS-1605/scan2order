@@ -30,6 +30,7 @@ import {
   Plug,
   CreditCard,
   Settings,
+  Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
@@ -59,6 +60,7 @@ const GROUPS: { heading: string; links: NavLink[] }[] = [
       { href: "/admin", label: "Overview", perm: "overview", icon: LayoutDashboard, exact: true },
       { href: "/admin/notifications", label: "Notifications", perm: "overview", icon: Bell },
       { href: "/admin/orders", label: "Orders", perm: "orders", icon: ShoppingBag },
+      { href: "/admin/refunds", label: "Refunds", perm: "refunds", icon: Undo2 },
       { href: "/admin/floor", label: "Floor", perm: "orders", icon: LayoutGrid },
       { href: "/admin/kitchen", label: "Kitchen", perm: "kitchen", icon: ChefHat },
       { href: "/admin/bar", label: "Bar", perm: "kitchen", icon: Wine, feature: "featureBar" },

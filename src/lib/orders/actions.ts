@@ -17,7 +17,9 @@ import {
 import { refundableAmount, clampRefund } from "@/lib/billing/refund-math";
 import type { OrderStatus } from "@/lib/orders/status";
 
-export type RefundResult = { ok: true; amount: number } | { ok: false; error: string };
+export type RefundResult =
+  | { ok: true; amount: number; pending?: boolean }
+  | { ok: false; error: string };
 
 async function ownedOrder(orderId: string, restaurantId: string) {
   const order = await prisma.order.findFirst({
@@ -242,13 +244,42 @@ export async function toggleItemPreparedAction(formData: FormData): Promise<void
   revalidatePath("/admin/bar");
 }
 
-// Staff-initiated refund (permission "refunds" -> OWNER/MANAGER). Full or
-// partial. Online payments are returned via Razorpay using the captured payment
-// id; counter/cash refunds are recorded as a manual note. The order flips to
-// REFUNDED once fully refunded. Refunds target the order that holds the payment
-// (the bill's primary order, where amountPaid > 0).
+// Attempts the actual money movement for a refund: Razorpay for online
+// payments, a no-op (manual/counter) otherwise. Shared by the direct
+// (OWNER/MANAGER) path and the manager-approval path below, so there's one
+// place that ever calls the gateway.
+async function chargeRefundToGateway(
+  order: {
+    payments: { razorpayPaymentId: string | null }[];
+    restaurant: { config: { razorpayKeyId: string | null; razorpayKeySecret: string | null } | null };
+  },
+  method: string,
+  amount: number,
+): Promise<{ ok: true; gatewayRefundId: string | null } | { ok: false }> {
+  if (method !== "ONLINE") return { ok: true, gatewayRefundId: null };
+  const pay = order.payments.find((p) => p.razorpayPaymentId);
+  const creds = order.restaurant.config ? resolveRazorpayCreds(order.restaurant.config) : null;
+  if (!pay?.razorpayPaymentId || !creds) return { ok: false };
+  try {
+    const res = await refundRazorpayPayment(creds, pay.razorpayPaymentId, amount);
+    return { ok: true, gatewayRefundId: res.id };
+  } catch {
+    return { ok: false };
+  }
+}
+
+// Staff-initiated refund. Full or partial. OWNER/MANAGER (permission
+// "refunds") execute immediately: online payments return via Razorpay using
+// the captured payment id, counter/cash refunds are a manual note. Anyone
+// else with "requestRefunds" (CASHIER/WAITER) instead creates a PENDING
+// record — no money moves until a manager approves it below. The order flips
+// to REFUNDED once fully refunded. Refunds target the order that holds the
+// payment (the bill's primary order, where amountPaid > 0).
 export async function refundOrderAction(formData: FormData): Promise<RefundResult> {
-  const session = await requireAdminWithPermission("refunds");
+  const session = await requireOnboardedAdmin();
+  const canExecute = hasPermission(session.role, "refunds");
+  const canRequest = canExecute || hasPermission(session.role, "requestRefunds");
+  if (!canRequest) throw new Error("You don't have permission for this action.");
   const { restaurantId } = session;
   const orderId = String(formData.get("orderId"));
   const reason = String(formData.get("reason") ?? "").trim() || null;
@@ -278,32 +309,56 @@ export async function refundOrderAction(formData: FormData): Promise<RefundResul
   const method = order.paymentMethod ?? "COUNTER";
   const currency = order.restaurant.config?.currency ?? "INR";
 
-  let gatewayRefundId: string | null = null;
+  if (!canExecute) {
+    await prisma.refund.create({
+      data: { restaurantId, orderId, amount, reason, method, status: "PENDING", createdByName: session.name },
+    });
+    await notifyRestaurant(restaurantId, {
+      title: "Refund needs approval",
+      body: `#${order.orderNumber} · ${formatMoney(amount, currency)}${reason ? ` · ${reason}` : ""}`,
+      url: "/admin/refunds",
+      tag: `refund-pending-${orderId}`,
+    });
+    await recordAudit(
+      restaurantId,
+      session,
+      "order.refund_requested",
+      `#${order.orderNumber} · ${formatMoney(amount, currency)}${reason ? ` · ${reason}` : ""}`,
+    );
+    revalidateAdmin();
+    return { ok: true, amount, pending: true };
+  }
+
   if (method === "ONLINE") {
     const pay = order.payments.find((p) => p.razorpayPaymentId);
-    const creds = order.restaurant.config
-      ? resolveRazorpayCreds(order.restaurant.config)
-      : null;
+    const creds = order.restaurant.config ? resolveRazorpayCreds(order.restaurant.config) : null;
     if (!pay?.razorpayPaymentId || !creds) {
       return {
         ok: false,
         error: "No online payment on file to refund — record a manual refund instead.",
       };
     }
-    try {
-      const res = await refundRazorpayPayment(creds, pay.razorpayPaymentId, amount);
-      gatewayRefundId = res.id;
-    } catch {
-      await prisma.refund.create({
-        data: { restaurantId, orderId, amount, reason, method, status: "FAILED", createdByName: session.name },
-      });
-      await recordAudit(restaurantId, session, "order.refund_failed", `#${order.orderNumber} · ${formatMoney(amount, currency)}`);
-      return { ok: false, error: "The payment gateway rejected the refund. Try again, or refund manually." };
-    }
+  }
+  const charged = await chargeRefundToGateway(order, method, amount);
+  if (!charged.ok) {
+    await prisma.refund.create({
+      data: { restaurantId, orderId, amount, reason, method, status: "FAILED", createdByName: session.name },
+    });
+    await recordAudit(restaurantId, session, "order.refund_failed", `#${order.orderNumber} · ${formatMoney(amount, currency)}`);
+    return { ok: false, error: "The payment gateway rejected the refund. Try again, or refund manually." };
   }
 
   await prisma.refund.create({
-    data: { restaurantId, orderId, amount, reason, method, gatewayRefundId, status: "DONE", createdByName: session.name },
+    data: {
+      restaurantId,
+      orderId,
+      amount,
+      reason,
+      method,
+      gatewayRefundId: charged.gatewayRefundId,
+      status: "DONE",
+      createdByName: session.name,
+    },
   });
   if (round2(already + amount) >= paid) {
     await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: "REFUNDED" } });
@@ -317,6 +372,91 @@ export async function refundOrderAction(formData: FormData): Promise<RefundResul
   emitEvent({ type: "order.updated", restaurantId, orderId });
   revalidateAdmin();
   return { ok: true, amount };
+}
+
+// Manager approves a PENDING refund request: charges the gateway (if online)
+// and flips it to DONE, exactly like a direct refund would have.
+export async function approveRefundAction(formData: FormData): Promise<RefundResult> {
+  const session = await requireAdminWithPermission("refunds");
+  const { restaurantId } = session;
+  const refundId = String(formData.get("refundId"));
+
+  const pending = await prisma.refund.findFirst({
+    where: { id: refundId, restaurantId, status: "PENDING" },
+    include: {
+      order: {
+        include: { payments: true, refunds: true, restaurant: { include: { config: true } } },
+      },
+    },
+  });
+  if (!pending) return { ok: false, error: "This request is no longer pending." };
+  const order = pending.order;
+
+  // Re-validate against what's refundable now — another refund may have
+  // landed since this was requested.
+  const paid = toNumber(order.amountPaid);
+  const refundable = refundableAmount(
+    paid,
+    order.refunds.map((r) => ({ amount: toNumber(r.amount), status: r.status })),
+  );
+  const amount = clampRefund(toNumber(pending.amount), refundable);
+  const currency = order.restaurant.config?.currency ?? "INR";
+  if (amount <= 0) {
+    await prisma.refund.update({
+      where: { id: refundId },
+      data: { status: "REJECTED", approvedByName: session.name },
+    });
+    return { ok: false, error: "Nothing left to refund on this order — request auto-declined." };
+  }
+
+  const charged = await chargeRefundToGateway(order, pending.method, amount);
+  if (!charged.ok) {
+    await prisma.refund.update({
+      where: { id: refundId },
+      data: { status: "FAILED", approvedByName: session.name },
+    });
+    return { ok: false, error: "The payment gateway rejected the refund. Try again, or refund manually." };
+  }
+
+  await prisma.refund.update({
+    where: { id: refundId },
+    data: { status: "DONE", amount, gatewayRefundId: charged.gatewayRefundId, approvedByName: session.name },
+  });
+  const already = round2(paid - refundable);
+  if (round2(already + amount) >= paid) {
+    await prisma.order.update({ where: { id: order.id }, data: { paymentStatus: "REFUNDED" } });
+  }
+  await recordAudit(
+    restaurantId,
+    session,
+    "order.refund_approved",
+    `#${order.orderNumber} · ${formatMoney(amount, currency)}`,
+  );
+  emitEvent({ type: "order.updated", restaurantId, orderId: order.id });
+  revalidateAdmin();
+  return { ok: true, amount };
+}
+
+// Manager declines a PENDING refund request — no money moves.
+export async function rejectRefundAction(formData: FormData): Promise<void> {
+  const session = await requireAdminWithPermission("refunds");
+  const refundId = String(formData.get("refundId"));
+  const refund = await prisma.refund.findFirst({
+    where: { id: refundId, restaurantId: session.restaurantId, status: "PENDING" },
+    include: { order: true },
+  });
+  if (!refund) return;
+  await prisma.refund.update({
+    where: { id: refundId },
+    data: { status: "REJECTED", approvedByName: session.name },
+  });
+  await recordAudit(
+    session.restaurantId,
+    session,
+    "order.refund_rejected",
+    `#${refund.order.orderNumber} · ${formatMoney(toNumber(refund.amount), "INR")}`,
+  );
+  revalidateAdmin();
 }
 
 // Waiter moves an order (or the whole party) to a different table. With

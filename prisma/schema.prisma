@@ -953,6 +953,8 @@ model PlanPayment {
 enum RefundStatus {
   DONE // money returned (gateway refund created, or manual cash/counter refund)
   FAILED // gateway refused — staff must retry / handle manually
+  PENDING // requested by staff without refund authority — awaiting manager approval, no money moved yet
+  REJECTED // a manager declined the request — no money moved
 }
 
 // A refund issued against a paid order. Online refunds carry the gateway refund
@@ -968,7 +970,8 @@ model Refund {
   method          PaymentMethod
   gatewayRefundId String? // Razorpay refund id, when refunded online
   status          RefundStatus  @default(DONE)
-  createdByName   String?
+  createdByName   String? // who requested/executed it
+  approvedByName  String? // who approved/rejected a PENDING request
   createdAt       DateTime      @default(now())
 
   @@index([orderId])

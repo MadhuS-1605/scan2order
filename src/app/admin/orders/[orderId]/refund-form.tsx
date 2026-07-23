@@ -13,11 +13,13 @@ export function RefundForm({
   refundable,
   currency,
   online,
+  canExecute,
 }: {
   orderId: string;
   refundable: number;
   currency: string;
   online: boolean;
+  canExecute: boolean;
 }) {
   const tr = useT();
   const [state, action, pending] = useActionState<RefundResult | null, FormData>(
@@ -25,6 +27,13 @@ export function RefundForm({
     null,
   );
 
+  if (state?.ok && state.pending) {
+    return (
+      <p className="text-sm font-medium text-amber-700">
+        ✓ Refund of {currency} {state.amount.toFixed(2)} sent for manager approval.
+      </p>
+    );
+  }
   if (state?.ok) {
     return (
       <p className="text-sm font-medium text-olive-700">
@@ -59,17 +68,20 @@ export function RefundForm({
           </span>
           <Input name="reason" placeholder={tr("refund.reasonPlaceholder")} />
         </label>
-        <Button type="submit" variant="danger" disabled={pending}>
+        <Button type="submit" variant={canExecute ? "danger" : "secondary"} disabled={pending}>
           {pending
             ? tr("refund.refunding")
-            : online
-              ? tr("refund.refundOnline")
-              : tr("refund.recordRefund")}
+            : !canExecute
+              ? "Request refund"
+              : online
+                ? tr("refund.refundOnline")
+                : tr("refund.recordRefund")}
         </Button>
       </div>
       <p className="text-xs text-ink/45">
-        {`${tr("refund.upTo")} ${currency} ${refundable.toFixed(2)} ${tr("refund.refundableSuffix")}`}
-        {online ? ` ${tr("refund.gatewayHint")}` : ` ${tr("refund.manualHint")}`}
+        {!canExecute
+          ? `Up to ${currency} ${refundable.toFixed(2)} — a manager must approve before money moves.`
+          : `${tr("refund.upTo")} ${currency} ${refundable.toFixed(2)} ${tr("refund.refundableSuffix")}${online ? ` ${tr("refund.gatewayHint")}` : ` ${tr("refund.manualHint")}`}`}
       </p>
     </form>
   );

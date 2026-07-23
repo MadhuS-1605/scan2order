@@ -69,7 +69,9 @@ export default async function OrderDetailPage({
     .filter((r) => r.status === "DONE")
     .reduce((s, r) => s + toNumber(r.amount), 0);
   const refundable = Math.max(0, Math.round((paid - refunded) * 100) / 100);
-  const canRefund = hasPermission(session.role, "refunds") && refundable > 0;
+  const canExecuteRefund = hasPermission(session.role, "refunds");
+  const canRefund =
+    (canExecuteRefund || hasPermission(session.role, "requestRefunds")) && refundable > 0;
 
   const timeline: { label: string; at: Date | null }[] = [
     { label: t(d, "orderDetail.placed"), at: order.placedAt ?? order.createdAt },
@@ -220,6 +222,12 @@ export default async function OrderDetailPage({
                     {r.status === "FAILED" && (
                       <span className="ml-1 text-red-600">{t(d, "orderDetail.failed")}</span>
                     )}
+                    {r.status === "PENDING" && (
+                      <span className="ml-1 text-amber-600">awaiting approval</span>
+                    )}
+                    {r.status === "REJECTED" && (
+                      <span className="ml-1 text-ink/40">declined</span>
+                    )}
                     {r.reason ? ` · ${r.reason}` : ""}
                     {r.createdByName ? ` · ${r.createdByName}` : ""}
                   </span>
@@ -237,6 +245,7 @@ export default async function OrderDetailPage({
                 refundable={refundable}
                 currency={cur}
                 online={order.paymentMethod === "ONLINE"}
+                canExecute={canExecuteRefund}
               />
             </div>
           )}
