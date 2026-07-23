@@ -770,6 +770,10 @@ model RestaurantTable {
   isActive     Boolean    @default(true)
   areaId       String?
   area         TableArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  // Position on the visual floor-plan canvas, as a 0-100 percentage of the
+  // canvas width/height. Null = not yet placed (falls back to the grid view).
+  posX         Float?
+  posY         Float?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
@@ -22,7 +23,7 @@ export default async function FloorPage() {
     prisma.restaurantTable.findMany({
       where: { restaurantId: restaurant.id, isActive: true },
       orderBy: { label: "asc" },
-      select: { id: true, label: true, kind: true },
+      select: { id: true, label: true, kind: true, posX: true, posY: true },
     }),
     // Open (unpaid, non-cancelled) orders define which tables are occupied.
     prisma.order.findMany({
@@ -53,10 +54,42 @@ export default async function FloorPage() {
       <LiveStream />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="font-display text-3xl font-medium text-ink">{t(d, "floor.title")}</h1>
-        <span className="text-sm text-ink/45">
-          {occupiedCount} {t(d, "floor.occupiedLower")} · {tables.length - occupiedCount} {t(d, "floor.freeLower")}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-ink/45">
+            {occupiedCount} {t(d, "floor.occupiedLower")} · {tables.length - occupiedCount} {t(d, "floor.freeLower")}
+          </span>
+          <Link
+            href="/admin/floor/layout"
+            className="rounded-lg border border-sand-300 bg-surface px-3 py-1.5 text-xs font-medium text-ink hover:border-brand-300"
+          >
+            Edit layout
+          </Link>
+        </div>
       </div>
+
+      {tables.some((tbl) => tbl.posX !== null && tbl.posY !== null) && (
+        <div className="relative aspect-[4/3] w-full max-w-2xl rounded-2xl border border-sand-200 bg-sand-100/40">
+          {tables
+            .filter((tbl) => tbl.posX !== null && tbl.posY !== null)
+            .map((tbl) => {
+              const occupied = byTable.has(tbl.id);
+              return (
+                <div
+                  key={tbl.id}
+                  className={`absolute flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-lg border text-[10px] font-medium ${
+                    occupied
+                      ? "border-brand-400 bg-brand-500 text-white"
+                      : "border-sand-300 bg-surface text-ink/70"
+                  }`}
+                  style={{ left: `${tbl.posX}%`, top: `${tbl.posY}%` }}
+                  title={seatLabel(tbl)}
+                >
+                  {tbl.label}
+                </div>
+              );
+            })}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {tables.map((tbl) => {
