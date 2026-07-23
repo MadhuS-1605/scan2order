@@ -27,7 +27,15 @@ export async function deleteRegisterAction(formData: FormData): Promise<void> {
 export async function openCashShiftAction(formData: FormData): Promise<void> {
   const session = await requireAdminWithPermission("orders");
   const openingFloat = Math.max(0, Number(formData.get("openingFloat") ?? 0) || 0);
-  const registerId = String(formData.get("registerId") ?? "") || null;
+  const registerIdRaw = String(formData.get("registerId") ?? "") || null;
+  // Registers are picked from a <select> of the venue's own options, but a
+  // Server Action is invocable with arbitrary FormData — re-verify the id
+  // actually belongs to this restaurant before attaching it to the shift,
+  // same as every other cross-entity reference in this file.
+  const register = registerIdRaw
+    ? await prisma.register.findFirst({ where: { id: registerIdRaw, restaurantId: session.restaurantId } })
+    : null;
+  if (registerIdRaw && !register) return;
 
   const open = await prisma.cashShift.findFirst({
     where: { adminUserId: session.sub, closedAt: null },
@@ -35,7 +43,12 @@ export async function openCashShiftAction(formData: FormData): Promise<void> {
   if (open) return; // one open shift per staff member at a time
 
   await prisma.cashShift.create({
-    data: { restaurantId: session.restaurantId, adminUserId: session.sub, openingFloat, registerId },
+    data: {
+      restaurantId: session.restaurantId,
+      adminUserId: session.sub,
+      openingFloat,
+      registerId: register?.id ?? null,
+    },
   });
   revalidate();
 }
