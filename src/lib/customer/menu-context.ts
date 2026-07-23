@@ -15,7 +15,13 @@ import type { Item } from "@/lib/customer/cart";
 export type MenuContext = {
   qrToken: string;
   restaurantId: string;
-  restaurant: { name: string; currency: string; groupName: string | null; logoUrl: string | null };
+  restaurant: {
+    name: string;
+    currency: string;
+    groupName: string | null;
+    logoUrl: string | null;
+    brandColor: string | null;
+  };
   table: { label: string; kind: string };
   config: {
     paymentTiming: string;
@@ -158,6 +164,7 @@ export async function getMenuContext(): Promise<MenuContext | null> {
       currency: config.currency,
       groupName: restaurant.group?.name ?? null,
       logoUrl: restaurant.logoUrl,
+      brandColor: restaurant.brandColor,
     },
     table: { label: table.label, kind: table.kind },
     config: {

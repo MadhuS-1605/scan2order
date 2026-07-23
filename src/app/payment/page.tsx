@@ -8,6 +8,7 @@ import { getActiveTableToken } from "@/lib/table-session";
 import { CustomerHeader, PoweredBy } from "@/components/customer-header";
 import { CustomerTabBar } from "@/components/diner/tab-bar";
 import { BillClient } from "@/components/diner/bill-client";
+import { BrandTheme } from "@/components/diner/brand-theme";
 
 
 export default async function PaymentPage({
@@ -121,6 +122,7 @@ export default async function PaymentPage({
   }
 
   return (
+    <BrandTheme color={entry.restaurant.brandColor}>
     <div className="min-h-screen bg-grain">
       <CustomerHeader
         restaurantName={entry.restaurant.name}
@@ -230,6 +232,7 @@ export default async function PaymentPage({
       </div>
       <CustomerTabBar />
     </div>
+    </BrandTheme>
   );
 }
 

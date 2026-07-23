@@ -36,6 +36,7 @@ export async function updateProfileAction(
       postalCode: d.postalCode || null,
       fssaiNumber: d.fssaiNumber || null,
       logoUrl: d.logoUrl || null,
+      brandColor: d.brandColor || null,
     },
   });
   revalidatePath("/admin/settings");

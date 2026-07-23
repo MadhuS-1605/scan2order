@@ -45,6 +45,11 @@ export const profileSchema = z.object({
     .refine((u) => /^https?:\/\//i.test(u), "Use an http(s) URL")
     .optional()
     .or(z.literal("")),
+  brandColor: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Use a hex color like #2a6f4b")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const settingsSchema = z.object({

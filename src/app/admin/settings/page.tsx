@@ -26,6 +26,7 @@ export default async function SettingsPage() {
           postalCode: restaurant.postalCode,
           fssaiNumber: restaurant.fssaiNumber,
           logoUrl: restaurant.logoUrl,
+          brandColor: restaurant.brandColor,
         }}
         config={{
           orderConfirmation: config.orderConfirmation,

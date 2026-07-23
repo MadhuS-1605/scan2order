@@ -31,6 +31,7 @@ type Profile = {
   postalCode: string | null;
   fssaiNumber: string | null;
   logoUrl: string | null;
+  brandColor: string | null;
 };
 
 type Config = {
@@ -156,6 +157,7 @@ function ProfileForm({ profile }: { profile: Profile }) {
     updateProfileAction,
     {},
   );
+  const [customColor, setCustomColor] = useState(Boolean(profile.brandColor));
   return (
     <Card>
       <h2 className="font-semibold text-ink">{tr("settings.businessProfile")}</h2>
@@ -218,6 +220,27 @@ function ProfileForm({ profile }: { profile: Profile }) {
         </Field>
         <Field label={tr("settings.logoUrl")} htmlFor="s-logo" hint={tr("settings.logoUrlHint")}>
           <ImageUpload name="logoUrl" kind="logo" defaultValue={profile.logoUrl ?? ""} />
+        </Field>
+        <Field label="Brand color" htmlFor="s-brand-color" hint="Accent color for your guest-facing menu & bill.">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-ink/70">
+              <input
+                type="checkbox"
+                checked={customColor}
+                onChange={(e) => setCustomColor(e.target.checked)}
+              />
+              Use a custom color
+            </label>
+            {customColor && (
+              <input
+                id="s-brand-color"
+                type="color"
+                name="brandColor"
+                defaultValue={profile.brandColor ?? "#d93d0b"}
+                className="h-10 w-14 cursor-pointer rounded border border-sand-300 bg-surface p-1"
+              />
+            )}
+          </div>
         </Field>
         <div className="flex justify-end">
           <Button type="submit" disabled={pending}>

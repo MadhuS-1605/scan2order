@@ -342,6 +342,10 @@ model Restaurant {
   // FSSAI food-licence number, printed on the bill (Indian compliance).
   fssaiNumber            String?
   logoUrl                String?
+  // Hex accent color (e.g. "#2a6f4b") applied to the diner-facing menu/bill —
+  // "Powered by Scan2Order" branding stays, but the accent color is the
+  // venue's own. Null falls back to Scan2Order's default brand color.
+  brandColor             String?
   // Restaurant-chosen username used as the public subdomain (e.g. "spicegarden"
   // -> spicegarden.scan.to). Unique across the platform.
   subdomain              String?          @unique
