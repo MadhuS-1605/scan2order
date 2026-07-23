@@ -20,6 +20,10 @@ enum RestaurantType {
   CLOUD_KITCHEN
   BAR
   QSR // fast food / self-serve restaurant (order at counter, pay first, pick up)
+  BAKERY
+  PIZZERIA
+  BURGER_JOINT
+  OTHER
 }
 
 enum AdminRole {

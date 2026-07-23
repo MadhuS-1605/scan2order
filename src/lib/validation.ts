@@ -25,6 +25,10 @@ export const restaurantTypeEnum = z.enum([
   "CLOUD_KITCHEN",
   "BAR",
   "QSR",
+  "BAKERY",
+  "PIZZERIA",
+  "BURGER_JOINT",
+  "OTHER",
 ]);
 
 export const profileSchema = z.object({

@@ -68,6 +68,10 @@ export function ProfileStep({ restaurant }: { restaurant: RestaurantLike }) {
             <option value="QSR">Fast Food (Self-Serve Restaurant)</option>
             <option value="CLOUD_KITCHEN">Cloud kitchen</option>
             <option value="BAR">Bar</option>
+            <option value="BAKERY">Bakery</option>
+            <option value="PIZZERIA">Pizzeria</option>
+            <option value="BURGER_JOINT">Burger joint</option>
+            <option value="OTHER">Other</option>
           </Select>
         </Field>
         <Field label="How do guests order?" htmlFor="serviceModel">

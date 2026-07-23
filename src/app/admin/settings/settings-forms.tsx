@@ -177,6 +177,11 @@ function ProfileForm({ profile }: { profile: Profile }) {
               <option value="HOTEL">{tr("settings.typeHotel")}</option>
               <option value="CLOUD_KITCHEN">{tr("settings.typeCloudKitchen")}</option>
               <option value="BAR">{tr("settings.typeBar")}</option>
+              <option value="QSR">{tr("settings.typeQsr")}</option>
+              <option value="BAKERY">{tr("settings.typeBakery")}</option>
+              <option value="PIZZERIA">{tr("settings.typePizzeria")}</option>
+              <option value="BURGER_JOINT">{tr("settings.typeBurgerJoint")}</option>
+              <option value="OTHER">{tr("settings.typeOther")}</option>
             </Select>
           </Field>
           <Field label={tr("settings.phone")} htmlFor="s-phone">

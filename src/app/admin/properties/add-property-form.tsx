@@ -38,6 +38,11 @@ export function AddPropertyForm() {
             <option value="HOTEL">{tr("properties.typeHotel")}</option>
             <option value="CLOUD_KITCHEN">{tr("properties.typeCloudKitchen")}</option>
             <option value="BAR">{tr("properties.typeBar")}</option>
+            <option value="QSR">{tr("properties.typeQsr")}</option>
+            <option value="BAKERY">{tr("properties.typeBakery")}</option>
+            <option value="PIZZERIA">{tr("properties.typePizzeria")}</option>
+            <option value="BURGER_JOINT">{tr("properties.typeBurgerJoint")}</option>
+            <option value="OTHER">{tr("properties.typeOther")}</option>
           </Select>
         </Field>
         <div className="sm:col-span-2">
