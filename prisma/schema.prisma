@@ -360,6 +360,7 @@ model Restaurant {
   menuItems         MenuItem[]
   ingredients       Ingredient[]
   ingredientLedger  IngredientLedgerEntry[]
+  expenses          Expense[]
   tables            RestaurantTable[]
   tableAreas        TableArea[]
   orders            Order[]
@@ -1356,6 +1357,24 @@ model PaymentReconciliationEvent {
 
   @@index([type, createdAt])
   @@map("payment_reconciliation_events")
+}
+
+// Tenant operating expenses (rent, utilities, supplies, salaries, ...) —
+// closes the "Expenses Management" gap vs. competitors. Independent of
+// billing/invoicing; purely for the venue's own cost tracking.
+model Expense {
+  id            String     @id @default(cuid())
+  restaurantId  String
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category      String
+  amount        Decimal    @db.Decimal(10, 2)
+  note          String?
+  incurredAt    DateTime
+  createdByName String?
+  createdAt     DateTime   @default(now())
+
+  @@index([restaurantId, incurredAt])
+  @@map("expenses")
 }
 
 // ---------------------------------------------------------------------------

@@ -33,6 +33,7 @@ import {
   Undo2,
   MonitorSmartphone,
   Smartphone,
+  Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
@@ -88,6 +89,7 @@ const GROUPS: { heading: string; links: NavLink[] }[] = [
     links: [
       { href: "/admin/analytics", label: "Analytics", perm: "analytics", icon: BarChart3 },
       { href: "/admin/reports", label: "Reports", perm: "analytics", icon: Receipt },
+      { href: "/admin/expenses", label: "Expenses", perm: "settings", icon: Wallet },
       { href: "/admin/customers", label: "Guests", perm: "analytics", icon: Contact },
       { href: "/admin/feedback", label: "Feedback", perm: "analytics", icon: Star },
       { href: "/admin/export", label: "Export", perm: "analytics", icon: Download },
