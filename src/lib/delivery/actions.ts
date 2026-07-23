@@ -64,16 +64,23 @@ export async function advanceDeliveryStatusAction(formData: FormData): Promise<v
   const orderId = String(formData.get("orderId"));
   const order = await prisma.order.findFirst({
     where: { id: orderId, restaurantId: session.restaurantId, fulfillment: "DELIVERY" },
-    select: { deliveryStatus: true },
+    select: { deliveryStatus: true, paymentStatus: true },
   });
   const next = order?.deliveryStatus ? NEXT[order.deliveryStatus] : undefined;
   if (!next) return;
+
+  // Cash-on-delivery orders (paymentMethod COUNTER, settled when the rider
+  // collects payment) are still UNPAID at drop-off — auto-completing on
+  // DELIVERED regardless of payment status let a COD order vanish from both
+  // the delivery board and the active-orders board before anyone actually
+  // collected the money. Only complete once it's actually paid.
+  const completing = next === "DELIVERED" && order?.paymentStatus === "PAID";
 
   await prisma.order.update({
     where: { id: orderId },
     data: {
       deliveryStatus: next,
-      ...(next === "DELIVERED" ? { status: "COMPLETED" } : {}),
+      ...(completing ? { status: "COMPLETED" } : {}),
     },
   });
   emitEvent({ type: "order.updated", restaurantId: session.restaurantId, orderId });

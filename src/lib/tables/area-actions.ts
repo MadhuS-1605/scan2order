@@ -30,10 +30,19 @@ export async function deleteAreaAction(formData: FormData): Promise<void> {
 export async function assignTableAreaAction(formData: FormData): Promise<void> {
   const session = await requireAdminWithPermission("tables");
   const tableId = String(formData.get("tableId"));
-  const areaId = String(formData.get("areaId") ?? "");
+  const areaIdRaw = String(formData.get("areaId") ?? "") || null;
+  // A <select> only ever offers this tenant's own areas, but a Server Action
+  // is invocable with arbitrary FormData — re-verify the area actually
+  // belongs to this restaurant before attaching it, same as every other
+  // cross-entity reference elsewhere in this codebase.
+  const area = areaIdRaw
+    ? await prisma.tableArea.findFirst({ where: { id: areaIdRaw, restaurantId: session.restaurantId } })
+    : null;
+  if (areaIdRaw && !area) return;
+
   await prisma.restaurantTable.updateMany({
     where: { id: tableId, restaurantId: session.restaurantId },
-    data: { areaId: areaId || null },
+    data: { areaId: area?.id ?? null },
   });
   revalidate();
 }

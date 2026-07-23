@@ -74,8 +74,9 @@ function parseDenomination(formData: FormData): { total: number; breakdown: Reco
 }
 
 // Closes the staff member's own open shift. Expected cash = opening float +
-// paid COUNTER orders during the shift window (see the schema comment on
-// CashShift for the updatedAt-as-paidAt approximation this relies on).
+// paid COUNTER orders − COUNTER refunds during the shift window (see the
+// schema comment on CashShift for the updatedAt-as-paidAt approximation the
+// orders side relies on).
 export async function closeCashShiftAction(formData: FormData): Promise<void> {
   const session = await requireAdminWithPermission("orders");
   const id = String(formData.get("id"));
@@ -94,7 +95,22 @@ export async function closeCashShiftAction(formData: FormData): Promise<void> {
     },
     _sum: { amountPaid: true },
   });
-  const expectedCash = toNumber(shift.openingFloat) + toNumber(paidCounter._sum.amountPaid ?? 0);
+  // Cash handed back during the shift reduces what should be in the drawer —
+  // a COUNTER refund otherwise showed up nowhere, so every cash refund
+  // during a shift created a phantom "shortage" against the cashier at close.
+  const counterRefunds = await prisma.refund.aggregate({
+    where: {
+      restaurantId: session.restaurantId,
+      method: "COUNTER",
+      status: "DONE",
+      createdAt: { gte: shift.openedAt, lte: closedAt },
+    },
+    _sum: { amount: true },
+  });
+  const expectedCash =
+    toNumber(shift.openingFloat) +
+    toNumber(paidCounter._sum.amountPaid ?? 0) -
+    toNumber(counterRefunds._sum.amount ?? 0);
   const { total: closingCounted, breakdown } = parseDenomination(formData);
   const variance = closingCounted - expectedCash;
 
