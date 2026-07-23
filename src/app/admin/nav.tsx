@@ -35,6 +35,7 @@ import {
   Smartphone,
   Wallet,
   Banknote,
+  Bike,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
@@ -65,6 +66,7 @@ const GROUPS: { heading: string; links: NavLink[] }[] = [
       { href: "/admin/notifications", label: "Notifications", perm: "overview", icon: Bell },
       { href: "/admin/orders", label: "Orders", perm: "orders", icon: ShoppingBag },
       { href: "/admin/cash-shifts", label: "Cash register", perm: "orders", icon: Banknote },
+      { href: "/admin/delivery", label: "Delivery", perm: "orders", icon: Bike },
       { href: "/admin/refunds", label: "Refunds", perm: "refunds", icon: Undo2 },
       { href: "/admin/floor", label: "Floor", perm: "orders", icon: LayoutGrid },
       { href: "/admin/kitchen", label: "Kitchen", perm: "kitchen", icon: ChefHat },

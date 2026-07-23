@@ -133,6 +133,30 @@ enum Fulfillment {
   DELIVERY
 }
 
+enum DeliveryStatus {
+  UNASSIGNED
+  ASSIGNED
+  OUT_FOR_DELIVERY
+  DELIVERED
+}
+
+// A delivery rider/executive — closes the "Delivery Executive" gap vs.
+// competitors. Assigned to DELIVERY-fulfillment orders for tracking.
+model DeliveryRider {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String?
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+
+  orders Order[]
+
+  @@index([restaurantId])
+  @@map("delivery_riders")
+}
+
 enum PushRole {
   RESTAURANT // admin/kitchen device — alerts on new orders
   CUSTOMER // diner device — alerts on their order status
@@ -365,6 +389,7 @@ model Restaurant {
   purchaseOrders    PurchaseOrder[]
   cashShifts        CashShift[]
   registers         Register[]
+  deliveryRiders    DeliveryRider[]
   tables            RestaurantTable[]
   tableAreas        TableArea[]
   orders            Order[]
@@ -894,6 +919,10 @@ model Order {
   // Fulfilment. DINE_IN by default; DELIVERY carries the address.
   fulfillment     Fulfillment @default(DINE_IN)
   deliveryAddress String?
+  // Rider assignment/tracking for DELIVERY orders — null for DINE_IN/PICKUP.
+  deliveryRiderId String?
+  deliveryRider   DeliveryRider?  @relation(fields: [deliveryRiderId], references: [id], onDelete: SetNull)
+  deliveryStatus  DeliveryStatus?
 
   paymentStatus PaymentStatus  @default(UNPAID)
   paymentMethod PaymentMethod?

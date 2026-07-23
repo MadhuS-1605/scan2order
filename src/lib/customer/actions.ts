@@ -383,6 +383,7 @@ export async function placeOrderAction(
         notes: data.notes ?? null,
         fulfillment,
         deliveryAddress: deliveryAddress || null,
+        deliveryStatus: fulfillment === "DELIVERY" ? "UNASSIGNED" : null,
         presence,
         distanceM,
         confirmedAt: autoConfirm ? new Date() : null,
