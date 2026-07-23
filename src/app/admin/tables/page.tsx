@@ -81,7 +81,7 @@ export default async function TablesPage() {
         <Card className="max-w-xs">
           <h2 className="mb-1 font-semibold text-ink">Self-service kiosk</h2>
           <p className="mb-2 text-xs text-ink/55">
-            Pin a tablet's browser (in kiosk mode) to this URL for walk-up ordering with no QR scan needed.
+            Pin a tablet&apos;s browser (in kiosk mode) to this URL for walk-up ordering with no QR scan needed.
           </p>
           <p className="break-all text-[10px] text-brand-600">
             {baseUrl}/kiosk/{restaurant.slug}

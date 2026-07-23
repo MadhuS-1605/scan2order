@@ -39,7 +39,7 @@ export default function AboutPage() {
           </h1>
           <p className="mt-5 text-lg leading-relaxed text-ink/70">
             A guest waiting for a menu, a waiter juggling six tables, a kitchen finding out an
-            order was wrong only after it's plated — these are solvable problems. Scan2Order
+            order was wrong only after it&apos;s plated — these are solvable problems. Scan2Order
             replaces the parts of dining that are just friction (flagging someone down to order,
             splitting a bill by hand, chasing a printed KOT) with a scan and a screen, so the
             people running the venue can spend their attention on the food and the guests, not
@@ -64,7 +64,7 @@ export default function AboutPage() {
 
       <section className="mx-auto max-w-3xl px-6 pb-20 text-center">
         <Reveal>
-          <h2 className="font-display text-2xl text-ink">Who it's for</h2>
+          <h2 className="font-display text-2xl text-ink">Who it&apos;s for</h2>
           <p className="mt-3 text-ink/65">
             Restaurants, cafés, bars, cloud kitchens, bakeries, pizzerias, burger joints, QSRs
             and hotels — anywhere a guest orders and someone in the back needs to know about it

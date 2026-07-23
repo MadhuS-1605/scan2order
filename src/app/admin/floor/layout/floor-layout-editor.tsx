@@ -47,7 +47,7 @@ export function FloorLayoutEditor({ tables }: { tables: Table[] }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-ink/55">Drag tables to match your venue's real layout.</p>
+        <p className="text-sm text-ink/55">Drag tables to match your venue&apos;s real layout.</p>
         <Button size="sm" onClick={handleSave} disabled={saving}>
           {saving ? "Saving…" : saved ? "Saved ✓" : "Save layout"}
         </Button>

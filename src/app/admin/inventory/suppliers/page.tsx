@@ -72,7 +72,7 @@ export default async function SuppliersPage() {
         <section className="space-y-3">
           <h2 className="font-display text-xl text-ink">Add to a purchase order</h2>
           <p className="text-sm text-ink/45">
-            Adds a line to the supplier's open draft order (creates one if none exists).
+            Adds a line to the supplier&apos;s open draft order (creates one if none exists).
           </p>
           <Card>
             <form action={addPurchaseOrderLineAction} className="flex flex-wrap items-end gap-2">

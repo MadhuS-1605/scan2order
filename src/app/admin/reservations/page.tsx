@@ -72,7 +72,7 @@ export default async function ReservationsPage() {
         <Card className="max-w-xl">
           <h2 className="mb-1 font-semibold text-ink">Slot capacity</h2>
           <p className="mb-3 text-xs text-ink/45">
-            Cap total guests per time slot so reservations can't overbook a service. Leave capacity
+            Cap total guests per time slot so reservations can&apos;t overbook a service. Leave capacity
             blank for no limit.
           </p>
           <form action={setReservationCapacityAction} className="flex flex-wrap items-end gap-2">
