@@ -313,22 +313,32 @@ rest of the app:
   on/off availability), ingredient stock **never blocks a sale** — it's for
   cost/wastage visibility, not an oversell guard. `Supplier` +
   `PurchaseOrder`/`PurchaseOrderLine` (DRAFT → RECEIVED) feed the same ledger
-  when a PO is marked received. `/admin/inventory/reports` aggregates the
-  ledger into a usage/wastage/cost view.
+  when a PO is marked received. Every ledger write snapshots the ingredient's
+  cost at that moment (`IngredientLedgerEntry.costPerUnit`), so a later price
+  change doesn't retroactively re-price historical usage/wastage; entries
+  from before this field existed fall back to the ingredient's current cost.
+  `/admin/inventory/reports` aggregates the ledger into a usage/wastage/cost
+  view.
 - **Combos** — a combo is just a `MenuItem` with `isCombo = true` plus
   `ComboLine` rows (other menu items + quantity) that are **display-only**
   (shown to guests as "Includes: …"). The combo is priced, cart-added, and
   ordered exactly like any other menu item — no changes to
   cart/checkout/order-creation were needed.
-- **Cash register** — `CashShift` (one open shift per `AdminUser` at a time:
-  opening float → denomination-counted close, with `expectedCash` derived from
-  paid `COUNTER` orders during the shift window and a computed `variance`) and
-  `Register` (a named physical counter a shift can attach to, for venues
-  running multiple simultaneous billing counters).
+- **Cash register** — `CashShift` (one open shift per `AdminUser` per
+  restaurant at a time: opening float → denomination-counted close, with
+  `expectedCash` derived from paid `COUNTER` orders explicitly attributed to
+  that shift via `Order.cashShiftId` — set once, at settlement time, by
+  `markPaidAction` — minus `COUNTER` refunds during the shift window, and a
+  computed `variance`). Exact attribution (rather than inferring by time
+  window) means two registers with concurrently open shifts never both claim
+  the same payment. `Register` (a named physical counter a shift can attach
+  to, for venues running multiple simultaneous billing counters).
 - **Delivery** — `DeliveryRider` + `Order.deliveryStatus`
   (`UNASSIGNED → ASSIGNED → OUT_FOR_DELIVERY → DELIVERED`, set on
   `DELIVERY`-fulfillment orders at creation). Marking `DELIVERED` also
-  completes the order (`status: COMPLETED`).
+  completes the order (`status: COMPLETED`) — unless it's a cash-on-delivery
+  order (`paymentMethod: COUNTER`) still unpaid at drop-off, which stays open
+  until `paymentStatus` is `PAID`.
 
 All four reuse the existing `requireAdminWithPermission`/`hasPermission` guard
 pattern and revalidate their own `/admin/*` path after each mutation — none of

@@ -41,13 +41,13 @@
 - **Image uploads** — upload menu photos & logo straight to cloud storage (per-venue), served via CDN.
 - **Recipe-based inventory** — attach ingredients + quantities to a dish; ingredient stock auto-deducts per order (never blocks a sale — it's for cost visibility, not an oversell guard). Manual **wastage logging**, **low-stock alerts** (menu items and ingredients both), quick restock.
 - **Suppliers & purchase orders** — a supplier directory and purchase orders (draft → received); receiving a PO tops up ingredient stock automatically.
-- **Inventory usage/wastage/cost report** — per-ingredient used/wasted/restocked quantities and cost over a selectable window (7/30/90 days).
+- **Inventory usage/wastage/cost report** — per-ingredient used/wasted/restocked quantities and cost over a selectable window (7/30/90 days), costed at each movement's own price snapshot so later cost changes don't retroactively re-price history.
 - **Inter-outlet stock transfer** — move ingredient stock between sibling outlets in a multi-property group.
 - **Coupons, happy hour & loyalty** — discount codes, time-boxed happy-hour pricing, points for repeat guests.
 - **Reservations & waitlist** — take bookings, confirm via WhatsApp, manage status. Optional **per-slot capacity** (max total guests per time bucket) so a busy service can't be overbooked.
 - **Refunds** — full/partial refunds against paid orders (Razorpay-backed), tracked. Staff without full refund authority (Cashier/Waiter) can **request** one instead — a manager reviews and approves/declines it at `/admin/refunds` before any money moves.
-- **Cash register** — staff open a shift with a counted float, close it by counting the drawer denomination-by-denomination; expected-vs-counted **variance** is flagged. Multiple **named registers/counters** support simultaneous shifts for high-volume venues.
-- **Delivery riders** — assign a rider to a delivery order and track it through assigned → out for delivery → delivered.
+- **Cash register** — staff open a shift with a counted float, close it by counting the drawer denomination-by-denomination; expected-vs-counted **variance** is flagged, with payments attributed to the exact shift that took them so concurrent registers never double-count one. Multiple **named registers/counters** support simultaneous shifts for high-volume venues.
+- **Delivery riders** — assign a rider to a delivery order and track it through assigned → out for delivery → delivered; a cash-on-delivery order stays open until the rider actually collects payment.
 - **Expense tracking** — log operating costs (rent, utilities, supplies, salaries, ...) by category with a period total and category breakdown.
 - **Guest Wi-Fi & brand color** — show the venue's Wi-Fi details on the diner menu, and customize the diner-facing accent color to the venue's own brand (guest pages only — the admin dashboard stays Scan2Order's own look).
 

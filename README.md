@@ -298,9 +298,13 @@ flowchart TD
   the gateway) or decline at `/admin/refunds`.
 - **Cash register**: staff open a shift with a counted opening float and close
   it by counting the drawer denomination-by-denomination; `expectedCash`
-  (float + paid `COUNTER` orders during the shift) vs. counted gives a
-  **variance**. Named **registers/counters** let multiple staff run
-  simultaneous shifts on separate stations (`/admin/cash-shifts`).
+  (float + paid `COUNTER` orders explicitly attributed to that shift via
+  `Order.cashShiftId`, set at settlement time, minus `COUNTER` refunds during
+  the shift window) vs. counted gives a **variance**. Attributing by exact
+  order, not a time window, means two registers with simultaneously open
+  shifts never double-count the same payment. Named **registers/counters**
+  let multiple staff run simultaneous shifts on separate stations
+  (`/admin/cash-shifts`).
 - **Display currency**: an ISO code the venue can pick for on-screen amounts —
   online payments/settlement still run through Razorpay/UPI in INR regardless.
 
@@ -384,7 +388,10 @@ flowchart TD
 - `DeliveryRider` + `Order.deliveryStatus` (UNASSIGNED → ASSIGNED → OUT_FOR_DELIVERY
   → DELIVERED) for DELIVERY-fulfillment orders. `/admin/delivery` manages
   riders and lists active deliveries with an assign-rider dropdown and a
-  one-tap "advance status" button; marking DELIVERED also completes the order.
+  one-tap "advance status" button. Marking DELIVERED also completes the order
+  — except a cash-on-delivery order (`COUNTER`, unpaid until the rider
+  collects), which stays uncompleted until `paymentStatus` is actually `PAID`,
+  so it can't vanish from the active-orders board before the money is in.
 
 ### Self-service kiosk
 - `/kiosk/<slug>` — a "Welcome! Tap to start" attract screen for a
