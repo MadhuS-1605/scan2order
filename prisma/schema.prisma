@@ -360,6 +360,7 @@ model Restaurant {
   menuItems         MenuItem[]
   ingredients       Ingredient[]
   tables            RestaurantTable[]
+  tableAreas        TableArea[]
   orders            Order[]
   refunds           Refund[]
   planPayments      PlanPayment[]
@@ -760,6 +761,8 @@ model RestaurantTable {
   seats        Int        @default(4)
   qrToken      String     @unique // CSPRNG token encoded in the QR — set explicitly via newQrToken() (src/lib/qr.ts), never DB-defaulted
   isActive     Boolean    @default(true)
+  areaId       String?
+  area         TableArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -767,7 +770,24 @@ model RestaurantTable {
   serviceRequests ServiceRequest[]
 
   @@index([restaurantId])
+  @@index([areaId])
   @@map("restaurant_tables")
+}
+
+// A zone/section grouping tables — e.g. "Patio", "Indoor", "Rooftop" — for
+// organizing the tables list. Purely organizational; doesn't affect ordering.
+model TableArea {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+
+  tables RestaurantTable[]
+
+  @@index([restaurantId])
+  @@map("table_areas")
 }
 
 // ---------------------------------------------------------------------------
