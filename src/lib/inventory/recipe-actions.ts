@@ -32,11 +32,53 @@ export async function restockIngredientAction(formData: FormData): Promise<void>
   const id = String(formData.get("id"));
   const amount = Number(formData.get("amount") ?? 0) || 0;
   if (amount === 0) return;
-  await prisma.ingredient.updateMany({
+  const ing = await prisma.ingredient.findFirst({
     where: { id, restaurantId: session.restaurantId },
-    data: { stockQty: { increment: amount } },
   });
+  if (!ing) return;
+  await prisma.$transaction([
+    prisma.ingredient.update({ where: { id }, data: { stockQty: { increment: amount } } }),
+    prisma.ingredientLedgerEntry.create({
+      data: {
+        restaurantId: session.restaurantId,
+        ingredientId: id,
+        delta: amount,
+        reason: "RESTOCK",
+        createdByName: session.name,
+      },
+    }),
+  ]);
   revalidate();
+}
+
+// Manual wastage entry (spillage/spoilage) — decrements stock and logs it
+// separately from order consumption so the inventory report can tell them
+// apart.
+export async function recordWastageAction(formData: FormData): Promise<void> {
+  const session = await requireMenuManager();
+  const id = String(formData.get("id"));
+  const qty = Math.abs(Number(formData.get("qty") ?? 0) || 0);
+  const note = String(formData.get("note") ?? "").trim() || null;
+  if (qty === 0) return;
+  const ing = await prisma.ingredient.findFirst({
+    where: { id, restaurantId: session.restaurantId },
+  });
+  if (!ing) return;
+  await prisma.$transaction([
+    prisma.ingredient.update({ where: { id }, data: { stockQty: { decrement: qty } } }),
+    prisma.ingredientLedgerEntry.create({
+      data: {
+        restaurantId: session.restaurantId,
+        ingredientId: id,
+        delta: -qty,
+        reason: "WASTAGE",
+        note,
+        createdByName: session.name,
+      },
+    }),
+  ]);
+  revalidate();
+  revalidatePath("/admin/inventory/reports");
 }
 
 export async function setIngredientThresholdAction(formData: FormData): Promise<void> {

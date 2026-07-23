@@ -52,7 +52,7 @@ async function recompute(orderId: string) {
   });
 }
 
-async function adjustStock(menuItemId: string | null, delta: number) {
+async function adjustStock(restaurantId: string, menuItemId: string | null, delta: number) {
   if (!menuItemId || delta === 0) return;
   const mi = await prisma.menuItem.findUnique({
     where: { id: menuItemId },
@@ -71,9 +71,13 @@ async function adjustStock(menuItemId: string | null, delta: number) {
   // Recipe ingredients follow the same delta — never blocks the edit, just
   // keeps ingredient stock consistent with what's actually been ordered.
   for (const r of mi.recipeLines) {
+    const qty = delta * toNumber(r.qtyPerServing);
     await prisma.ingredient.update({
       where: { id: r.ingredientId },
-      data: { stockQty: { decrement: delta * toNumber(r.qtyPerServing) } },
+      data: { stockQty: { decrement: qty } },
+    });
+    await prisma.ingredientLedgerEntry.create({
+      data: { restaurantId, ingredientId: r.ingredientId, delta: -qty, reason: "ORDER_CONSUMPTION" },
     });
   }
 }
@@ -156,6 +160,9 @@ export async function createStaffOrderAction(formData: FormData): Promise<void> 
     }
     for (const [ingredientId, qty] of ingredientConsumption) {
       await tx.ingredient.update({ where: { id: ingredientId }, data: { stockQty: { decrement: qty } } });
+      await tx.ingredientLedgerEntry.create({
+        data: { restaurantId: session.restaurantId, ingredientId, delta: -qty, reason: "ORDER_CONSUMPTION" },
+      });
     }
     const r = await tx.restaurant.update({
       where: { id: session.restaurantId },
@@ -232,7 +239,7 @@ export async function addOrderItemAction(formData: FormData): Promise<void> {
       lineTotal: Math.round(unit * quantity * 100) / 100,
     },
   });
-  await adjustStock(mi.id, quantity);
+  await adjustStock(session.restaurantId, mi.id, quantity);
   await recompute(order.id);
   emitEvent({ type: "order.updated", restaurantId: session.restaurantId, orderId: order.id });
   await recordAudit(
@@ -268,7 +275,7 @@ export async function setOrderItemQtyAction(formData: FormData): Promise<void> {
       data: { quantity, lineTotal: Math.round(unit * quantity * 100) / 100 },
     });
   }
-  await adjustStock(item.menuItemId, delta);
+  await adjustStock(session.restaurantId, item.menuItemId, delta);
   await recompute(order.id);
   emitEvent({ type: "order.updated", restaurantId: session.restaurantId, orderId: order.id });
   await recordAudit(

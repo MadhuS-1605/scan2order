@@ -5,6 +5,7 @@ import {
   deleteIngredientAction,
   setRecipeLineAction,
   deleteRecipeLineAction,
+  recordWastageAction,
 } from "@/lib/inventory/recipe-actions";
 import { Button, Input, Select, Card } from "@/components/ui";
 
@@ -99,6 +100,16 @@ export function RecipeManager({
                       </div>
                       <Button size="sm" type="submit">
                         Save
+                      </Button>
+                    </form>
+                    <form action={recordWastageAction} className="flex items-end gap-1">
+                      <input type="hidden" name="id" value={ing.id} />
+                      <div>
+                        <label className="block text-[10px] uppercase text-ink/45">Waste</label>
+                        <Input name="qty" type="number" min="0" step="0.01" placeholder="0" className="w-16" />
+                      </div>
+                      <Button size="sm" variant="secondary" type="submit">
+                        Log
                       </Button>
                     </form>
                     <form action={deleteIngredientAction}>

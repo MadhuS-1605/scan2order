@@ -355,6 +355,9 @@ export async function placeOrderAction(
           where: { id: ingredientId },
           data: { stockQty: { decrement: qty } },
         });
+        await tx.ingredientLedgerEntry.create({
+          data: { restaurantId: restaurant.id, ingredientId, delta: -qty, reason: "ORDER_CONSUMPTION" },
+        });
       }
       const r = await tx.restaurant.update({
         where: { id: restaurant.id },

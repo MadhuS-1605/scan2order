@@ -359,6 +359,7 @@ model Restaurant {
   categories        MenuCategory[]
   menuItems         MenuItem[]
   ingredients       Ingredient[]
+  ingredientLedger  IngredientLedgerEntry[]
   tables            RestaurantTable[]
   tableAreas        TableArea[]
   orders            Order[]
@@ -699,9 +700,36 @@ model Ingredient {
   updatedAt         DateTime @updatedAt
 
   recipeLines RecipeLine[]
+  ledger      IngredientLedgerEntry[]
 
   @@index([restaurantId])
   @@map("ingredients")
+}
+
+enum IngredientLedgerReason {
+  ORDER_CONSUMPTION // deducted automatically for a placed/edited order
+  WASTAGE // manually logged spillage/spoilage
+  RESTOCK // manual restock
+}
+
+// Movement log for ingredient stock — the basis for the usage/wastage/cost
+// report (/admin/inventory/reports). Ingredient.stockQty is the current
+// balance; this is the ledger of how it got there.
+model IngredientLedgerEntry {
+  id           String                 @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant             @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  ingredientId String
+  ingredient   Ingredient             @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  delta        Decimal                @db.Decimal(10, 3) // negative = consumed/wasted, positive = restocked
+  reason       IngredientLedgerReason
+  note         String?
+  createdByName String?
+  createdAt    DateTime               @default(now())
+
+  @@index([restaurantId, createdAt])
+  @@index([ingredientId])
+  @@map("ingredient_ledger_entries")
 }
 
 // How much of an ingredient one serving of a menu item consumes.
