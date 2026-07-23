@@ -32,6 +32,7 @@ import {
   Settings,
   Undo2,
   MonitorSmartphone,
+  Smartphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasPermission, type Permission } from "@/lib/auth/permissions";
@@ -67,6 +68,7 @@ const GROUPS: { heading: string; links: NavLink[] }[] = [
       { href: "/admin/bar", label: "Bar", perm: "kitchen", icon: Wine, feature: "featureBar" },
       { href: "/admin/monitor", label: "Monitor", perm: "monitor", icon: MonitorPlay },
       { href: "/admin/display", label: "Customer display", perm: "orders", icon: MonitorSmartphone },
+      { href: "/captain", label: "Captain (mobile order-taking)", perm: "orders", icon: Smartphone },
     ],
   },
   {
