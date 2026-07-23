@@ -232,16 +232,23 @@ gating does not protect actions, so each action re-checks). The session is a
 `jose` HS256 JWT in the `sto_session` cookie (7-day expiry).
 
 **Permissions:** `overview`, `orders`, `kitchen`, `monitor`, `menu`, `tables`,
-`analytics`, `settings`, `staff`, `properties`.
+`analytics`, `settings`, `staff`, `properties`, `refunds`, `requestRefunds`.
 
-| Role | overview | orders | kitchen | monitor | menu | tables | analytics | settings | staff | properties |
-|------|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| **OWNER**   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| **MANAGER** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
-| **CASHIER** | ✓ | ✓ | — | ✓ | — | — | — | — | — | — |
-| **WAITER**  | ✓ | ✓ | — | ✓ | — | — | — | — | — | — |
-| **KITCHEN** | — | — | ✓ | ✓ | — | — | — | — | — | — |
-| **STAFF**   | ✓ | ✓ | — | ✓ | — | — | — | — | — | — |
+| Role | overview | orders | kitchen | monitor | menu | tables | analytics | settings | staff | properties | refunds | requestRefunds |
+|------|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| **OWNER**   | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **MANAGER** | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | ✓ | ✓ |
+| **CASHIER** | ✓ | ✓ | — | ✓ | — | — | — | — | — | — | — | ✓ |
+| **WAITER**  | ✓ | ✓ | — | ✓ | — | — | — | — | — | — | — | ✓ |
+| **KITCHEN** | — | — | ✓ | ✓ | — | — | — | — | — | — | — | — |
+| **STAFF**   | ✓ | ✓ | — | ✓ | — | — | — | — | — | — | — | — |
+
+`refunds` executes a refund immediately (Razorpay or manual). `requestRefunds`
+(CASHIER/WAITER) instead creates a `PENDING` `Refund` row with no money moved —
+a manager reviews it at `/admin/refunds` and approves (charges the gateway,
+the same code path a direct refund would use) or rejects it. See
+`src/lib/orders/actions.ts` (`refundOrderAction`, `approveRefundAction`,
+`rejectRefundAction`).
 
 **Landing page** after sign-in (`landingFor`): a role with `overview` → `/admin`;
 else `kitchen` → `/admin/kitchen`; else `orders` → `/admin/orders`; else
@@ -254,20 +261,75 @@ permission, and some are additionally gated by venue **feature flags**:
 |----------|-----------|--------------|
 | Overview | overview | — |
 | Orders | orders | — |
+| Cash register | orders | — |
+| Delivery | orders | — |
+| Refunds | refunds | — |
 | Reservations | orders | `featureReservations` |
 | Rooms | orders | `featureRooms` |
 | Banquets | orders | `featureBanquets` |
 | Kitchen | kitchen | — |
+| Bar | kitchen | `featureBar` |
 | Monitor | monitor | — |
+| Customer display | orders | — |
+| Captain (mobile order-taking) | orders | — (lives outside `/admin`, own permission check) |
 | Menu / Coupons / Inventory | menu | — |
 | Tables & QR | tables | — |
-| Feedback / Analytics / Export | analytics | — |
+| Feedback / Analytics / Export / Reports / Expenses / Guests | analytics or settings | — |
 | Staff | staff | — |
+| Attendance | staff | `featureAttendance` |
 | Properties | properties | — |
 | Audit log / Integrations / Plan & billing / Settings | settings | — |
+
+Inventory's sub-pages (recipes/ingredients, suppliers & purchase orders, usage/
+wastage/cost reports) and Tables' floor-plan editor (`/admin/floor/layout`) all
+gate on the same `menu`/`tables` permission as their parent page — see
+[Recipe management, cash register & delivery](#5-recipe-management-cash-register--delivery)
+below.
 
 **Assignable staff roles** (`ASSIGNABLE_ROLES`): MANAGER, CASHIER, WAITER, KITCHEN.
 
 **Super-admin** is orthogonal to roles: `AdminUser.isSuperAdmin = true` grants the
 `/superadmin` console (`requireSuperAdmin` in `src/lib/platform/actions.ts`), which
 can set any restaurant's subscription `PlanTier` (FREE / STARTER / PRO).
+
+---
+
+## 5. Recipe management, cash register & delivery
+
+Three self-contained subsystems added after the initial build, following the
+same "extend the existing order/stock model, don't fork it" approach as the
+rest of the app:
+
+- **Recipe management** — `Ingredient` (raw material: name, unit, stock,
+  low-stock threshold, cost/unit) and `RecipeLine` (how much of an ingredient
+  one serving of a `MenuItem` consumes). Ingredient stock is decremented in the
+  same transaction as the order (both the diner flow in
+  `src/lib/customer/actions.ts` and staff orders/edits in
+  `src/lib/orders/staff-actions.ts`'s `adjustStock`), and every stock movement
+  — order consumption, manual restock, wastage, a received purchase order, or
+  an inter-outlet transfer — is written to `IngredientLedgerEntry` (reason:
+  `ORDER_CONSUMPTION` / `RESTOCK` / `WASTAGE` / `TRANSFER_OUT` /
+  `TRANSFER_IN`). Unlike `MenuItem.trackStock` (which gates a dish's own
+  on/off availability), ingredient stock **never blocks a sale** — it's for
+  cost/wastage visibility, not an oversell guard. `Supplier` +
+  `PurchaseOrder`/`PurchaseOrderLine` (DRAFT → RECEIVED) feed the same ledger
+  when a PO is marked received. `/admin/inventory/reports` aggregates the
+  ledger into a usage/wastage/cost view.
+- **Combos** — a combo is just a `MenuItem` with `isCombo = true` plus
+  `ComboLine` rows (other menu items + quantity) that are **display-only**
+  (shown to guests as "Includes: …"). The combo is priced, cart-added, and
+  ordered exactly like any other menu item — no changes to
+  cart/checkout/order-creation were needed.
+- **Cash register** — `CashShift` (one open shift per `AdminUser` at a time:
+  opening float → denomination-counted close, with `expectedCash` derived from
+  paid `COUNTER` orders during the shift window and a computed `variance`) and
+  `Register` (a named physical counter a shift can attach to, for venues
+  running multiple simultaneous billing counters).
+- **Delivery** — `DeliveryRider` + `Order.deliveryStatus`
+  (`UNASSIGNED → ASSIGNED → OUT_FOR_DELIVERY → DELIVERED`, set on
+  `DELIVERY`-fulfillment orders at creation). Marking `DELIVERED` also
+  completes the order (`status: COMPLETED`).
+
+All four reuse the existing `requireAdminWithPermission`/`hasPermission` guard
+pattern and revalidate their own `/admin/*` path after each mutation — none of
+them introduced a new permission except `refunds`/`requestRefunds` (§4 above).

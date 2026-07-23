@@ -11,10 +11,13 @@
 - **QR scan-to-order** — each table has its own QR; the guest scans, the menu opens instantly on their phone. No app install.
 - **Live digital menu** — categories, photos, veg/non-veg marks, chef's specials, "special of the day", prep-time estimate, happy-hour pricing.
 - **Item availability** — sold-out / "86'd" items and out-of-stock (inventory) items hide automatically.
-- **Modifiers & options** — add-ons and choices per item (e.g. size, extra cheese), with price deltas.
+- **Modifiers & options** — add-ons and choices per item (e.g. size, extra cheese), with price deltas. Required single-select groups double as **variant/size pricing** (e.g. Small/Medium/Large).
+- **Combos & meal bundles** — a combo is an orderable item that lists what it includes ("Includes: 1× Burger, 1× Fries, 1× Coke") at its own bundle price.
+- **Guest Wi-Fi** — the venue's Wi-Fi name/password shown on the menu (behind a tap, when configured).
 - **Cart & ordering** — add to cart, place order; order goes to the kitchen (instantly, or after a waiter confirms — configurable).
 - **Order tracking** — live status (placed → preparing → ready → served) on the guest's phone.
-- **Multiple service models** — dine-in (per table), self-service / counter / QSR (pay-first, pick up by number), and takeaway / delivery (cloud kitchens) with address capture.
+- **Multiple service models** — dine-in (per table), self-service / counter / QSR (pay-first, pick up by number), and takeaway / delivery (cloud kitchens) with address capture. A **self-service kiosk** attract-screen (`/kiosk/<slug>`) is available for tablets pinned in kiosk mode.
+- **Venue types** — Restaurant, Café, Hotel, Bar, QSR, Cloud kitchen, Bakery, Pizzeria, Burger joint, or Other — each seeds sensible module/service defaults at onboarding (see [docs/ONBOARDING.md](ONBOARDING.md)).
 - **Pay how they like** — pay online (Razorpay), scan-to-pay UPI on the bill, or pay at the counter.
 - **Bill delivery** — itemised GST bill as PDF, sent via WhatsApp or email, or downloaded.
 - **Feedback & ratings** — 1–5 star rating + comment after the meal; happy guests are nudged to your public review page.
@@ -26,17 +29,27 @@
 - **Orders board** — every incoming order, statuses, per-item progress.
 - **Kitchen Display (KDS)** — live ticket screen for the kitchen; mark items/orders ready.
 - **Bar Display** — separate KDS for the bar (drinks routed to bar station).
-- **Floor view** — table map / status at a glance.
+- **Floor view** — table map / status at a glance, plus a **visual drag-and-drop floor-plan editor** (`/admin/floor/layout`) that matches the venue's real room layout.
+- **Table areas/zones** — group tables into named zones (Patio, Indoor, Rooftop) for organization; purely organizational, doesn't affect ordering.
+- **Customer-facing display** — a second screen (tablet/monitor facing the guest at a counter) showing the current order and running total live, so guests see pricing update as staff ring items in.
+- **Captain (mobile order-taking)** — a distraction-free, no-sidebar version of staff order-taking meant for a waiter's own phone (`/captain`), reusing the same POS component and action as `/admin/orders/new`.
 - **Waiter-confirm flow** — optional approval step before orders reach the kitchen.
 - **KOT thermal printing** — kitchen order tickets to a network printer.
 - **Table-shared billing** — everyone at a table shares one running bill; settle or clear per table.
 - **Move / merge / clear tables** — handle walk-outs and seating changes.
-- **Menu management** — categories & items, prices, photos (uploaded to CDN), veg flags, specials, availability windows (time-of-day), drag-free **reorder (move up/down)**, **CSV import/export**, starter-menu templates.
+- **Menu management** — categories & items, prices, photos (uploaded to CDN), veg flags, specials, availability windows (time-of-day), drag-free **reorder (move up/down)**, **CSV import/export**, starter-menu templates. Items can be marked as **combos** with included items listed for guests.
 - **Image uploads** — upload menu photos & logo straight to cloud storage (per-venue), served via CDN.
-- **Inventory & stock** — per-item stock tracking, auto-hide at zero, **low-stock alerts**, quick restock.
+- **Recipe-based inventory** — attach ingredients + quantities to a dish; ingredient stock auto-deducts per order (never blocks a sale — it's for cost visibility, not an oversell guard). Manual **wastage logging**, **low-stock alerts** (menu items and ingredients both), quick restock.
+- **Suppliers & purchase orders** — a supplier directory and purchase orders (draft → received); receiving a PO tops up ingredient stock automatically.
+- **Inventory usage/wastage/cost report** — per-ingredient used/wasted/restocked quantities and cost over a selectable window (7/30/90 days).
+- **Inter-outlet stock transfer** — move ingredient stock between sibling outlets in a multi-property group.
 - **Coupons, happy hour & loyalty** — discount codes, time-boxed happy-hour pricing, points for repeat guests.
-- **Reservations & waitlist** — take bookings, confirm via WhatsApp, manage status.
-- **Refunds** — full/partial refunds against paid orders (Razorpay-backed), tracked.
+- **Reservations & waitlist** — take bookings, confirm via WhatsApp, manage status. Optional **per-slot capacity** (max total guests per time bucket) so a busy service can't be overbooked.
+- **Refunds** — full/partial refunds against paid orders (Razorpay-backed), tracked. Staff without full refund authority (Cashier/Waiter) can **request** one instead — a manager reviews and approves/declines it at `/admin/refunds` before any money moves.
+- **Cash register** — staff open a shift with a counted float, close it by counting the drawer denomination-by-denomination; expected-vs-counted **variance** is flagged. Multiple **named registers/counters** support simultaneous shifts for high-volume venues.
+- **Delivery riders** — assign a rider to a delivery order and track it through assigned → out for delivery → delivered.
+- **Expense tracking** — log operating costs (rent, utilities, supplies, salaries, ...) by category with a period total and category breakdown.
+- **Guest Wi-Fi & brand color** — show the venue's Wi-Fi details on the diner menu, and customize the diner-facing accent color to the venue's own brand (guest pages only — the admin dashboard stays Scan2Order's own look).
 
 ## 3. Hotels & large venues
 
@@ -55,6 +68,7 @@
 - **FSSAI licence** — printed on the bill (Indian food compliance).
 - **Tax-invoice bill PDF** — branded with logo, footer message, GST breakdown, venue-local time.
 - **Tips / gratuity & discounts** — captured and reported.
+- **Display currency** — an ISO currency code the venue can pick for on-screen amounts (online payments/settlement still run through Razorpay/UPI in INR regardless — this is display-only).
 
 ## 5. Insights & reporting (owners & managers)
 

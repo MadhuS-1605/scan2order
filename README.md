@@ -265,7 +265,17 @@ flowchart TD
   **Occupied** (occupied = has an open bill, with total + idle time). One tap
   frees a table for the next party — **Settle & free** (records payment) or
   **Void & free** (cancels as a walk-out, confirm-gated). Occupancy is derived
-  from open orders (no separate state).
+  from open orders (no separate state). A read-only **spatial mini-map** shows
+  occupied tables at their real positions (see the floor-plan editor below).
+- **Visual floor-plan editor** (`/admin/floor/layout`): drag tables onto a
+  canvas to match the venue's real room (pointer events, works on touch too);
+  "Save layout" bulk-writes every position in one call.
+- **Table areas/zones**: group tables into named zones (Patio, Indoor,
+  Rooftop) from `/admin/tables` — organizational only, doesn't affect ordering
+  or the floor view.
+- **Customer-facing display** (`/admin/display`): open a table/counter's
+  current order full-screen on a second tablet/monitor facing the guest — live
+  item list + running subtotal/tax/total, updating as staff edit the order.
 
 ### Order attribution
 - Every order records **who placed it** and **how**: QR self-order vs. staff/POS
@@ -282,6 +292,17 @@ flowchart TD
   (`ROOM`), settled by the front desk at checkout.
 - A **mock** online-payment path keeps the flow demoable in development when no
   Razorpay keys are set (disabled in production).
+- **Refund approval workflow**: OWNER/MANAGER (`refunds` permission) refund
+  instantly. CASHIER/WAITER (`requestRefunds`) instead submit a request — a
+  `PENDING` `Refund` with no money moved — for a manager to approve (charges
+  the gateway) or decline at `/admin/refunds`.
+- **Cash register**: staff open a shift with a counted opening float and close
+  it by counting the drawer denomination-by-denomination; `expectedCash`
+  (float + paid `COUNTER` orders during the shift) vs. counted gives a
+  **variance**. Named **registers/counters** let multiple staff run
+  simultaneous shifts on separate stations (`/admin/cash-shifts`).
+- **Display currency**: an ISO code the venue can pick for on-screen amounts —
+  online payments/settlement still run through Razorpay/UPI in INR regardless.
 
 ### KOT / kitchen printing
 - ESC/POS Kitchen Order Tickets over TCP (network thermal printer, default
@@ -299,6 +320,14 @@ flowchart TD
 - Base English plus optional per-item translations. Supported codes: en, hi, ta,
   te, kn, ml, bn, mr (`src/lib/languages.ts`).
 
+### Guest Wi-Fi & brand color
+- **Guest Wi-Fi**: `OnboardingConfig.wifiSsid`/`wifiPassword`, shown behind a
+  tap on the diner menu when set (both null → icon hidden).
+- **Brand color**: `Restaurant.brandColor` (hex). When set, `<BrandTheme>`
+  scopes the `brand-*` Tailwind color scale to the venue's own accent via
+  CSS `color-mix()` on the diner-facing pages only (menu/cart/checkout/order/
+  bill) — the admin dashboard and marketing site stay Scan2Order's own look.
+
 ### Loyalty
 - Points credited once per paid order (1 point per ₹10), keyed to the
   phone-identified `Customer`; idempotent via `Order.pointsAwarded`.
@@ -310,6 +339,26 @@ flowchart TD
 ### Inventory
 - Per-item stock tracking: auto-hide at 0, decrement on order, low-stock
   threshold alerts.
+- **Recipe management** (`/admin/inventory/recipes`): `Ingredient` (raw
+  material — name, unit, stock, low-stock threshold, cost/unit) + `RecipeLine`
+  (how much of an ingredient one serving of a dish uses). Ingredient stock
+  auto-decrements per order in the same transaction as the menu-item stock
+  check, but — unlike `trackStock` — **never blocks a sale**; it's for
+  cost/wastage visibility, not an oversell guard.
+- **Inventory ledger & report** (`/admin/inventory/reports`): every stock
+  movement (order consumption, manual restock, wastage, a received purchase
+  order, an inter-outlet transfer) is logged to `IngredientLedgerEntry`;
+  the report aggregates it into per-ingredient used/wasted/restocked
+  quantities and cost over a selectable window.
+- **Suppliers & purchase orders** (`/admin/inventory/suppliers`): a supplier
+  directory and POs (draft → received); receiving one tops up ingredient
+  stock and logs it to the same ledger.
+- **Inter-outlet stock transfer**: move ingredient stock between sibling
+  outlets in a multi-property group (matched by ingredient name, auto-created
+  at the destination if it doesn't exist there yet).
+- **Combos / meal bundles**: mark a menu item as a combo and list what it
+  includes (other menu items + quantity) — display-only; the combo is priced,
+  cart-added and ordered exactly like any other item.
 
 ### Reservations
 - Table bookings + walk-in waitlist with status lifecycle (Pending → Confirmed →
@@ -317,6 +366,9 @@ flowchart TD
 - Waitlist entries show a **queue position (#N)** on the admin cards; a guest
   who joins gets a public, auto-refreshing **live-position page**
   (`/book/[slug]/waitlist/[id]`) linked from their booking confirmation.
+- **Slot capacity**: an optional per-slot cap on total guests (bucket width +
+  max guests configurable at `/admin/reservations`) — a booking that would
+  push a time slot over capacity is rejected instead of created.
 
 ### Hotel rooms & banquets
 - **Rooms**: tables of kind `ROOM` for in-room dining; charge-to-room folio
@@ -327,6 +379,28 @@ flowchart TD
 ### Multi-property
 - A `PropertyGroup` lets one owner manage several outlets under one login and
   switch the active property (`/admin/properties`).
+
+### Delivery
+- `DeliveryRider` + `Order.deliveryStatus` (UNASSIGNED → ASSIGNED → OUT_FOR_DELIVERY
+  → DELIVERED) for DELIVERY-fulfillment orders. `/admin/delivery` manages
+  riders and lists active deliveries with an assign-rider dropdown and a
+  one-tap "advance status" button; marking DELIVERED also completes the order.
+
+### Self-service kiosk
+- `/kiosk/<slug>` — a "Welcome! Tap to start" attract screen for a
+  SELF_SERVICE venue's tablet pinned in kiosk mode; tapping through reuses the
+  normal `/t/<qrToken>` QR-scan flow (no separate ordering path to maintain).
+
+### Captain (mobile order-taking)
+- `/captain` — the same order-taking UI as `/admin/orders/new`
+  (`PosClient`/`createStaffOrderAction`), but living outside `/admin` so it
+  skips the full dashboard sidebar — meant to be bookmarked on a waiter's own
+  phone.
+
+### Expense tracking
+- `/admin/expenses` — log operating costs (rent, utilities, supplies,
+  salaries, maintenance, marketing) by category and date; a period selector
+  (7/30/90/365d) shows the total and a by-category breakdown.
 
 ### Integrations & webhooks
 - A provider catalog (POS / PMS / Accounting / SSO / Webhook). **Outbound
@@ -588,6 +662,11 @@ visit its URL).
 >   `/superadmin` works out of the box) and a demo **UPI ID** (`spicegarden@oksbi`)
 >   plus all per-venue modules enabled. For a real deployment, make **your own**
 >   account the super-admin and keep restaurant-owner accounts non-super.
+> - `prisma/seed.ts` doesn't yet create sample data for the newer modules
+>   (ingredients/recipes, combos, table areas, cash shifts/registers, delivery
+>   riders, expenses, suppliers/purchase orders) — those admin pages will show
+>   their empty state on a freshly seeded demo until you add data through the
+>   UI or extend the seed.
 
 ---
 
@@ -613,18 +692,26 @@ this machine's IPs, and private LAN ranges as dev origins.
 ```
 src/
   app/
-    page.tsx                 Marketing / landing page
+    page.tsx                 Marketing / landing page (hero, FAQ, pricing)
+    features/  about/        Marketing: full feature tour, About page
     (auth)/signin, signup    Owner email auth
     (auth)/r/[code]/signin   Restaurant-scoped staff (username) sign in
     onboarding/              Setup wizard (profile → menu → settings → tables → done)
+    kiosk/[slug]/            Self-service kiosk attract screen (SELF_SERVICE venues)
+    captain/                 Standalone mobile order-taking for waiters (outside /admin)
     admin/                   Admin dashboard (nav + mobile hamburger + layout chrome)
       orders/ (+ new [POS], history [paginated], [orderId] editor + change-table)
-      floor/                 Live table-occupancy view (Free/Occupied, free table)
+      floor/  floor/layout/  Live table-occupancy view + visual drag-and-drop floor-plan editor
+      display/[tableId]/     Customer-facing order/bill display (second screen)
+      cash-shifts/           Cash register: open/close shifts, registers/counters
+      delivery/              Delivery rider assignment & tracking
+      refunds/               Manager approval queue for staff-requested refunds
+      expenses/              Operating-expense tracking
       kitchen/  bar/  monitor/   Kitchen, bar (KDS) + customer-facing board
       kot/[orderId]/         Printable 80mm KOT
       notifications/         Unified alert feed
-      menu/  coupons/  inventory/
-      tables/                Tables & QR
+      menu/  coupons/  inventory/ (+ recipes/, suppliers/, reports/)
+      tables/                Tables & QR + area/zone management
       reservations/  rooms/  banquets/
       feedback/  analytics/  export/  audit/ [paginated]
       staff/  attendance/  properties/  integrations/  billing/  settings/
@@ -647,8 +734,9 @@ src/
       export/[type]/         CSV export
   components/
     diner/                   customer-menu, cart-view, checkout-form, bill-client,
-                             controls, tab-bar, scan-prompt, use-cart
+                             controls, tab-bar, scan-prompt, use-cart, brand-theme
     admin/                   clock-widget, mobile-nav, pager, free-table
+    marketing/               site-header, site-footer, faq, reveal, venue-switcher, ...
   lib/
     auth/                    session (jose JWT), guards (+ live disable/role), permissions, password
     onboarding/              actions + step order
@@ -670,6 +758,12 @@ src/
     i18n-screens.ts  i18n.ts  i18n-actions.ts   admin i18n (en/hi/kn)
     properties/  tenant/     multi-outlet + subdomain resolution
     loyalty.ts  coupons/  inventory/  reservations/  rooms/  banquets/  feedback/
+    inventory/               recipe.ts (ledger math), recipe-actions, supplier-actions, transfer-actions
+    cash/                    cash-shift open/close + register actions
+    delivery/                rider CRUD + assign/advance-status actions
+    expenses/                expense log CRUD
+    tables/                  area-actions (zones), layout-actions (floor-plan positions)
+    menu/                    modifiers (variants/add-ons) + combos (meal bundles)
     pricing.ts               totals + GST + service charge + happy hour + round2
     languages.ts  templates.ts  qr.ts  subdomain.ts  push.ts  audit.ts  usage.ts  env.ts  db.ts
   proxy.ts                   Subdomain → /[tenant] + staff /signin rewrite (middleware)

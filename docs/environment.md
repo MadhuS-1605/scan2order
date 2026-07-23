@@ -49,6 +49,7 @@ Pick a provider with `MESSAGING_PROVIDER`. `console` (default) just logs — fin
 | Key | Req | What / how to get it |
 |---|---|---|
 | `MESSAGING_PROVIDER` | ⚪ | `console` \| `meta`. Default `console`. |
+| `MESSAGING_ALLOW_LIVE_ON_STAGING` | ⚪ | Staging shares the same live Meta WABA/credentials as production (no separate test number) — on `APP_ENV=staging`, WhatsApp sends are mocked (console-logged) by default even with real credentials set. Set to `true` to actually send real WhatsApp messages from staging; leave unset otherwise. |
 | `SMS_FALLBACK_PROVIDER` | ⚪ | `none` \| `twofactor`. SMS OTP fallback when WhatsApp can't deliver. |
 | `TWOFACTOR_API_KEY` | 🟡* | 2Factor.in dashboard → API key. *If `SMS_FALLBACK_PROVIDER=twofactor`. |
 | `TWOFACTOR_TEMPLATE` | ⚪ | Optional approved 2Factor SMS template name. |
