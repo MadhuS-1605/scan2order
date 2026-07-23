@@ -364,6 +364,7 @@ model Restaurant {
   suppliers         Supplier[]
   purchaseOrders    PurchaseOrder[]
   cashShifts        CashShift[]
+  registers         Register[]
   tables            RestaurantTable[]
   tableAreas        TableArea[]
   orders            Order[]
@@ -1421,6 +1422,24 @@ model PurchaseOrderLine {
   @@map("purchase_order_lines")
 }
 
+// A physical billing counter/register — closes the "Multi POS Setup" gap vs.
+// competitors (handle volume across multiple simultaneous billing counters).
+// Purely a label CashShift can attach to; multiple staff can already run
+// independent concurrent shifts (one open shift per adminUserId), this just
+// gives each one a named station instead of an anonymous shared drawer.
+model Register {
+  id           String     @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  createdAt    DateTime   @default(now())
+
+  cashShifts CashShift[]
+
+  @@index([restaurantId])
+  @@map("registers")
+}
+
 // A staff member's cash-register session — closes the "Cash Register/Till"
 // gap vs. competitors. Cash collected during the shift is approximated as
 // paid COUNTER orders updated within [openedAt, closedAt] (Order has no
@@ -1432,6 +1451,8 @@ model CashShift {
   restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   adminUserId    String
   adminUser      AdminUser  @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  registerId     String?
+  register       Register?  @relation(fields: [registerId], references: [id], onDelete: SetNull)
   openingFloat   Decimal    @db.Decimal(10, 2)
   openedAt       DateTime   @default(now())
   closingCounted Decimal?   @db.Decimal(10, 2)
@@ -1441,6 +1462,7 @@ model CashShift {
   closedAt       DateTime?
 
   @@index([restaurantId, openedAt])
+  @@index([registerId])
   @@map("cash_shifts")
 }
 

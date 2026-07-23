@@ -9,9 +9,25 @@ function revalidate() {
   revalidatePath("/admin/cash-shifts");
 }
 
+export async function createRegisterAction(formData: FormData): Promise<void> {
+  const session = await requireAdminWithPermission("settings");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return;
+  await prisma.register.create({ data: { restaurantId: session.restaurantId, name } });
+  revalidate();
+}
+
+export async function deleteRegisterAction(formData: FormData): Promise<void> {
+  const session = await requireAdminWithPermission("settings");
+  const id = String(formData.get("id"));
+  await prisma.register.deleteMany({ where: { id, restaurantId: session.restaurantId } });
+  revalidate();
+}
+
 export async function openCashShiftAction(formData: FormData): Promise<void> {
   const session = await requireAdminWithPermission("orders");
   const openingFloat = Math.max(0, Number(formData.get("openingFloat") ?? 0) || 0);
+  const registerId = String(formData.get("registerId") ?? "") || null;
 
   const open = await prisma.cashShift.findFirst({
     where: { adminUserId: session.sub, closedAt: null },
@@ -19,7 +35,7 @@ export async function openCashShiftAction(formData: FormData): Promise<void> {
   if (open) return; // one open shift per staff member at a time
 
   await prisma.cashShift.create({
-    data: { restaurantId: session.restaurantId, adminUserId: session.sub, openingFloat },
+    data: { restaurantId: session.restaurantId, adminUserId: session.sub, openingFloat, registerId },
   });
   revalidate();
 }
