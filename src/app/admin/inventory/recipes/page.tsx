@@ -2,12 +2,14 @@ import Link from "next/link";
 import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { toNumber } from "@/lib/utils";
+import { hasPermission } from "@/lib/auth/permissions";
 import { RecipeManager } from "./recipe-manager";
+import { TransferStockForm } from "./transfer-stock-form";
 
 export default async function RecipesPage() {
-  const { restaurant } = await getCurrentRestaurant("menu");
+  const { restaurant, session } = await getCurrentRestaurant("menu");
 
-  const [ingredients, menuItems] = await Promise.all([
+  const [ingredients, menuItems, me] = await Promise.all([
     prisma.ingredient.findMany({
       where: { restaurantId: restaurant.id },
       orderBy: { name: "asc" },
@@ -17,7 +19,16 @@ export default async function RecipesPage() {
       include: { recipeLines: true },
       orderBy: { name: "asc" },
     }),
+    prisma.adminUser.findUnique({ where: { id: session.sub }, select: { groupId: true } }),
   ]);
+  const siblings =
+    me?.groupId && hasPermission(session.role, "properties")
+      ? await prisma.restaurant.findMany({
+          where: { groupId: me.groupId, id: { not: restaurant.id } },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        })
+      : [];
 
   return (
     <div className="space-y-5">
@@ -68,6 +79,12 @@ export default async function RecipesPage() {
           })),
         }))}
       />
+      {siblings.length > 0 && ingredients.length > 0 && (
+        <TransferStockForm
+          ingredients={ingredients.map((i) => ({ id: i.id, name: i.name, unit: i.unit }))}
+          outlets={siblings}
+        />
+      )}
     </div>
   );
 }

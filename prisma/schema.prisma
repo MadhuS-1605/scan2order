@@ -710,14 +710,16 @@ model Ingredient {
   ledger      IngredientLedgerEntry[]
   poLines     PurchaseOrderLine[]
 
-  @@index([restaurantId])
+  @@unique([restaurantId, name])
   @@map("ingredients")
 }
 
 enum IngredientLedgerReason {
   ORDER_CONSUMPTION // deducted automatically for a placed/edited order
   WASTAGE // manually logged spillage/spoilage
-  RESTOCK // manual restock
+  RESTOCK // manual restock or a received purchase order
+  TRANSFER_OUT // moved to a sibling outlet in the same property group
+  TRANSFER_IN // received from a sibling outlet
 }
 
 // Movement log for ingredient stock — the basis for the usage/wastage/cost
