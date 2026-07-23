@@ -363,6 +363,7 @@ model Restaurant {
   expenses          Expense[]
   suppliers         Supplier[]
   purchaseOrders    PurchaseOrder[]
+  cashShifts        CashShift[]
   tables            RestaurantTable[]
   tableAreas        TableArea[]
   orders            Order[]
@@ -489,6 +490,7 @@ model AdminUser {
   group             PropertyGroup?    @relation(fields: [groupId], references: [id], onDelete: SetNull)
   ordersCreated     Order[]           @relation("OrderCreatedBy")
   attendance        StaffAttendance[]
+  cashShifts        CashShift[]
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -1417,6 +1419,29 @@ model PurchaseOrderLine {
 
   @@index([purchaseOrderId])
   @@map("purchase_order_lines")
+}
+
+// A staff member's cash-register session — closes the "Cash Register/Till"
+// gap vs. competitors. Cash collected during the shift is approximated as
+// paid COUNTER orders updated within [openedAt, closedAt] (Order has no
+// dedicated paidAt field; updatedAt is the closest proxy — see the ponytail
+// note on closeCashShiftAction for the known limitation this implies).
+model CashShift {
+  id             String     @id @default(cuid())
+  restaurantId   String
+  restaurant     Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  adminUserId    String
+  adminUser      AdminUser  @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  openingFloat   Decimal    @db.Decimal(10, 2)
+  openedAt       DateTime   @default(now())
+  closingCounted Decimal?   @db.Decimal(10, 2)
+  expectedCash   Decimal?   @db.Decimal(10, 2)
+  variance       Decimal?   @db.Decimal(10, 2)
+  denomination   Json? // {"500": 2, "100": 5, ...} note/coin counts at close
+  closedAt       DateTime?
+
+  @@index([restaurantId, openedAt])
+  @@map("cash_shifts")
 }
 
 // Tenant operating expenses (rent, utilities, supplies, salaries, ...) —
