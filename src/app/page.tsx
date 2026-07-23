@@ -367,7 +367,7 @@ export default async function Home() {
       </section>
 
       {/* FAQ */}
-      <section id="faq" className="mx-auto max-w-3xl px-6 py-16">
+      <section id="faq" className="mx-auto max-w-4xl px-6 py-16">
         <Reveal>
           <h2 className="text-center font-display text-3xl text-ink">Frequently asked questions</h2>
         </Reveal>

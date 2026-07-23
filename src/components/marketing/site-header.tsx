@@ -14,7 +14,7 @@ export function SiteHeader() {
       <div aria-hidden className="scroll-progress" />
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" className="flex items-center">
-          <Image src="/logo-mark.png" alt="Scan2Order" width={40} height={40} priority className="h-10 w-10" />
+          <Image src="/logo-mark.png" alt="Scan2Order" width={48} height={48} priority className="h-12 w-12" />
         </Link>
         <nav className="flex items-center gap-5 text-sm">
           <Link href="/features" className="hidden text-ink/70 hover:text-ink sm:inline">
