@@ -23,10 +23,20 @@ export default async function InventoryReportsPage({
 
   const rows = ingredients.map((ing) => {
     const own = entries.filter((e) => e.ingredientId === ing.id);
-    const consumed = -own.filter((e) => e.reason === "ORDER_CONSUMPTION").reduce((s, e) => s + toNumber(e.delta), 0);
-    const wasted = -own.filter((e) => e.reason === "WASTAGE").reduce((s, e) => s + toNumber(e.delta), 0);
+    // Each entry's own snapshotted cost (see IngredientLedgerEntry.costPerUnit)
+    // — not the ingredient's current cost — so a later price change doesn't
+    // retroactively re-price historical usage/wastage. Entries written before
+    // this field existed have no snapshot; fall back to the current cost for
+    // those only, same as the report always did.
+    const fallbackCost = toNumber(ing.costPerUnit);
+    const costOf = (e: (typeof own)[number]) => (e.costPerUnit !== null ? toNumber(e.costPerUnit) : fallbackCost);
+    const consumedEntries = own.filter((e) => e.reason === "ORDER_CONSUMPTION");
+    const wastedEntries = own.filter((e) => e.reason === "WASTAGE");
+    const consumed = -consumedEntries.reduce((s, e) => s + toNumber(e.delta), 0);
+    const wasted = -wastedEntries.reduce((s, e) => s + toNumber(e.delta), 0);
     const restocked = own.filter((e) => e.reason === "RESTOCK").reduce((s, e) => s + toNumber(e.delta), 0);
-    const cost = toNumber(ing.costPerUnit);
+    const consumedCost = consumedEntries.reduce((s, e) => s + -toNumber(e.delta) * costOf(e), 0);
+    const wastedCost = wastedEntries.reduce((s, e) => s + -toNumber(e.delta) * costOf(e), 0);
     return {
       id: ing.id,
       name: ing.name,
@@ -34,8 +44,8 @@ export default async function InventoryReportsPage({
       consumed,
       wasted,
       restocked,
-      consumedCost: consumed * cost,
-      wastedCost: wasted * cost,
+      consumedCost,
+      wastedCost,
     };
   });
 

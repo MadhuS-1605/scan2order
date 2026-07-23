@@ -776,6 +776,12 @@ model IngredientLedgerEntry {
   reason       IngredientLedgerReason
   note         String?
   createdByName String?
+  // Snapshot of Ingredient.costPerUnit at write time, so the usage/wastage
+  // cost report reflects what the ingredient cost when actually consumed —
+  // not whatever costPerUnit happens to be today (which is editable anytime).
+  // Null on entries written before this field existed; the report falls back
+  // to the ingredient's current cost for those, same as it always did.
+  costPerUnit  Decimal?               @db.Decimal(10, 2)
   createdAt    DateTime               @default(now())
 
   @@index([restaurantId, createdAt])

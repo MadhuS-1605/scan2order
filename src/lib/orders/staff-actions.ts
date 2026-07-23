@@ -66,7 +66,9 @@ async function adjustStock(
     where: { id: menuItemId },
     select: {
       trackStock: true,
-      recipeLines: { select: { ingredientId: true, qtyPerServing: true } },
+      recipeLines: {
+        select: { ingredientId: true, qtyPerServing: true, ingredient: { select: { costPerUnit: true } } },
+      },
     },
   });
   if (!mi) return;
@@ -85,7 +87,13 @@ async function adjustStock(
       data: { stockQty: { decrement: qty } },
     });
     await tx.ingredientLedgerEntry.create({
-      data: { restaurantId, ingredientId: r.ingredientId, delta: -qty, reason: "ORDER_CONSUMPTION" },
+      data: {
+        restaurantId,
+        ingredientId: r.ingredientId,
+        delta: -qty,
+        reason: "ORDER_CONSUMPTION",
+        costPerUnit: toNumber(r.ingredient.costPerUnit),
+      },
     });
   }
 }
@@ -114,7 +122,7 @@ export async function createStaffOrderAction(formData: FormData): Promise<void> 
 
   const items = await prisma.menuItem.findMany({
     where: { id: { in: lines.map((l) => l.menuItemId) }, restaurantId: session.restaurantId },
-    include: { recipeLines: true },
+    include: { recipeLines: { include: { ingredient: { select: { costPerUnit: true } } } } },
   });
   const byId = new Map(items.map((m) => [m.id, m]));
 
@@ -156,6 +164,9 @@ export async function createStaffOrderAction(formData: FormData): Promise<void> 
     built.map((b) => ({ menuItemId: b.menuItemId, quantity: b.quantity })),
     recipesByItem,
   );
+  const costByIngredient = new Map(
+    items.flatMap((m) => m.recipeLines.map((r) => [r.ingredientId, toNumber(r.ingredient.costPerUnit)] as const)),
+  );
 
   const order = await prisma.$transaction(async (tx) => {
     for (const b of built) {
@@ -169,7 +180,13 @@ export async function createStaffOrderAction(formData: FormData): Promise<void> 
     for (const [ingredientId, qty] of ingredientConsumption) {
       await tx.ingredient.update({ where: { id: ingredientId }, data: { stockQty: { decrement: qty } } });
       await tx.ingredientLedgerEntry.create({
-        data: { restaurantId: session.restaurantId, ingredientId, delta: -qty, reason: "ORDER_CONSUMPTION" },
+        data: {
+          restaurantId: session.restaurantId,
+          ingredientId,
+          delta: -qty,
+          reason: "ORDER_CONSUMPTION",
+          costPerUnit: costByIngredient.get(ingredientId) ?? null,
+        },
       });
     }
     const r = await tx.restaurant.update({

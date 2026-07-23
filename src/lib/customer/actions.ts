@@ -201,7 +201,10 @@ export async function placeOrderAction(
   const ids = data.items.map((i) => i.menuItemId);
   const menuItems = await prisma.menuItem.findMany({
     where: { id: { in: ids }, restaurantId: restaurant.id },
-    include: { modifierGroups: { include: { options: true } }, recipeLines: true },
+    include: {
+      modifierGroups: { include: { options: true } },
+      recipeLines: { include: { ingredient: { select: { costPerUnit: true } } } },
+    },
   });
   const byId = new Map(menuItems.map((m) => [m.id, m]));
 
@@ -336,6 +339,12 @@ export async function placeOrderAction(
     lines.map((l) => ({ menuItemId: l.menuItemId, quantity: l.quantity })),
     recipesByItem,
   );
+  // Snapshot each ingredient's current cost for the ledger entry below (see
+  // IngredientLedgerEntry.costPerUnit) — a later price change shouldn't
+  // retroactively re-price this order's cost in the usage report.
+  const costByIngredient = new Map(
+    menuItems.flatMap((m) => m.recipeLines.map((r) => [r.ingredientId, toNumber(r.ingredient.costPerUnit)] as const)),
+  );
 
   let order: Awaited<ReturnType<typeof prisma.order.create>>;
   try {
@@ -356,7 +365,13 @@ export async function placeOrderAction(
           data: { stockQty: { decrement: qty } },
         });
         await tx.ingredientLedgerEntry.create({
-          data: { restaurantId: restaurant.id, ingredientId, delta: -qty, reason: "ORDER_CONSUMPTION" },
+          data: {
+            restaurantId: restaurant.id,
+            ingredientId,
+            delta: -qty,
+            reason: "ORDER_CONSUMPTION",
+            costPerUnit: costByIngredient.get(ingredientId) ?? null,
+          },
         });
       }
       const r = await tx.restaurant.update({

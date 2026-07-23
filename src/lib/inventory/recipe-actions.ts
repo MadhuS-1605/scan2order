@@ -45,6 +45,7 @@ export async function restockIngredientAction(formData: FormData): Promise<void>
         delta: amount,
         reason: "RESTOCK",
         createdByName: session.name,
+        costPerUnit: ing.costPerUnit,
       },
     }),
   ]);
@@ -74,6 +75,7 @@ export async function recordWastageAction(formData: FormData): Promise<void> {
         reason: "WASTAGE",
         note,
         createdByName: session.name,
+        costPerUnit: ing.costPerUnit,
       },
     }),
   ]);

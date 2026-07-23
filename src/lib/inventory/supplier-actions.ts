@@ -104,6 +104,10 @@ export async function receivePurchaseOrderAction(formData: FormData): Promise<vo
           reason: "RESTOCK",
           note: `PO ${po.id.slice(-6)}`,
           createdByName: session.name,
+          // The line's own unitCost (what was actually paid for this
+          // purchase) is a more accurate snapshot than the ingredient's
+          // general costPerUnit.
+          costPerUnit: l.unitCost,
         },
       });
     }

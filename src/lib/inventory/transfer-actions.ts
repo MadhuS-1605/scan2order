@@ -58,6 +58,7 @@ export async function transferIngredientStockAction(formData: FormData): Promise
         reason: "TRANSFER_OUT",
         note: `to ${toRestaurantId.slice(-6)}`,
         createdByName: session.name,
+        costPerUnit: from.costPerUnit,
       },
     });
     await tx.ingredientLedgerEntry.create({
@@ -68,6 +69,7 @@ export async function transferIngredientStockAction(formData: FormData): Promise
         reason: "TRANSFER_IN",
         note: `from ${session.restaurantId.slice(-6)}`,
         createdByName: session.name,
+        costPerUnit: from.costPerUnit,
       },
     });
   }).catch((e) => {
