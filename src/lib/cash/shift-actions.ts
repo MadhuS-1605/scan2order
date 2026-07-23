@@ -74,9 +74,14 @@ function parseDenomination(formData: FormData): { total: number; breakdown: Reco
 }
 
 // Closes the staff member's own open shift. Expected cash = opening float +
-// paid COUNTER orders − COUNTER refunds during the shift window (see the
-// schema comment on CashShift for the updatedAt-as-paidAt approximation the
-// orders side relies on).
+// paid COUNTER orders explicitly attributed to this shift (Order.cashShiftId,
+// set by markPaidAction) − COUNTER refunds during the shift window.
+//
+// The refund side still infers by time window rather than exact attribution
+// (Refund has no cashShiftId) — a lower-priority gap than the orders side
+// was: refunds are far lower-volume than payments, and double-counting one
+// only makes expectedCash *more conservative* (a smaller expected total),
+// not profit-inflating, unlike the bug this replaced.
 export async function closeCashShiftAction(formData: FormData): Promise<void> {
   const session = await requireAdminWithPermission("orders");
   const id = String(formData.get("id"));
@@ -91,7 +96,7 @@ export async function closeCashShiftAction(formData: FormData): Promise<void> {
       restaurantId: session.restaurantId,
       paymentMethod: "COUNTER",
       paymentStatus: "PAID",
-      updatedAt: { gte: shift.openedAt, lte: closedAt },
+      cashShiftId: shift.id,
     },
     _sum: { amountPaid: true },
   });

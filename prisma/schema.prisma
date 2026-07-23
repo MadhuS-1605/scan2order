@@ -962,6 +962,14 @@ model Order {
 
   paymentStatus PaymentStatus  @default(UNPAID)
   paymentMethod PaymentMethod?
+  // Which cash-register shift this COUNTER payment was collected under (set
+  // by markPaidAction when the settling staff member has one open) — lets a
+  // shift's expectedCash sum exactly the orders paid under it, instead of
+  // inferring by time window, which double-counts across concurrently open
+  // shifts on different registers. Null when settled with no shift open
+  // (venue not using the cash-register feature) or for non-COUNTER payments.
+  cashShiftId   String?
+  cashShift     CashShift?     @relation(fields: [cashShiftId], references: [id], onDelete: SetNull)
 
   // Money snapshots (so historical bills don't change if config/prices change)
   subtotal       Decimal @default(0) @db.Decimal(10, 2)
@@ -1506,10 +1514,11 @@ model Register {
 }
 
 // A staff member's cash-register session — closes the "Cash Register/Till"
-// gap vs. competitors. Cash collected during the shift is approximated as
-// paid COUNTER orders updated within [openedAt, closedAt] (Order has no
-// dedicated paidAt field; updatedAt is the closest proxy — see the ponytail
-// note on closeCashShiftAction for the known limitation this implies).
+// gap vs. competitors. Cash collected during the shift is the sum of paid
+// COUNTER orders explicitly attributed to it via Order.cashShiftId (set by
+// markPaidAction when the settling staff member has this shift open) — not
+// inferred by time window, which would double-count a payment across every
+// concurrently open shift on a different register.
 model CashShift {
   id             String     @id @default(cuid())
   restaurantId   String
@@ -1525,6 +1534,8 @@ model CashShift {
   variance       Decimal?   @db.Decimal(10, 2)
   denomination   Json? // {"500": 2, "100": 5, ...} note/coin counts at close
   closedAt       DateTime?
+
+  orders Order[]
 
   @@index([restaurantId, openedAt])
   @@index([registerId])

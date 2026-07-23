@@ -184,9 +184,21 @@ export async function rejectOrderAction(formData: FormData): Promise<void> {
 // Marks a counter (offline) payment as collected. Settles the whole table bill
 // (all open rounds at the table, any device/staff), since billing is table-based.
 export async function markPaidAction(formData: FormData): Promise<void> {
-  const { restaurantId } = await requireAdminWithPermission("orders");
+  const session = await requireAdminWithPermission("orders");
+  const { restaurantId } = session;
   const orderId = String(formData.get("orderId"));
   const order = await ownedOrder(orderId, restaurantId);
+
+  // Attribute this COUNTER settlement to the acting staff member's currently
+  // open cash shift (if any), so a shift's expectedCash can sum exactly the
+  // orders paid under it instead of inferring by time window — which
+  // double-counts a payment across every concurrently open shift on a
+  // different register. Null (no open shift) if the venue isn't using the
+  // cash-register feature — unaffected either way.
+  const openShift = await prisma.cashShift.findFirst({
+    where: { restaurantId, adminUserId: session.sub, closedAt: null },
+    select: { id: true },
+  });
 
   // Settle the diner's dining session (their consolidated bill), not the whole
   // table — so separate parties at a shared table are billed independently and
@@ -226,6 +238,7 @@ export async function markPaidAction(formData: FormData): Promise<void> {
         paymentStatus: "PAID",
         paymentMethod: "COUNTER",
         amountPaid: o.id === primary?.id ? payable : 0,
+        cashShiftId: openShift?.id ?? null,
         ...(justConfirmed ? { status: "CONFIRMED", confirmedAt: new Date() } : {}),
       },
     });
