@@ -64,6 +64,11 @@ export const settingsSchema = z.object({
   gstLegalName: z.string().max(200).optional().or(z.literal("")),
   gstVerified: z.boolean().optional(),
   gstPercentage: z.coerce.number().min(0).max(28),
+  currency: z
+    .string()
+    .regex(/^[A-Z]{3}$/, "Use a 3-letter ISO currency code, e.g. INR")
+    .optional()
+    .or(z.literal("")),
 });
 
 export const categorySchema = z.object({

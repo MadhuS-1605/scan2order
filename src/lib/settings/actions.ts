@@ -99,6 +99,7 @@ export async function updateOperationsAction(
       gstMode: d.gstMode,
       gstNumber: d.gstNumber || null,
       gstPercentage: d.gstPercentage,
+      ...(d.currency ? { currency: d.currency } : {}),
       serviceChargePercent: Math.max(0, Math.min(100, Number(formData.get("serviceChargePercent") ?? 0) || 0)),
       reviewUrl: reviewUrl || null,
       happyHourEnabled: formData.get("happyHourEnabled") === "on",

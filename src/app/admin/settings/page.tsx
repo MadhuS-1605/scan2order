@@ -36,6 +36,7 @@ export default async function SettingsPage() {
           gstMode: config.gstMode,
           gstNumber: config.gstNumber,
           gstPercentage: config.gstPercentage.toString(),
+          currency: config.currency,
           serviceChargePercent: config.serviceChargePercent.toString(),
           reviewUrl: config.reviewUrl,
           happyHourEnabled: config.happyHourEnabled,

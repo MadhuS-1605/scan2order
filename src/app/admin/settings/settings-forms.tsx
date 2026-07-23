@@ -42,6 +42,7 @@ type Config = {
   gstMode: string;
   gstNumber: string | null;
   gstPercentage: string;
+  currency: string;
   serviceChargePercent: string;
   reviewUrl: string | null;
   happyHourEnabled: boolean;
@@ -434,6 +435,19 @@ function OperationsForm({ config }: { config: Config }) {
               defaultValue={config.gstPercentage}
               disabled={gstMode === "NONE"}
             />
+          </Field>
+          <Field
+            label="Currency"
+            htmlFor="o-currency"
+            hint="Display only — online payments (Razorpay/UPI) always settle in INR regardless of this."
+          >
+            <Select id="o-currency" name="currency" defaultValue={config.currency}>
+              {["INR", "USD", "GBP", "EUR", "AED", "SGD", "AUD"].map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </Select>
           </Field>
           <Field label={tr("settings.serviceCharge")} htmlFor="o-sc" hint={tr("settings.serviceChargeHint")}>
             <Input
