@@ -18,14 +18,19 @@ function InstagramIcon(props: React.SVGProps<SVGSVGElement>) {
 function FacebookIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" {...props}>
-      <path d="M15 8h-2a2 2 0 0 0-2 2v2H9v3h2v7h3v-7h2.2l.8-3H14v-1.5c0-.5.3-.8.8-.8H15V8Z" />
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <path
+        d="M13.8 20v-6.6h2.2l.35-2.55h-2.55v-1.63c0-.74.2-1.24 1.26-1.24h1.35V5.66C15.94 5.6 15.16 5.5 14.24 5.5c-1.87 0-3.15 1.14-3.15 3.24v1.8H8.9v2.55h2.2V20h2.7Z"
+        fill="currentColor"
+        stroke="none"
+      />
     </svg>
   );
 }
 
 const SOCIAL_LINKS = [
   { name: "Instagram", href: "https://instagram.com/scan2order.co.in", icon: InstagramIcon },
-  { name: "Facebook", href: "https://facebook.com/Scan2Order", icon: FacebookIcon },
+  { name: "Facebook", href: "https://www.facebook.com/profile.php?id=61592198670874", icon: FacebookIcon },
 ];
 
 export function SiteFooter() {
