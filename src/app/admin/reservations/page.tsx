@@ -4,9 +4,13 @@ import { getCurrentRestaurant } from "@/lib/restaurant";
 import { prisma } from "@/lib/db";
 import { getBaseUrl } from "@/lib/request";
 import { ADMIN_LOCALE_COOKIE, dictFor, t, type Dict } from "@/lib/i18n";
-import { Button, StatusBadge } from "@/components/ui";
+import { Button, StatusBadge, Input, Card } from "@/components/ui";
 import { LiveStream } from "@/components/live-stream";
-import { setReservationStatusAction } from "@/lib/reservations/actions";
+import { hasPermission } from "@/lib/auth/permissions";
+import {
+  setReservationStatusAction,
+  setReservationCapacityAction,
+} from "@/lib/reservations/actions";
 
 const NEXT_ACTIONS: Record<string, { status: string; labelKey: string; danger?: boolean }[]> = {
   PENDING: [
@@ -21,7 +25,7 @@ const NEXT_ACTIONS: Record<string, { status: string; labelKey: string; danger?: 
 };
 
 export default async function ReservationsPage() {
-  const { restaurant } = await getCurrentRestaurant("orders");
+  const { restaurant, session, config } = await getCurrentRestaurant("orders");
   const d = dictFor((await cookies()).get(ADMIN_LOCALE_COOKIE)?.value);
   const startOfToday = new Date();
   startOfToday.setHours(0, 0, 0, 0);
@@ -63,6 +67,45 @@ export default async function ReservationsPage() {
           {t(d, "reservations.bookingLink")}: <span className="text-brand-600">{bookUrl}</span>
         </a>
       </div>
+
+      {hasPermission(session.role, "settings") && (
+        <Card className="max-w-xl">
+          <h2 className="mb-1 font-semibold text-ink">Slot capacity</h2>
+          <p className="mb-3 text-xs text-ink/45">
+            Cap total guests per time slot so reservations can't overbook a service. Leave capacity
+            blank for no limit.
+          </p>
+          <form action={setReservationCapacityAction} className="flex flex-wrap items-end gap-2">
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/55">
+                Slot length (min)
+              </span>
+              <Input
+                name="slotMinutes"
+                type="number"
+                min="5"
+                max="240"
+                defaultValue={config.reservationSlotMinutes}
+                className="w-24"
+              />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-ink/55">
+                Max guests / slot
+              </span>
+              <Input
+                name="capacityPerSlot"
+                type="number"
+                min="1"
+                placeholder="No limit"
+                defaultValue={config.reservationCapacityPerSlot ?? ""}
+                className="w-28"
+              />
+            </label>
+            <Button size="sm" type="submit">Save</Button>
+          </form>
+        </Card>
+      )}
 
       <section>
         <h2 className="mb-2 flex items-center gap-1.5 font-display text-lg text-ink">

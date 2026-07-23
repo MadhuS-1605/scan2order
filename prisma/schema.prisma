@@ -562,6 +562,13 @@ model OnboardingConfig {
   featureBar          Boolean @default(false) // separate bar counter / KDS
   featureAttendance   Boolean @default(false) // staff clock-in/out tracking
 
+  // Reservation slot capacity: reservedFor is bucketed into
+  // reservationSlotMinutes-wide slots (e.g. 19:00-19:29), and the sum of
+  // partySize already booked in a slot can't exceed reservationCapacityPerSlot.
+  // Null = uncapped (default; opt-in per venue).
+  reservationSlotMinutes     Int  @default(30)
+  reservationCapacityPerSlot Int?
+
   // Venue location for attendance geofencing. When set, self clock-in/out is
   // only allowed within geofenceRadiusM metres of these coordinates.
   latitude        Float?

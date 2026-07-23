@@ -8,6 +8,7 @@ import { emitEvent } from "@/lib/realtime/bus";
 import { notifyRestaurant } from "@/lib/push";
 import { sendWhatsAppFreeform } from "@/lib/messaging/provider";
 import { recordUsage } from "@/lib/usage";
+import { slotBucketMs, capacityExceeded } from "@/lib/reservations/slots";
 import type { ReservationStatus } from "@prisma/client";
 
 export async function createReservationAction(args: {
@@ -41,6 +42,25 @@ export async function createReservationAction(args: {
     include: { config: true },
   });
   if (!restaurant) return { ok: false, error: "Restaurant not found." };
+
+  const capacityPerSlot = restaurant.config?.reservationCapacityPerSlot ?? null;
+  if (reservedFor && capacityPerSlot !== null) {
+    const slotMinutes = restaurant.config?.reservationSlotMinutes ?? 30;
+    const bucketStart = slotBucketMs(reservedFor, slotMinutes);
+    const bucketEnd = bucketStart + slotMinutes * 60_000;
+    const inSlot = await prisma.reservation.findMany({
+      where: {
+        restaurantId: restaurant.id,
+        type: "RESERVATION",
+        status: { in: ["PENDING", "CONFIRMED"] },
+        reservedFor: { gte: new Date(bucketStart), lt: new Date(bucketEnd) },
+      },
+      select: { partySize: true },
+    });
+    if (capacityExceeded(inSlot.map((r) => r.partySize), partySize, capacityPerSlot)) {
+      return { ok: false, error: "That time is fully booked — please pick another slot." };
+    }
+  }
 
   const reservation = await prisma.reservation.create({
     data: {
@@ -80,6 +100,21 @@ export async function createReservationAction(args: {
   if (res.ok) await recordUsage(restaurant.id, "whatsapp");
 
   return { ok: true, mocked: res.mocked, id: reservation.id };
+}
+
+// Owner/manager sets (or clears) the per-slot capacity cap. Empty capacity
+// input means uncapped.
+export async function setReservationCapacityAction(formData: FormData): Promise<void> {
+  const session = await requireOnboardedAdmin();
+  if (!hasPermission(session.role, "settings")) return;
+  const slotMinutes = Math.max(5, Math.min(240, Math.floor(Number(formData.get("slotMinutes")) || 30)));
+  const raw = String(formData.get("capacityPerSlot") ?? "").trim();
+  const capacityPerSlot = raw === "" ? null : Math.max(1, Math.floor(Number(raw)) || 1);
+  await prisma.onboardingConfig.update({
+    where: { restaurantId: session.restaurantId },
+    data: { reservationSlotMinutes: slotMinutes, reservationCapacityPerSlot: capacityPerSlot },
+  });
+  revalidatePath("/admin/reservations");
 }
 
 const VALID: ReservationStatus[] = [
