@@ -361,6 +361,8 @@ model Restaurant {
   ingredients       Ingredient[]
   ingredientLedger  IngredientLedgerEntry[]
   expenses          Expense[]
+  suppliers         Supplier[]
+  purchaseOrders    PurchaseOrder[]
   tables            RestaurantTable[]
   tableAreas        TableArea[]
   orders            Order[]
@@ -706,6 +708,7 @@ model Ingredient {
 
   recipeLines RecipeLine[]
   ledger      IngredientLedgerEntry[]
+  poLines     PurchaseOrderLine[]
 
   @@index([restaurantId])
   @@map("ingredients")
@@ -1357,6 +1360,61 @@ model PaymentReconciliationEvent {
 
   @@index([type, createdAt])
   @@map("payment_reconciliation_events")
+}
+
+// A raw-material supplier — closes the "Supplier Management" gap vs.
+// competitors. Purchase orders reference a supplier and, once received, top
+// up Ingredient.stockQty (logged as a RESTOCK IngredientLedgerEntry).
+model Supplier {
+  id           String   @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name         String
+  phone        String?
+  email        String?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  purchaseOrders PurchaseOrder[]
+
+  @@index([restaurantId])
+  @@map("suppliers")
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  ORDERED
+  RECEIVED
+}
+
+model PurchaseOrder {
+  id           String              @id @default(cuid())
+  restaurantId String
+  restaurant   Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  supplierId   String
+  supplier     Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  status       PurchaseOrderStatus @default(DRAFT)
+  createdByName String?
+  createdAt    DateTime            @default(now())
+  receivedAt   DateTime?
+
+  lines PurchaseOrderLine[]
+
+  @@index([restaurantId, status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  ingredientId    String
+  ingredient      Ingredient    @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  qty             Decimal       @db.Decimal(10, 2)
+  unitCost        Decimal       @db.Decimal(10, 2)
+
+  @@index([purchaseOrderId])
+  @@map("purchase_order_lines")
 }
 
 // Tenant operating expenses (rent, utilities, supplies, salaries, ...) —

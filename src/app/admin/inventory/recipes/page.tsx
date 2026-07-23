@@ -33,12 +33,20 @@ export default async function RecipesPage() {
               automatically as orders come in.
             </p>
           </div>
-          <Link
-            href="/admin/inventory/reports"
-            className="rounded-lg border border-sand-300 bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-brand-300"
-          >
-            Usage & wastage report →
-          </Link>
+          <div className="flex gap-2">
+            <Link
+              href="/admin/inventory/suppliers"
+              className="rounded-lg border border-sand-300 bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-brand-300"
+            >
+              Suppliers & POs →
+            </Link>
+            <Link
+              href="/admin/inventory/reports"
+              className="rounded-lg border border-sand-300 bg-surface px-4 py-2 text-sm font-medium text-ink hover:border-brand-300"
+            >
+              Usage & wastage report →
+            </Link>
+          </div>
         </div>
       </div>
       <RecipeManager
