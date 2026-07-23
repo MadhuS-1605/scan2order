@@ -32,16 +32,25 @@ export async function transferIngredientStockAction(formData: FormData): Promise
   if (!from || !me?.groupId || !toRestaurant || toRestaurant.groupId !== me.groupId) return;
   if (from.stockQty.toNumber() < qty) return;
 
-  const to = await prisma.ingredient.upsert({
-    where: { restaurantId_name: { restaurantId: toRestaurantId, name: from.name } },
-    create: { restaurantId: toRestaurantId, name: from.name, unit: from.unit, costPerUnit: from.costPerUnit },
-    update: {},
-  });
+  await prisma.$transaction(async (tx) => {
+    // Guarded decrement (mirrors the order-placement oversell guard in
+    // src/lib/customer/actions.ts): two concurrent transfers of the same
+    // ingredient could both pass the plain-read check above before either
+    // writes, driving stock negative. Aborting on affected-row-count === 0
+    // makes the decrement atomic against that race.
+    const decremented = await tx.ingredient.updateMany({
+      where: { id: from.id, stockQty: { gte: qty } },
+      data: { stockQty: { decrement: qty } },
+    });
+    if (decremented.count === 0) throw new Error("Not enough stock to transfer.");
 
-  await prisma.$transaction([
-    prisma.ingredient.update({ where: { id: from.id }, data: { stockQty: { decrement: qty } } }),
-    prisma.ingredient.update({ where: { id: to.id }, data: { stockQty: { increment: qty } } }),
-    prisma.ingredientLedgerEntry.create({
+    const to = await tx.ingredient.upsert({
+      where: { restaurantId_name: { restaurantId: toRestaurantId, name: from.name } },
+      create: { restaurantId: toRestaurantId, name: from.name, unit: from.unit, costPerUnit: from.costPerUnit },
+      update: {},
+    });
+    await tx.ingredient.update({ where: { id: to.id }, data: { stockQty: { increment: qty } } });
+    await tx.ingredientLedgerEntry.create({
       data: {
         restaurantId: session.restaurantId,
         ingredientId: from.id,
@@ -50,8 +59,8 @@ export async function transferIngredientStockAction(formData: FormData): Promise
         note: `to ${toRestaurantId.slice(-6)}`,
         createdByName: session.name,
       },
-    }),
-    prisma.ingredientLedgerEntry.create({
+    });
+    await tx.ingredientLedgerEntry.create({
       data: {
         restaurantId: toRestaurantId,
         ingredientId: to.id,
@@ -60,8 +69,11 @@ export async function transferIngredientStockAction(formData: FormData): Promise
         note: `from ${session.restaurantId.slice(-6)}`,
         createdByName: session.name,
       },
-    }),
-  ]);
+    });
+  }).catch((e) => {
+    if (e instanceof Error && e.message === "Not enough stock to transfer.") return;
+    throw e;
+  });
   revalidatePath("/admin/inventory/recipes");
   revalidatePath("/admin/inventory/reports");
 }

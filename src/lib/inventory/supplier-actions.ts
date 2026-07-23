@@ -79,17 +79,24 @@ export async function receivePurchaseOrderAction(formData: FormData): Promise<vo
   });
   if (!po) return;
 
-  await prisma.$transaction([
-    prisma.purchaseOrder.update({
-      where: { id },
+  await prisma.$transaction(async (tx) => {
+    // The status flip is the guard: two concurrent submits (double-click, a
+    // retried request) both passing the findFirst check above before either
+    // writes would otherwise double-credit every line's ingredient stock.
+    // updateMany's affected-row-count makes it atomic — only the first one
+    // to land actually flips RECEIVED and applies the stock increments.
+    const flipped = await tx.purchaseOrder.updateMany({
+      where: { id, status: { not: "RECEIVED" } },
       data: { status: "RECEIVED", receivedAt: new Date() },
-    }),
-    ...po.lines.flatMap((l) => [
-      prisma.ingredient.update({
+    });
+    if (flipped.count === 0) return;
+
+    for (const l of po.lines) {
+      await tx.ingredient.update({
         where: { id: l.ingredientId },
         data: { stockQty: { increment: l.qty } },
-      }),
-      prisma.ingredientLedgerEntry.create({
+      });
+      await tx.ingredientLedgerEntry.create({
         data: {
           restaurantId: session.restaurantId,
           ingredientId: l.ingredientId,
@@ -98,9 +105,9 @@ export async function receivePurchaseOrderAction(formData: FormData): Promise<vo
           note: `PO ${po.id.slice(-6)}`,
           createdByName: session.name,
         },
-      }),
-    ]),
-  ]);
+      });
+    }
+  });
   revalidate();
   revalidatePath("/admin/inventory/reports");
 }
