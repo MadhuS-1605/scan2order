@@ -30,7 +30,7 @@ function FacebookIcon(props: React.SVGProps<SVGSVGElement>) {
 
 const SOCIAL_LINKS = [
   { name: "Instagram", href: "https://instagram.com/scan2order.co.in", icon: InstagramIcon },
-  { name: "Facebook", href: "https://www.facebook.com/profile.php?id=61592198670874", icon: FacebookIcon },
+  { name: "Facebook", href: "https://www.facebook.com/scan2order.co.in", icon: FacebookIcon },
 ];
 
 export function SiteFooter() {
