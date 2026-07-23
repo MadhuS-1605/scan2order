@@ -23,6 +23,9 @@ export function SiteHeader() {
           <Link href="/#pricing" className="hidden text-ink/70 hover:text-ink sm:inline">
             Pricing
           </Link>
+          <Link href="/about" className="hidden text-ink/70 hover:text-ink sm:inline">
+            About
+          </Link>
           <Link href={`${APP_URL}/signin`} className="text-ink/70 hover:text-ink">
             Sign in
           </Link>

@@ -36,6 +36,9 @@ export function SiteFooter() {
         <div className="flex flex-col items-center justify-between gap-4 text-sm text-ink/50 sm:flex-row">
           <Image src="/logo-mark.png" alt="Scan2Order" width={64} height={64} className="h-16 w-16" />
           <div className="flex items-center gap-4">
+            <Link href="/about" className="hover:text-ink">
+              About
+            </Link>
             <Link href="/features" className="hover:text-ink">
               Features
             </Link>
