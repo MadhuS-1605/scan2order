@@ -74,6 +74,10 @@ export async function getMenuContext(): Promise<MenuContext | null> {
                   },
                 },
               },
+              comboLines: {
+                orderBy: { sortOrder: "asc" },
+                include: { includedItem: { select: { name: true } } },
+              },
             },
           },
         },
@@ -156,6 +160,7 @@ export async function getMenuContext(): Promise<MenuContext | null> {
           translations: o.translations as Record<string, { name?: string }> | null,
         })),
       })),
+    comboItems: i.comboLines.map((l) => ({ name: l.includedItem.name, quantity: l.quantity })),
   }));
 
   return {

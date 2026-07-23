@@ -29,6 +29,10 @@ export default async function MenuPage() {
           orderBy: { sortOrder: "asc" },
           include: { options: { orderBy: { sortOrder: "asc" } } },
         },
+        comboLines: {
+          orderBy: { sortOrder: "asc" },
+          include: { includedItem: { select: { id: true, name: true } } },
+        },
       },
     }),
     prisma.restaurantTable.findFirst({
@@ -91,6 +95,13 @@ export default async function MenuPage() {
           isAvailable: i.isAvailable,
           isSpecialOfDay: i.isSpecialOfDay,
           isChefSpecial: i.isChefSpecial,
+          isCombo: i.isCombo,
+          comboLines: i.comboLines.map((l) => ({
+            id: l.id,
+            includedItemId: l.includedItemId,
+            includedItemName: l.includedItem.name,
+            quantity: l.quantity,
+          })),
           availableFrom: i.availableFrom,
           availableTo: i.availableTo,
           imageUrl: i.imageUrl,

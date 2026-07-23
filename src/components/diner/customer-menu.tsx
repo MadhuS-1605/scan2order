@@ -712,6 +712,11 @@ function ItemRow({
             {description}
           </p>
         )}
+        {item.comboItems.length > 0 && (
+          <p className="mt-0.5 text-xs text-ink/45">
+            Includes: {item.comboItems.map((c) => `${c.quantity}× ${c.name}`).join(", ")}
+          </p>
+        )}
         <p className="mt-1 text-sm">
           {hhFactor < 1 ? (
             <>

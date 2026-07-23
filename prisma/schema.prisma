@@ -699,6 +699,13 @@ model MenuItem {
 
   isSpecialOfDay Boolean @default(false)
   isChefSpecial  Boolean @default(false) // chef's signature pick
+  // A combo/meal bundle: sold as one orderable item at its own `price` (set
+  // like any other item — typically a discount vs. buying the parts
+  // separately), with comboLines listing what it includes for display/KOT
+  // clarity. Deliberately NOT a "choose 1 of N" builder (e.g. "pick a side")
+  // — each combo is a fixed set of items; add per-line choice groups later
+  // if a fixed bundle turns out not to be enough.
+  isCombo        Boolean @default(false)
   sortOrder      Int     @default(0)
 
   // Per-language overrides: { "hi": { "name": "...", "description": "..." } }
@@ -716,6 +723,8 @@ model MenuItem {
   orderItems     OrderItem[]
   modifierGroups ModifierGroup[]
   recipeLines    RecipeLine[]
+  comboLines     ComboLine[]      @relation("ComboParent")
+  includedInLines ComboLine[]     @relation("ComboIncludedItem")
 
   @@index([restaurantId])
   @@index([categoryId])
@@ -823,6 +832,23 @@ model ModifierOption {
 
   @@index([groupId])
   @@map("modifier_options")
+}
+
+// One item included in a combo MenuItem (MenuItem.isCombo). Display/KOT-only
+// — the combo's own price is what's actually charged; this just lists what's
+// in it (e.g. a "Burger Combo" listing 1x Burger, 1x Fries, 1x Coke).
+model ComboLine {
+  id            String   @id @default(cuid())
+  comboId       String
+  combo         MenuItem @relation("ComboParent", fields: [comboId], references: [id], onDelete: Cascade)
+  includedItemId String
+  includedItem  MenuItem @relation("ComboIncludedItem", fields: [includedItemId], references: [id], onDelete: Cascade)
+  quantity      Int      @default(1)
+  sortOrder     Int      @default(0)
+
+  @@index([comboId])
+  @@index([includedItemId])
+  @@map("combo_lines")
 }
 
 // ---------------------------------------------------------------------------
