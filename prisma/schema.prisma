@@ -354,6 +354,7 @@ model Restaurant {
   admins            AdminUser[]
   categories        MenuCategory[]
   menuItems         MenuItem[]
+  ingredients       Ingredient[]
   tables            RestaurantTable[]
   orders            Order[]
   refunds           Refund[]
@@ -662,10 +663,48 @@ model MenuItem {
 
   orderItems     OrderItem[]
   modifierGroups ModifierGroup[]
+  recipeLines    RecipeLine[]
 
   @@index([restaurantId])
   @@index([categoryId])
   @@map("menu_items")
+}
+
+// Raw material tracked for recipe-based costing (distinct from MenuItem's own
+// trackStock, which gates a dish's own availability). Ingredient stock is
+// decremented on order placement per RecipeLine, but never blocks a sale — it's
+// for cost/wastage visibility, not an oversell guard.
+model Ingredient {
+  id                String   @id @default(cuid())
+  restaurantId      String
+  restaurant        Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  name              String
+  unit              String // free text, e.g. "g", "ml", "pcs"
+  stockQty          Decimal  @default(0) @db.Decimal(10, 2)
+  lowStockThreshold Decimal  @default(0) @db.Decimal(10, 2)
+  costPerUnit       Decimal  @default(0) @db.Decimal(10, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  recipeLines RecipeLine[]
+
+  @@index([restaurantId])
+  @@map("ingredients")
+}
+
+// How much of an ingredient one serving of a menu item consumes.
+model RecipeLine {
+  id            String     @id @default(cuid())
+  menuItemId    String
+  menuItem      MenuItem   @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  ingredientId  String
+  ingredient    Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  qtyPerServing Decimal    @db.Decimal(10, 3)
+
+  @@unique([menuItemId, ingredientId])
+  @@index([menuItemId])
+  @@index([ingredientId])
+  @@map("recipe_lines")
 }
 
 // A set of choices attached to a menu item. A "variant" (e.g. Size: Half/Full)

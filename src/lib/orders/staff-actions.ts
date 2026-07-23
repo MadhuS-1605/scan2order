@@ -9,6 +9,7 @@ import { recordAudit } from "@/lib/audit";
 import type { Prisma } from "@prisma/client";
 import { computeTotals, type GstMode } from "@/lib/pricing";
 import { toNumber, happyHourPercentNow } from "@/lib/utils";
+import { aggregateRecipeConsumption } from "@/lib/inventory/recipe";
 
 // Effective unit price = base × current happy-hour factor.
 function effectivePrice(
@@ -55,13 +56,26 @@ async function adjustStock(menuItemId: string | null, delta: number) {
   if (!menuItemId || delta === 0) return;
   const mi = await prisma.menuItem.findUnique({
     where: { id: menuItemId },
-    select: { trackStock: true },
+    select: {
+      trackStock: true,
+      recipeLines: { select: { ingredientId: true, qtyPerServing: true } },
+    },
   });
-  if (!mi?.trackStock) return;
-  await prisma.menuItem.update({
-    where: { id: menuItemId },
-    data: { stockQty: { increment: -delta } }, // +delta items ordered => stock down
-  });
+  if (!mi) return;
+  if (mi.trackStock) {
+    await prisma.menuItem.update({
+      where: { id: menuItemId },
+      data: { stockQty: { increment: -delta } }, // +delta items ordered => stock down
+    });
+  }
+  // Recipe ingredients follow the same delta — never blocks the edit, just
+  // keeps ingredient stock consistent with what's actually been ordered.
+  for (const r of mi.recipeLines) {
+    await prisma.ingredient.update({
+      where: { id: r.ingredientId },
+      data: { stockQty: { decrement: delta * toNumber(r.qtyPerServing) } },
+    });
+  }
 }
 
 // Waiter places an order on a guest's behalf.
@@ -88,6 +102,7 @@ export async function createStaffOrderAction(formData: FormData): Promise<void> 
 
   const items = await prisma.menuItem.findMany({
     where: { id: { in: lines.map((l) => l.menuItemId) }, restaurantId: session.restaurantId },
+    include: { recipeLines: true },
   });
   const byId = new Map(items.map((m) => [m.id, m]));
 
@@ -122,6 +137,14 @@ export async function createStaffOrderAction(formData: FormData): Promise<void> 
     toNumber(config.gstPercentage),
   );
 
+  const recipesByItem = new Map(
+    items.map((m) => [m.id, m.recipeLines.map((r) => ({ ingredientId: r.ingredientId, qtyPerServing: toNumber(r.qtyPerServing) }))]),
+  );
+  const ingredientConsumption = aggregateRecipeConsumption(
+    built.map((b) => ({ menuItemId: b.menuItemId, quantity: b.quantity })),
+    recipesByItem,
+  );
+
   const order = await prisma.$transaction(async (tx) => {
     for (const b of built) {
       if (b.trackStock) {
@@ -130,6 +153,9 @@ export async function createStaffOrderAction(formData: FormData): Promise<void> 
           data: { stockQty: { decrement: b.quantity } },
         });
       }
+    }
+    for (const [ingredientId, qty] of ingredientConsumption) {
+      await tx.ingredient.update({ where: { id: ingredientId }, data: { stockQty: { decrement: qty } } });
     }
     const r = await tx.restaurant.update({
       where: { id: session.restaurantId },
