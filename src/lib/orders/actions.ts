@@ -443,6 +443,7 @@ export async function approveRefundAction(formData: FormData): Promise<RefundRes
     currency: string;
     payments: { razorpayPaymentId: string | null }[];
     razorpayConfig: { razorpayKeyId: string | null; razorpayKeySecret: string | null } | null;
+    fullyCovered: boolean;
   };
   let reserved: Reserved | "gone" | "empty";
   try {
@@ -470,9 +471,10 @@ export async function approveRefundAction(formData: FormData): Promise<RefundRes
           where: { id: refundId },
           data: { status: "DONE", amount, approvedByName: session.name },
         });
-        if (round2(paidNow - refundableNow + amount) >= paidNow) {
-          await tx.order.update({ where: { id: order.id }, data: { paymentStatus: "REFUNDED" } });
-        }
+        // NOTE: paymentStatus isn't flipped to REFUNDED here — this reserves
+        // the amount pre-gateway-call, but the order should only ever show
+        // REFUNDED once the gateway has actually confirmed it (see below,
+        // same ordering refundOrderAction's direct path already used).
         return {
           orderId: order.id,
           orderNumber: order.orderNumber,
@@ -481,6 +483,7 @@ export async function approveRefundAction(formData: FormData): Promise<RefundRes
           currency: order.restaurant.config?.currency ?? "INR",
           payments: order.payments,
           razorpayConfig: order.restaurant.config,
+          fullyCovered: round2(paidNow - refundableNow + amount) >= paidNow,
         };
       },
       { isolationLevel: "Serializable" },
@@ -503,11 +506,15 @@ export async function approveRefundAction(formData: FormData): Promise<RefundRes
   if (!charged.ok) {
     // Compensate: this refund was reserved as DONE above but the gateway
     // never actually moved money — flip back to FAILED so a future retry
-    // sees the capacity as available again.
+    // sees the capacity as available again. paymentStatus was never touched,
+    // so there's nothing to revert there.
     await prisma.refund.update({ where: { id: refundId }, data: { status: "FAILED" } });
     return { ok: false, error: "The payment gateway rejected the refund. Try again, or refund manually." };
   }
   await prisma.refund.update({ where: { id: refundId }, data: { gatewayRefundId: charged.gatewayRefundId } });
+  if (reserved.fullyCovered) {
+    await prisma.order.update({ where: { id: reserved.orderId }, data: { paymentStatus: "REFUNDED" } });
+  }
 
   await recordAudit(
     restaurantId,
