@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import {
   ChevronDown,
   ArrowRight,
@@ -18,13 +17,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { Reveal } from "@/components/marketing/reveal";
 import { RotatingWord } from "@/components/marketing/rotating-word";
 import { InteractivePhoneDemo } from "@/components/marketing/interactive-phone-demo";
 import { VenueSwitcher } from "@/components/marketing/venue-switcher";
 import { TiltCard } from "@/components/marketing/tilt-card";
 import { StickyMobileCta } from "@/components/marketing/sticky-mobile-cta";
+import { SiteHeader } from "@/components/marketing/site-header";
+import { SiteFooter } from "@/components/marketing/site-footer";
+import { Faq } from "@/components/marketing/faq";
 
 const PLATFORM_DOMAIN = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? "scan2order.co.in";
 // In production the marketing site lives on the apex domain and the actual
@@ -41,7 +42,7 @@ export default async function Home() {
   const plans = await resolvePlans();
   return (
     <div className="min-h-screen bg-grain">
-      <Header />
+      <SiteHeader />
 
       {/* Hero */}
       <section className="relative overflow-hidden">
@@ -365,48 +366,19 @@ export default async function Home() {
         </div>
       </section>
 
-      <footer>
-        <div className="mx-auto max-w-6xl px-6 py-8">
-          <Separator className="mb-8 bg-sand-200" />
-          <div className="flex flex-col items-center justify-between gap-3 text-sm text-ink/50 sm:flex-row">
-            <Image src="/logo-mark.png" alt="Scan2Order" width={64} height={64} className="h-16 w-16" />
-            <div className="flex items-center gap-4">
-              <Link href="/privacy" className="hover:text-ink">
-                Privacy
-              </Link>
-              <Link href="/terms" className="hover:text-ink">
-                Terms
-              </Link>
-            </div>
-          </div>
-          <p className="mt-4 text-center text-xs text-ink/35">
-            © 2026 Scan2Order. All rights reserved.
-          </p>
-        </div>
-      </footer>
+      {/* FAQ */}
+      <section id="faq" className="mx-auto max-w-3xl px-6 py-16">
+        <Reveal>
+          <h2 className="text-center font-display text-3xl text-ink">Frequently asked questions</h2>
+        </Reveal>
+        <Reveal delay={100} className="mt-8">
+          <Faq />
+        </Reveal>
+      </section>
+
+      <SiteFooter />
 
       <StickyMobileCta />
     </div>
-  );
-}
-
-function Header() {
-  return (
-    <header className="sticky top-0 z-10 border-b border-sand-200/70 bg-paper/80 backdrop-blur">
-      <div aria-hidden className="scroll-progress" />
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link href="/" className="flex items-center">
-          <Image src="/logo-mark.png" alt="Scan2Order" width={40} height={40} priority className="h-10 w-10" />
-        </Link>
-        <nav className="flex items-center gap-5 text-sm">
-          <Link href={`${APP_URL}/signin`} className="text-ink/70 hover:text-ink">
-            Sign in
-          </Link>
-          <Link href={`${APP_URL}/signup`} className={buttonVariants()}>
-            Get started
-          </Link>
-        </nav>
-      </div>
-    </header>
   );
 }
