@@ -55,8 +55,8 @@ body {
 
 /* Per-tenant diner-facing accent color (Restaurant.brandColor). Applied via
    <BrandTheme> only when a venue has set one — derives the rest of the
-   brand-* scale from their single chosen shade with color-mix(), so every
-   bg-brand-*/text-brand-* utility already in use restyles for free. */
+   brand color scale from their single chosen shade with color-mix(), so every
+   existing bg-brand and text-brand utility restyles for free. */
 .s2o-tenant-theme {
   --color-brand-500: color-mix(in srgb, var(--color-brand-600) 90%, white);
   --color-brand-400: color-mix(in srgb, var(--color-brand-600) 70%, white);
