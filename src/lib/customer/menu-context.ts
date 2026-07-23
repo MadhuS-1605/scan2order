@@ -33,6 +33,8 @@ export type MenuContext = {
     minOrderAmount: number;
     pickupEnabled: boolean;
     deliveryEnabled: boolean;
+    wifiSsid: string | null;
+    wifiPassword: string | null;
   };
   happyHourPercent: number;
   // Whether the venue is currently accepting orders (business hours + manual
@@ -180,6 +182,8 @@ export async function getMenuContext(): Promise<MenuContext | null> {
       minOrderAmount: config.minOrderAmount,
       pickupEnabled: config.pickupEnabled,
       deliveryEnabled: config.deliveryEnabled,
+      wifiSsid: config.wifiSsid,
+      wifiPassword: config.wifiPassword,
     },
     happyHourPercent,
     // Ordering availability: a platform suspension or the global maintenance

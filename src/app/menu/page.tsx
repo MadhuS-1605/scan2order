@@ -40,6 +40,7 @@ export default async function MenuPage({
         ordering={ctx.ordering}
         languages={ctx.languages}
         restaurant={ctx.restaurant}
+        wifi={{ ssid: ctx.config.wifiSsid, password: ctx.config.wifiPassword }}
         table={ctx.table}
         categories={ctx.categories}
         items={ctx.items}

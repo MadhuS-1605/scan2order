@@ -156,6 +156,8 @@ export async function updatePaymentCredsAction(
   const whatsappFrom = String(formData.get("whatsappFrom") ?? "").trim();
   const upiId = String(formData.get("upiId") ?? "").trim();
   const upiName = String(formData.get("upiName") ?? "").trim();
+  const wifiSsid = String(formData.get("wifiSsid") ?? "").trim();
+  const wifiPassword = String(formData.get("wifiPassword") ?? "").trim();
 
   await prisma.onboardingConfig.update({
     where: { restaurantId },
@@ -167,6 +169,8 @@ export async function updatePaymentCredsAction(
       whatsappFrom: whatsappFrom || null,
       upiId: upiId || null,
       upiName: upiName || null,
+      wifiSsid: wifiSsid || null,
+      wifiPassword: wifiPassword || null,
     },
   });
   revalidatePath("/admin/settings");

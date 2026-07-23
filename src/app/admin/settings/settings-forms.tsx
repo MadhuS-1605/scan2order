@@ -76,6 +76,8 @@ type Config = {
   whatsappFrom: string | null;
   upiId: string | null;
   upiName: string | null;
+  wifiSsid: string | null;
+  wifiPassword: string | null;
 };
 
 function Status({ state }: { state: ActionState }) {
@@ -670,6 +672,19 @@ function PaymentForm({ config }: { config: Config }) {
               name="upiName"
               defaultValue={config.upiName ?? ""}
               placeholder="Your Café"
+            />
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Guest Wi-Fi name" htmlFor="wifi-ssid" hint="Shown on the guest menu page.">
+            <Input id="wifi-ssid" name="wifiSsid" defaultValue={config.wifiSsid ?? ""} placeholder="CafeGuest" />
+          </Field>
+          <Field label="Guest Wi-Fi password" htmlFor="wifi-password">
+            <Input
+              id="wifi-password"
+              name="wifiPassword"
+              defaultValue={config.wifiPassword ?? ""}
+              placeholder="Leave blank if open network"
             />
           </Field>
         </div>

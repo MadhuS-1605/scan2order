@@ -555,6 +555,10 @@ model OnboardingConfig {
   upiId   String?
   upiName String?
 
+  // Guest Wi-Fi shown on the diner menu page. Both null = no Wi-Fi card shown.
+  wifiSsid     String?
+  wifiPassword String?
+
   // Which optional modules this venue uses — chosen at onboarding, drive which
   // admin sections show. Defaults are seeded from the venue type.
   featureReservations Boolean @default(true)

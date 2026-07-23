@@ -50,6 +50,8 @@ export default async function SettingsPage() {
           whatsappFrom: config.whatsappFrom,
           upiId: config.upiId,
           upiName: config.upiName,
+          wifiSsid: config.wifiSsid,
+          wifiPassword: config.wifiPassword,
           featureReservations: config.featureReservations,
           featureRooms: config.featureRooms,
           featureBanquets: config.featureBanquets,

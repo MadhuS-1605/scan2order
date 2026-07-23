@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Sparkles, X, ReceiptText, UtensilsCrossed, Search } from "lucide-react";
+import { Sparkles, X, ReceiptText, UtensilsCrossed, Search, Wifi } from "lucide-react";
 import { formatMoney } from "@/lib/utils";
 import { Button, Alert, VegMark } from "@/components/ui";
 import { ServiceButton } from "@/components/service-button";
@@ -30,6 +30,7 @@ export function CustomerMenu({
   ordering = { open: true, reason: null },
   languages,
   restaurant,
+  wifi,
   table,
   categories,
   items,
@@ -41,6 +42,7 @@ export function CustomerMenu({
   ordering?: { open: boolean; reason: "paused" | "closed" | "suspended" | "maintenance" | null };
   languages: string[];
   restaurant: { name: string; currency: string; groupName?: string | null; logoUrl?: string | null };
+  wifi?: { ssid: string | null; password: string | null };
   table: { label: string; kind?: string };
   categories: Category[];
   items: Item[];
@@ -55,6 +57,7 @@ export function CustomerMenu({
   const [query, setQuery] = useState("");
   const [customizing, setCustomizing] = useState<Item | null>(null);
   const [logoFailed, setLogoFailed] = useState(false);
+  const [showWifi, setShowWifi] = useState(false);
   const { cart, count, addLine } = useCart(restaurantId, { prefill });
 
   // Auto table-move: if this device has an active dining session and has just
@@ -205,6 +208,16 @@ export function CustomerMenu({
                 ))}
               </select>
             )}
+            {wifi?.ssid && (
+              <button
+                type="button"
+                onClick={() => setShowWifi((v) => !v)}
+                aria-label="Guest Wi-Fi"
+                className="rounded-md border border-sand-300 p-1.5 text-ink/60 hover:bg-sand-100"
+              >
+                <Wifi className="h-4 w-4" />
+              </button>
+            )}
             <ServiceButton qrToken={qrToken} />
           </div>
         </div>
@@ -248,6 +261,23 @@ export function CustomerMenu({
           </Link>
         </div>
       </header>
+
+      {showWifi && wifi?.ssid && (
+        <div className="mx-auto mt-3 max-w-2xl px-2 sm:px-4">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-sand-200 bg-surface px-4 py-3 text-sm">
+            <span className="flex items-center gap-2 text-ink/80">
+              <Wifi className="h-4 w-4 text-ink/40" />
+              <span>
+                <span className="font-medium">{wifi.ssid}</span>
+                {wifi.password && <span className="text-ink/50"> · {wifi.password}</span>}
+              </span>
+            </span>
+            <button type="button" onClick={() => setShowWifi(false)} className="text-ink/40 hover:text-ink">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {!orderingOpen && (
         <div className="mx-auto mt-3 max-w-2xl px-2 sm:px-4">
